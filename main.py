@@ -10,7 +10,9 @@ def gerar_resposta_openrouter(mensagem_usuario):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "https://github.com/welnecker/roleplay-mary-streamlit",  # obrigatório
+      #  "HTTP-Referer": "https://github.com/welnecker/roleplay-mary-streamlit",  # obrigatório
+        "Referer": "https://github.com/welnecker/roleplay-mary-streamlit",
+
         "Content-Type": "application/json"
     }
 
