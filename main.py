@@ -5,7 +5,7 @@ import requests
 OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 OPENROUTER_MODEL = "gryphe/mythomax-l2-13b"  # ou outro modelo NSFW permitido
 
-# --- Função que gera a resposta via OpenRouter ---
+## --- Função que gera a resposta via OpenRouter ---
 def gerar_resposta_openrouter(mensagem_usuario):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
