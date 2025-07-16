@@ -1,0 +1,35 @@
+# Arquivos de cache e temporários
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Ambientes virtuais
+.venv/
+env/
+venv/
+ENV/
+
+# Configurações locais
+*.env
+*.local
+*.db
+secrets.toml  # você já está usando secrets no Streamlit Cloud, não suba localmente
+
+# Mac OS / Linux / Windows
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/config.toml
+.streamlit/credentials.toml
+
+# VS Code
+.vscode/
+.idea/
+
+# Arquivos de build Python
+build/
+dist/
+*.egg-info/

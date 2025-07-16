@@ -1,49 +1,42 @@
 import streamlit as st
 import requests
-import os
 
-# Configurações iniciais
-st.set_page_config(page_title="Roleplay Mary", page_icon="🧠")
-st.title("🎭 Roleplay com Mary via OpenRouter")
+# --- Configuração da API ---
+OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
+OPENROUTER_MODEL = "gryphe/mythomax-l2-13b"  # ou outro modelo NSFW permitido
 
-# Entrada do usuário
-user_input = st.text_area("Digite sua mensagem:", height=150)
-
-# Botão para enviar
-if st.button("Enviar"):
-    if not user_input.strip():
-        st.warning("Digite algo para iniciar a conversa.")
-    else:
-        with st.spinner("Gerando resposta..."):
-            resposta = gerar_resposta_openrouter(user_input)
-            st.markdown("**Mary:** " + resposta)
-
-# Função para gerar resposta via OpenRouter
-def gerar_resposta_openrouter(prompt, modelo="gryphe/mythomax-l2-13b"):
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        return "❌ Chave de API não encontrada."
-
+# --- Função que gera a resposta via OpenRouter ---
+def gerar_resposta_openrouter(mensagem_usuario):
+    url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://welnecker-roleplay-mary-streamlit.streamlit.app",  # ou use share.streamlit.io se for local
-        "X-Title": "Roleplay Mary",
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "https://github.com/welnecker/roleplay-mary-streamlit",  # obrigatório
+        "Content-Type": "application/json"
     }
 
     data = {
-        "model": modelo,
+        "model": OPENROUTER_MODEL,
         "messages": [
-            {"role": "system", "content": "Você é Mary, uma mulher madura, sensual e intensa. Responda com emoções e profundidade, sempre em tom roleplay."},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": "Você é Mary, uma mulher carismática, sensual e inteligente. Responda de forma envolvente e íntima."},
+            {"role": "user", "content": mensagem_usuario}
         ]
     }
 
-    try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"].strip()
-        else:
-            return f"❌ Erro OpenRouter: {response.status_code}\n{response.text}"
-    except Exception as e:
-        return f"❌ Erro na requisição: {e}"
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        return response.json()["choices"][0]["message"]["content"]
+    else:
+        return f"❌ Erro {response.status_code}: {response.text}"
+
+# --- Interface do Streamlit ---
+st.set_page_config(page_title="Mary Roleplay", page_icon="💬")
+st.title("💬 Mary Roleplay")
+st.markdown("Converse com Mary em uma experiência de roleplay envolvente.")
+
+mensagem_usuario = st.text_input("Você:", placeholder="Digite algo para Mary...")
+
+if mensagem_usuario:
+    with st.spinner("Mary está digitando..."):
+        resposta = gerar_resposta_openrouter(mensagem_usuario)
+        st.markdown(f"**Mary:** {resposta}")
