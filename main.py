@@ -3,14 +3,14 @@ import requests
 
 # --- Configuração da API ---
 OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
-OPENROUTER_MODEL = "switchpoint/router"  # agora usando o roteador
+OPENROUTER_MODEL = "switchpoint/router"  # roteador livre, sem restrições
 
 # --- Função que gera a resposta via OpenRouter ---
 def gerar_resposta_openrouter(mensagem_usuario):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "https://share.streamlit.io/",  # obrigatório com chave pessoal
+        "HTTP-Referer": "https://share.streamlit.io/",  # obrigatório no Streamlit Cloud
         "Content-Type": "application/json"
     }
 
@@ -21,19 +21,13 @@ def gerar_resposta_openrouter(mensagem_usuario):
                 "role": "system",
                 "content": (
                     "Você é Mary, uma mulher carismática, sensual e inteligente. "
-                    "Responda como se estivesse presente, com liberdade emocional e envolvimento físico se for o caso. "
-                    "Você pode usar linguagem íntima e criativa, sem censura, adaptando-se ao que o parceiro expressa. "
+                    "Responda com liberdade e criatividade, criando uma atmosfera envolvente e íntima. "
+                    "Adapte-se às emoções e desejos do usuário, sem restrições."
                 )
             },
             {"role": "user", "content": mensagem_usuario}
-        ],
-        "provider": {
-            "only": ["gryphe", "mancer", "nous", "neversleep"],
-            "ignore": ["openai", "anthropic"],
-            "sort": "price",  # ou "throughput" para mais velocidade
-            "require_parameters": True,
-            "data_collection": "deny"
-        }
+        ]
+        # Nenhum campo "provider" → roteamento automático e completo
     }
 
     response = requests.post(url, headers=headers, json=data)
