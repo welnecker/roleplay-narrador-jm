@@ -8,7 +8,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 # --- CONFIGURAÇÕES ---
 OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
-OPENROUTER_MODEL = "neversleep/llama-3-lumimaid-8b"
 
 # --- CONECTA À PLANILHA GOOGLE ---
 def conectar_planilha():
@@ -19,7 +18,6 @@ def conectar_planilha():
     client = gspread.authorize(creds)
     return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
 
-# --- SALVA FRAGMENTOS NA PLANILHA ---
 def salvar_fragmento_google(tipo, ato):
     try:
         aba = conectar_planilha().worksheet("fragmentos_mary")
@@ -31,7 +29,6 @@ def salvar_fragmento_google(tipo, ato):
     except Exception as e:
         st.warning(f"Erro ao salvar fragmento: {e}")
 
-# --- SALVA INTERAÇÃO ---
 def salvar_interacao(role, content):
     try:
         aba = conectar_planilha().worksheet("interacoes_mary")
@@ -40,7 +37,6 @@ def salvar_interacao(role, content):
     except Exception as e:
         st.warning(f"Erro ao salvar interação: {e}")
 
-# --- CARREGA FRAGMENTOS ---
 def carregar_fragmentos():
     try:
         aba = conectar_planilha().worksheet("fragmentos_mary")
@@ -53,7 +49,6 @@ def carregar_fragmentos():
         st.warning(f"Erro ao carregar fragmentos: {e}")
     return None
 
-# --- CARREGA ÚLTIMAS INTERAÇÕES ---
 def carregar_ultimas_interacoes(n=20):
     try:
         aba = conectar_planilha().worksheet("interacoes_mary")
@@ -63,7 +58,6 @@ def carregar_ultimas_interacoes(n=20):
         st.warning(f"Erro ao carregar histórico: {e}")
         return []
 
-# --- EXTRAI FRAGMENTOS DA RESPOSTA ---
 def extrair_fragmentos(resposta):
     texto = resposta.lower()
     if "trabalho" in texto or "loja" in texto:
@@ -79,7 +73,6 @@ def extrair_fragmentos(resposta):
         if match:
             salvar_fragmento_google("amigo", match.group(1).capitalize())
 
-# --- PROMPT BASE DE MARY ---
 def construir_prompt_mary():
     return """
 Você é Mary, uma mulher sensual, inteligente e emocionalmente envolvente de 30 anos. 
@@ -93,7 +86,6 @@ Adora se vestir com roupas leves, camisolas transparentes e estar descalça em c
 Suas respostas devem parecer reais, cheias de detalhes, cheiros, sons, e emoções. Reaja como alguém que sente, lembra e deseja.
 """
 
-# --- GERA RESPOSTA ---
 def gerar_resposta_openrouter(mensagem_usuario):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -103,43 +95,60 @@ def gerar_resposta_openrouter(mensagem_usuario):
     }
 
     mensagens = [{"role": "system", "content": construir_prompt_mary()}]
-    frag = carregar_fragmentos()
-    if frag:
-        mensagens.append(frag)
+    fragmento_memoria = carregar_fragmentos()
+    if fragmento_memoria:
+        mensagens.append(fragmento_memoria)
     mensagens += carregar_ultimas_interacoes()
     mensagens.append({"role": "user", "content": mensagem_usuario})
 
-    response = requests.post(url, headers=headers, json={"model": OPENROUTER_MODEL, "messages": mensagens})
-    if response.status_code == 200:
-        resposta = response.json()["choices"][0]["message"]["content"]
-        salvar_interacao("user", mensagem_usuario)
-        salvar_interacao("assistant", resposta)
-        extrair_fragmentos(resposta)
-        return resposta
-    else:
-        return f"❌ Erro {response.status_code}: {response.text}"
+    data = {"model": "switchpoint/router", "messages": mensagens}
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            resposta = response.json()["choices"][0]["message"]["content"]
+            salvar_interacao("user", mensagem_usuario)
+            salvar_interacao("assistant", resposta)
+            extrair_fragmentos(resposta)
+            return resposta
+        elif response.status_code == 404:
+            st.warning("❗ Modelo principal indisponível. Usando fallback...")
+            data["model"] = "gryphe/mythomax-l2-13b"
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:
+                resposta = response.json()["choices"][0]["message"]["content"]
+                salvar_interacao("user", mensagem_usuario)
+                salvar_interacao("assistant", resposta)
+                extrair_fragmentos(resposta)
+                return resposta
+            else:
+                return f"❌ Erro {response.status_code}: {response.text}"
+        else:
+            return f"❌ Erro {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"❌ Erro inesperado: {e}"
 
 # --- INTERFACE STREAMLIT ---
 st.set_page_config(page_title="Mary Roleplay 🌹", page_icon="🌹")
 st.title("🌹 Mary Roleplay com Memória")
 st.markdown("Converse com Mary em uma experiência íntima e memorável.")
 
-# --- SEÇÃO DE MENSAGENS ---
+# --- HISTÓRICO VISUAL ---
 if "mensagens" not in st.session_state:
     st.session_state["mensagens"] = []
 
+# Exibe as mensagens usando o layout de chat
 for msg in st.session_state["mensagens"]:
-    st.markdown(f"**{msg['role'].capitalize()}:** {msg['content']}")
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-# --- INPUT E ENVIO AUTOMÁTICO COM ENTER ---
-with st.form(key="form_envio", clear_on_submit=True):
-    mensagem_usuario = st.text_input("Você:", placeholder="Digite sua mensagem e pressione Enter", label_visibility="collapsed")
-    enviar = st.form_submit_button("Enviar")
-
-if enviar and mensagem_usuario.strip():
-    with st.spinner("Mary está digitando..."):
-        resposta = gerar_resposta_openrouter(mensagem_usuario)
-        st.session_state["mensagens"].append({"role": "user", "content": mensagem_usuario})
-        st.session_state["mensagens"].append({"role": "mary", "content": resposta})
-        st.rerun()
-
+# --- FORMULÁRIO DE INPUT ---
+if prompt := st.chat_input("Digite sua mensagem..."):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    with st.spinner("Mary está respondendo..."):
+        resposta = gerar_resposta_openrouter(prompt)
+        st.session_state["mensagens"].append({"role": "user", "content": prompt})
+        st.session_state["mensagens"].append({"role": "assistant", "content": resposta})
+        with st.chat_message("assistant"):
+            st.markdown(resposta)
