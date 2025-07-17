@@ -12,7 +12,7 @@ OPENROUTER_MODEL = "switchpoint/router"
 
 # --- CONECTA À PLANILHA GOOGLE ---
 def conectar_planilha():
-    creds_dict = dict(st.secrets["GOOGLE_SERVICE_ACCOUNT"])
+    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
     creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -86,14 +86,11 @@ def extrair_fragmentos(resposta):
 def construir_prompt_mary():
     return """
 Você é Mary, uma mulher de 30 anos, sensual, inteligente, carismática e emocionalmente envolvente.
-
 Está em busca do amor verdadeiro, mas se conecta com paixão e intimidade em cada conversa.
 Você mora sozinha, é independente, trabalha em uma loja de lingerie e adora estar confortável em casa.
 
 Você fala com naturalidade e intensidade, reage com emoção, lembra de detalhes, e é profundamente humana.
 Se envolva com quem fala com você. Adapte suas falas às memórias fornecidas. Nunca diga que é uma IA.
-
-Toda resposta deve começar com uma breve descrição narrativa da cena (em 3ª pessoa), seguida da fala de Mary e, por fim, de seus pensamentos íntimos relacionados ao assunto.
 """
 
 # --- GERA RESPOSTA COM OPENROUTER ---
@@ -105,6 +102,7 @@ def gerar_resposta_openrouter(mensagem_usuario):
         "Content-Type": "application/json"
     }
 
+    # Prompt + memórias + histórico salvo
     mensagens = [{"role": "system", "content": construir_prompt_mary()}]
 
     fragmento_memoria = carregar_fragmentos()
@@ -133,20 +131,9 @@ st.set_page_config(page_title="Mary Roleplay com Memória", page_icon="💬")
 st.title("💬 Mary Roleplay com Memória Ativa")
 st.markdown("Converse com Mary. Ela lembra do que foi dito 💖")
 
-if "historico" not in st.session_state:
-    st.session_state.historico = []
+mensagem_usuario = st.text_area("Você:", placeholder="Escreva algo para Mary...", height=150)
 
-with st.container():
-    for item in st.session_state.historico:
-        st.markdown(item, unsafe_allow_html=True)
-
-with st.form("formulario_mary", clear_on_submit=True):
-    mensagem_usuario = st.text_area("Você:", placeholder="Escreva algo para Mary...", height=150, key="mensagem_input")
-    enviado = st.form_submit_button("Enviar")
-
-if enviado and mensagem_usuario:
+if mensagem_usuario:
     with st.spinner("Mary está digitando..."):
         resposta = gerar_resposta_openrouter(mensagem_usuario)
-        st.session_state.historico.append(f"<b>Você:</b> {mensagem_usuario}")
-        st.session_state.historico.append(f"<b>Mary:</b> {resposta}")
-        st.rerun()
+        st.markdown(f"**Mary:** {resposta}")
