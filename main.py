@@ -131,12 +131,15 @@ if "mensagens" not in st.session_state:
 for msg in st.session_state["mensagens"]:
     st.markdown(f"**{msg['role'].capitalize()}:** {msg['content']}")
 
-# --- INPUT ---
-mensagem_usuario = st.text_input("Você:", key="mensagem_input", placeholder="Digite sua mensagem e pressione Enter")
+# --- INPUT E ENVIO AUTOMÁTICO COM ENTER ---
+with st.form(key="form_envio", clear_on_submit=True):
+    mensagem_usuario = st.text_input("Você:", placeholder="Digite sua mensagem e pressione Enter", label_visibility="collapsed")
+    enviar = st.form_submit_button("Enviar")
 
-if mensagem_usuario:
+if enviar and mensagem_usuario.strip():
     with st.spinner("Mary está digitando..."):
         resposta = gerar_resposta_openrouter(mensagem_usuario)
         st.session_state["mensagens"].append({"role": "user", "content": mensagem_usuario})
         st.session_state["mensagens"].append({"role": "mary", "content": resposta})
-        st.experimental_rerun()
+        st.rerun()
+
