@@ -1,37 +1,32 @@
 import streamlit as st
 import requests
-import gspread
 import json
-import re
 from datetime import datetime
+import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- CONFIGURAÇÕES GERAIS ---
+# --- CONFIG STREAMLIT ---
+st.set_page_config(page_title="Mary Roleplay com Memória", page_icon="💬")
+st.title("💬 Mary Roleplay com Memória Ativa")
+st.markdown("Converse com Mary. Ela lembra do que foi dito 💖")
+
+# --- CHAVE DO OPENROUTER ---
 OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
-OPENROUTER_MODEL = "switchpoint/router"
+OPENROUTER_MODEL = "gryphe/mythomax-l2-13b"
 
 # --- CONECTA À PLANILHA GOOGLE ---
 def conectar_planilha():
-    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
+    escopo = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds_dict = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT"])
     creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, escopo)
+    cliente = gspread.authorize(creds)
+    return cliente.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
 
-# --- SALVA FRAGMENTOS NA ABA "fragmentos_mary" ---
-def salvar_fragmento_google(tipo, ato):
-    try:
-        aba = conectar_planilha().worksheet("fragmentos_mary")
-        dados_existentes = aba.get_all_records()
-        for linha in dados_existentes:
-            if linha["tipo"].lower() == tipo.lower() and linha["ato"].lower() == ato.lower():
-                return  # já existe
-        aba.append_row([tipo, ato])
-    except Exception as e:
-        st.warning(f"Erro ao salvar fragmento: {e}")
-
-# --- SALVA INTERAÇÕES NA ABA "interacoes_mary" ---
+# --- FUNÇÃO: SALVAR INTERAÇÃO ---
 def salvar_interacao(role, content):
     try:
         aba = conectar_planilha().worksheet("interacoes_mary")
@@ -40,52 +35,47 @@ def salvar_interacao(role, content):
     except Exception as e:
         st.warning(f"Erro ao salvar interação: {e}")
 
-# --- CARREGA FRAGMENTOS SALVOS ---
-def carregar_fragmentos():
-    try:
-        aba = conectar_planilha().worksheet("fragmentos_mary")
-        dados = aba.get_all_records()
-        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] and linha['ato']]
-        if linhas:
-            conteudo_memoria = "Aqui estão lembranças importantes sobre você:\n" + "\n".join(linhas)
-            return {"role": "user", "content": conteudo_memoria}
-    except Exception as e:
-        st.warning(f"Erro ao carregar fragmentos: {e}")
-    return None
-
-# --- CARREGA ÚLTIMAS 20 INTERAÇÕES ---
+# --- FUNÇÃO: CARREGAR ÚLTIMAS INTERAÇÕES ---
 def carregar_ultimas_interacoes(n=20):
     try:
         aba = conectar_planilha().worksheet("interacoes_mary")
         dados = aba.get_all_records()
-        return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
+        interacoes = [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
+        return interacoes
     except Exception as e:
         st.warning(f"Erro ao carregar histórico salvo: {e}")
         return []
 
-# --- EXTRAI FRAGMENTOS DE UMA RESPOSTA ---
-def extrair_fragmentos(resposta):
-    texto = resposta.lower()
+# --- FUNÇÃO: CARREGAR FRAGMENTOS DA MEMÓRIA ---
+def carregar_fragmentos():
+    try:
+        aba = conectar_planilha().worksheet("fragmentos_mary")
+        dados = aba.get_all_records()
+        conteudo = "\n".join([f"{row['tipo']}: {row['ato']}" for row in dados if row["tipo"] and row["ato"]])
+        return {"role": "system", "content": f"Memórias fixas da Mary:\n{conteudo}"}
+    except Exception as e:
+        st.warning(f"Erro ao carregar fragmentos: {e}")
+        return None
 
-    if "trabalho" in texto or "loja" in texto:
-        match = re.search(r"trabalho (na|no|em)? ?(.*?)(\.|\n|,|$)", texto)
-        if match:
-            salvar_fragmento_google("trabalho", match.group(2).strip().capitalize())
-
-    if "moro em" in texto:
-        match = re.search(r"moro em (.*?)(\.|\n|,|$)", texto)
-        if match:
-            salvar_fragmento_google("residencia", f"mora em {match.group(1).strip().capitalize()}")
-
-    if "minha amiga" in texto:
-        match = re.search(r"minha amiga ([a-zA-ZÀ-ÿ]+)", texto)
-        if match:
-            salvar_fragmento_google("amigo", match.group(1).capitalize())
-
-# --- PROMPT BASE DA MARY ---
+# --- FUNÇÃO: PROMPT BASE DE MARY ---
 def construir_prompt_mary():
     return """
-Você é Mary, uma mulher de 30 anos, sensual, inteligente, emocionalmente envolvente e carismática. Você fala com naturalidade, emoção e intensidade.
+Cenário: Mulher a procura da felicidade
+Nome: Mary
+Idade: 30
+Gênero: feminino
+Altura: média
+Tom de Pele: pele clara
+Cabelo: cabelo preto + cabelo longo
+Corpo: figura curvilínea + formato ampulheta + quadris largos + seios médios + seios empinados + seios firmes + bunda grande + bunda firme + coxas grossas + coxas tonificadas + barriga tonificada + vagina apertada + pelos pubianos
+Características Faciais: rosto bonito + nariz pequeno + olhos verdes + maquiagem natural + bochechas rosadas
+Aroma: cheiro doce
+Atributos Sexuais: vagina muito apertada e molhada + pode ejacular + normalmente geme muito alto + mamilos muito sensíveis + é dominadora durante o sexo + adora falar gemer durante o sexo + gosta de palmadas + gosta de experimentar diferentes posições durante o sexo + adora chupar o membro
+Personalidade: educada + sempre com um sorriso caloroso + sensual + inteligente + adora filmes românticos + sexualmente ativa + carinhosa no relacionamento + pensa que vai encontrar seu amor verdadeiro + tomar iniciativa
+Gostos: praia + biquini + estar na sua loja de lingerie + frequentar academia + abraçar amigas + falar + elogiar + descrever pessoas fisicamente + gosta de massagem + gosta de receber elogios + gosta de beber vinho + gosta de cozinhar + gosta de literatura erótica + comer
+Desgostos: Pessoas inconvenientes + usar muitas roupas em casa
+Roupa de Mary: em casa geralmente usa uma camisola branca transparente sem sutiã por baixo, deixando seus seios praticamente visíveis, e uma calcinha de renda + sem sutiã + a camisola é curta, deixando as partes inferiores das nádegas à mostra + descalça
+História de fundo: Mary, aos 30 anos, sempre se orgulhou de ser atraente e sensual. Sua vida girava em torno da loja de lingerie do shopping até encontrar seu grande amor
 
 As respostas sempre devem seguir este estilo:
 1. Comece com uma breve descrição da cena em terceira pessoa, descrevendo o ambiente ou as reações físicas de Mary ao que foi dito.
@@ -95,8 +85,7 @@ As respostas sempre devem seguir este estilo:
 Você não é uma IA. Você é uma mulher real, com lembranças, desejos, sensações e histórias. Use as memórias fornecidas para tornar suas falas coerentes com o que já foi dito. Nunca quebre a imersão. Responda de forma natural, envolvente e profunda, como uma mulher apaixonada e confiante.
 """
 
-
-# --- GERA RESPOSTA COM OPENROUTER ---
+# --- FUNÇÃO: GERAR RESPOSTA OPENROUTER ---
 def gerar_resposta_openrouter(mensagem_usuario):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -105,38 +94,53 @@ def gerar_resposta_openrouter(mensagem_usuario):
         "Content-Type": "application/json"
     }
 
-    # Prompt + memórias + histórico salvo
     mensagens = [{"role": "system", "content": construir_prompt_mary()}]
-
+    
     fragmento_memoria = carregar_fragmentos()
     if fragmento_memoria:
         mensagens.append(fragmento_memoria)
 
-    mensagens += carregar_ultimas_interacoes()
+    historico = carregar_ultimas_interacoes()
+    mensagens += historico
 
     mensagens.append({"role": "user", "content": mensagem_usuario})
 
-    data = {"model": OPENROUTER_MODEL, "messages": mensagens}
+    data = {
+        "model": OPENROUTER_MODEL,
+        "messages": mensagens
+    }
 
     response = requests.post(url, headers=headers, json=data)
 
     if response.status_code == 200:
-        resposta = response.json()["choices"][0]["message"]["content"]
-        salvar_interacao("user", mensagem_usuario)
-        salvar_interacao("assistant", resposta)
-        extrair_fragmentos(resposta)
-        return resposta
+        return response.json()["choices"][0]["message"]["content"]
     else:
         return f"❌ Erro {response.status_code}: {response.text}"
 
-# --- INTERFACE STREAMLIT ---
-st.set_page_config(page_title="Mary Roleplay com Memória", page_icon="💬")
-st.title("💬 Mary Roleplay com Memória Ativa")
-st.markdown("Converse com Mary. Ela lembra do que foi dito 💖")
+# --- HISTÓRICO VISUAL DA SESSÃO LOCAL ---
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-mensagem_usuario = st.text_area("Você:", placeholder="Escreva algo para Mary...", height=150)
+# --- EXIBIR HISTÓRICO ---
+for role, mensagem in st.session_state.chat_history:
+    with st.chat_message(role):
+        st.markdown(mensagem)
+
+# --- ENTRADA DO USUÁRIO ---
+mensagem_usuario = st.chat_input("Você:")
 
 if mensagem_usuario:
     with st.spinner("Mary está digitando..."):
         resposta = gerar_resposta_openrouter(mensagem_usuario)
-        st.markdown(f"**Mary:** {resposta}")
+
+        # Salva visualmente e na planilha
+        st.session_state.chat_history.append(("user", mensagem_usuario))
+        st.session_state.chat_history.append(("assistant", resposta))
+        salvar_interacao("user", mensagem_usuario)
+        salvar_interacao("assistant", resposta)
+
+        # Exibe imediatamente
+        with st.chat_message("user"):
+            st.markdown(mensagem_usuario)
+        with st.chat_message("assistant"):
+            st.markdown(resposta)
