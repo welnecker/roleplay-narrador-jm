@@ -133,16 +133,18 @@ st.set_page_config(page_title="Mary Roleplay 🌹", page_icon="🌹")
 st.title("🌹 Mary Roleplay com Memória")
 st.markdown("Converse com Mary em uma experiência íntima e memorável.")
 
-# --- HISTÓRICO VISUAL ---
+# --- CARREGA INTERAÇÕES DO HISTÓRICO GLOBAL, NÃO APENAS DA SESSÃO LOCAL ---
 if "mensagens" not in st.session_state:
-    st.session_state["mensagens"] = []
+    # Carrega as últimas 50 interações da planilha
+    historico = carregar_ultimas_interacoes(n=50)
+    st.session_state["mensagens"] = historico
 
-# Exibe as mensagens usando o layout de chat
+# --- EXIBE HISTÓRICO COMPLETO USANDO LAYOUT DE CHAT ---
 for msg in st.session_state["mensagens"]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# --- FORMULÁRIO DE INPUT ---
+# --- FORMULÁRIO DE INPUT E ENVIO COM ENTER ---
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
         st.markdown(prompt)
