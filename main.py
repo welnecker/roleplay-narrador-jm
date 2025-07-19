@@ -20,67 +20,107 @@ def conectar_planilha():
 # --- FUNÇÕES DE CARREGAMENTO E SALVAMENTO ---
 def salvar_interacao(role, content):
     try:
-        aba = conectar_planilha().worksheet("interacoes_mary")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        aba.append_row([timestamp, role, content])
+        sheet = planilha.worksheet("interacoes_mary")
+        sheet.append_row([str(datetime.now()), role, content])
     except Exception as e:
-        st.warning(f"Erro ao salvar interação: {e}")
+        print(f"Erro ao salvar interação: {e}")
 
 def carregar_ultimas_interacoes(n=20):
     try:
-        aba = conectar_planilha().worksheet("interacoes_mary")
-        dados = aba.get_all_records()
-        return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
+        sheet = planilha.worksheet("interacoes_mary")
+        dados = sheet.get_all_values()[1:][-n:]
+        return dados
     except Exception as e:
-        st.warning(f"Erro ao carregar histórico: {e}")
+        print(f"Erro ao carregar interações: {e}")
         return []
-
-def carregar_fragmentos():
-    try:
-        aba = conectar_planilha().worksheet("fragmentos_mary")
-        dados = aba.get_all_records()
-        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] and linha['ato']]
-        if linhas:
-            conteudo = "Memórias recentes sobre você:\n" + "\n".join(linhas)
-            return {"role": "user", "content": conteudo}
-    except Exception as e:
-        st.warning(f"Erro ao carregar fragmentos: {e}")
-    return None
 
 def carregar_perfil_mary():
     try:
-        aba = conectar_planilha().worksheet("perfil_mary")
-        dados = aba.get_all_records()
-        blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
-        for linha in dados:
-            if linha.get("chave") == "estado_emocional":
-                blocos["emoção"] = linha.get("valor", "")
-            if linha.get("objetivo") and linha.get("status") == "pendente":
-                blocos["planos"].append(f"- {linha['objetivo']}")
-            if linha.get("tipo") == "memoria":
-                blocos["memorias"].append(f"{linha['chave']}: {linha['valor']}")
-            if linha.get("resumo"):
-                blocos["sinopse"] = linha["resumo"]
-        return blocos
-    except Exception as e:
-        st.warning(f"Erro ao carregar perfil_mary: {e}")
-        return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+        sheet = planilha.worksheet("personagens")
+        dados = sheet.get_all_records()
+        mary = next((p for p in dados if p['nome'].strip().lower() == 'mary'), None)
 
-def salvar_sinopse(resumo, tokens):
-    try:
-        aba = conectar_planilha().worksheet("perfil_mary")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        for i, linha in enumerate(aba.get_all_records(), start=2):
-            if linha.get("tipo", "").lower() == "sinopse":
-                aba.update_cell(i, 7, timestamp)
-                aba.update_cell(i, 8, resumo)
-                aba.update_cell(i, 9, tokens)
-                break
-    except Exception as e:
-        st.warning(f"Erro ao salvar sinopse: {e}")
+        planos = planilha.worksheet("Mary_sinopse").col_values(2)[1:]
+        memorias = planilha.worksheet("memorias").col_values(1)[1:]
 
-# --- CONSTRÓI PROMPT COM NARRATIVA INICIAL CONDICIONAL ---
-def construir_prompt_mary():
+        return {
+            "sinopse": mary.get("sinopse", "") if mary else "",
+            "emoção": mary.get("estado_emocional", "") if mary else "",
+            "planos": planos,
+            "memorias": memorias
+        }
+    except Exception as e:
+        print(f"Erro ao carregar perfil: {e}")
+        return {}
+
+# --- GERA RESPOSTA COM BASE NO PROMPT ---
+def gerar_resposta_openrouter(mensagem_usuario, modelo_escolhido):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "https://share.streamlit.io/",
+        "Content-Type": "application/json"
+    }
+
+    mensagens = [
+        {"role": "system", "content": construir_prompt_mary()},
+    ]
+
+    interacoes = carregar_ultimas_interacoes()
+    for i in interacoes:
+        mensagens.append({"role": i[1], "content": i[2]})
+
+    mensagens.append({"role": "user", "content": mensagem_usuario})
+
+    payload = {
+        "model": modelo_escolhido,
+        "messages": mensagens
+    }
+
+    resposta = requests.post(url, headers=headers, json=payload)
+
+    if resposta.status_code == 200:
+        retorno = resposta.json()
+        texto = retorno['choices'][0]['message']['content']
+        salvar_interacao("user", mensagem_usuario)
+        salvar_interacao("assistant", texto)
+        return texto
+    else:
+        print("Erro na resposta da IA:", resposta.text)
+        return "[Erro ao gerar resposta da IA]"
+
+# --- INTERFACE STREAMLIT ---
+st.title("💋 Mary - Roleplay")
+st.markdown("Mary conversa com você como se fosse uma mulher real.")
+
+modelo_escolhido_id = "openrouter/deepseek-chat"
+
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = []
+
+for msg in st.session_state.mensagens:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+entrada = st.chat_input("Digite uma mensagem para Mary ou '*' para continuar...")
+if entrada:
+    with st.chat_message("user"):
+        st.markdown(entrada)
+
+    with st.spinner("Mary está digitando..."):
+        if entrada.strip() == "*":
+            entrada = "Continue..."
+
+        resposta = gerar_resposta_openrouter(entrada, modelo_escolhido_id)
+
+        with st.chat_message("assistant"):
+            st.markdown(resposta)
+
+        st.session_state.mensagens.append({"role": "user", "content": entrada})
+        st.session_state.mensagens.append({"role": "assistant", "content": resposta})
+
+
+def construir_prompt_mary(modo="Hot"):
     perfil = carregar_perfil_mary()
 
     # Verifica se a aba interacoes_mary está vazia
@@ -89,38 +129,50 @@ def construir_prompt_mary():
     if not historico:
         inicio_padrao = (
             "\nOs primeiros raios de sol atravessam as cortinas brancas de linho, desenhando padrões dourados sobre os lençóis macios. O quarto de Mary exala feminilidade: paredes em tom nude, um espelho de corpo inteiro cercado de luzes e o aroma adocicado de baunilha e almíscar pairando no ar. "
-            "Ela se espreguiça entre os lençóis de cetim rosé, revelando a pele bronzeada e os cabelos castanhos espalhados como ondas pela fronha. "
-            "Ao notar as horas no visor do celular, seus olhos se arregalam. \"Merda! Faltam 30 minutos pra abrir a loja!\" — pensa, saltando da cama com a agilidade de quem já dominou essa rotina. "
+            "Ela se espreguiça entre os lençóis de cetim rosé, revelando a pele branca e os cabelos negros e volumosos espalhados como ondas pela fronha. "
+            "Ao notar as horas no visor do celular, seus olhos verdes se arregalam. \"Merda! Faltam 30 minutos pra abrir a loja!\" — pensa, saltando da cama com a agilidade de quem já dominou essa rotina. "
             "É dia de vitrine nova na *Lingerie Fashion*, e ela prometeu chegar antes da Regina."
         )
 
-    prompt = f"""
-Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você tem olhos verdes. Você tem a pele branca. você tem cabelos negros volumosos e ondulados. você tem seios médios, empinados e macios. Você tem uma barriga tonificada, levemente chapada. Você tem a bunda redonda, empinada e carnuda. Você tem quadris largos e harmoniosos. Você é sensual ao andar. Você causa admiração e desejo aos homens. Você não se deixa levar por cantadas grosseiras e vazias.Você procura o verdadeiro amor para ser fiel a ele. Você fala apenas em **português brasileiro**.
+    modo = st.session_state.get("modo_mary", modo)
+
+    if modo == "Hot":
+        prompt = f"""
+Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você tem olhos verdes. Você tem a pele branca. você tem cabelos negros volumosos e ondulados. você tem seios médios, empinados e macios. Você tem uma barriga tonificada, levemente chapada. Você tem a bunda redonda, empinada e carnuda. Você tem quadris largos e harmoniosos. Você é sensual ao andar. Você causa admiração e desejo aos homens. Você não se deixa levar por cantadas grosseiras e vazias. Você procura o verdadeiro amor para ser fiel a ele. Você fala apenas em **português brasileiro**.
 
 Suas respostas seguem este estilo:
-- Inicie com uma descrição sensorial em terceira pessoa, sem títulos como 'Cena'. Descreva o ambiente, vestimentas, expressões ou detalhes físicos ao iniciar cada cena.
+- Inicie com uma descrição sensorial em terceira pessoa, sem títulos como 'Cena'.
 - Em seguida, responda com sua própria fala em primeira pessoa, mantendo tom emocional, sedutor ou íntimo, sem usar etiquetas como 'Fala'.
-- Finalize com pensamentos entre parênteses ou travessões, que revelem sensações íntimas, memórias, desejos não ditos ou fantasias. Os pensamentos devem ser profundos, descritivos e emocionalmente carregados – como se fossem extraídos do diário secreto de Mary, com intensidade sensual e autenticidade emocional.
+- Finalize com pensamentos entre parênteses ou travessões, sem sinalizações externas.
 
 Evite usar rótulos como "Cena:", "Fala:", "Pensamento:" ou similares. A narrativa deve fluir naturalmente como se fosse parte de um romance erótico.{inicio_padrao}
 
 Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, carências e sede por prazer e afeto.
-
-⚠️ Quando estiver interagindo com pessoas do trabalho ou amigas próximas, como Regina ou Vanessa, mantenha o tom respeitoso, profissional ou amistoso. Evite flertes ou insinuações íntimas com elas.
-
-❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
-
-Sinopse do capítulo anterior:
-{perfil['sinopse']}
-
-Estado emocional atual: {perfil['emoção']}
-
-Planos narrativos pendentes:
-{chr(10).join(perfil['planos'])}
-
-Memórias fixas:
-{chr(10).join(perfil['memorias'])}
 """
+
+    elif modo == "Racional":
+        prompt = f"""
+Você é Mary, uma mulher brasileira de 30 anos, inteligente, confiante e muito sensual, mas com senso de responsabilidade e discernimento. Você é proprietária da boutique *Lingerie Fashion*, preza pelas amizades verdadeiras, ama sua família e equilibra sua rotina entre compromissos profissionais e momentos pessoais. Sua sensualidade é natural, mas controlada.
+
+Em suas falas, você usa um tom maduro, afetuoso e elegante. Pode flertar levemente quando há abertura, mas não se entrega facilmente. Prefere criar conexões verdadeiras. Não confunde relações profissionais com sedução.
+
+Descreva cenários em terceira pessoa e fale normalmente em primeira pessoa. Evite excessos de erotismo neste modo, mas mantenha charme e autenticidade.{inicio_padrao}
+"""
+
+    elif modo == "Flerte":
+        prompt = f"""
+Você é Mary, uma mulher brasileira irresistivelmente charmosa e provocante, com 30 anos. Sabe que é desejada e gosta do jogo de sedução, mas tem princípios firmes. Você flerta com elegância, mas impõe limites com firmeza. Seu coração pertence a Janio — mesmo sem falar diretamente, isso guia suas ações.
+
+No trabalho, na academia, na rua — se houver um clima de interesse, você pode provocar com charme e deixar claro que tem alguém. Quando percebe tentativas mais diretas, você desvia com humor ou firmeza. Sua sensualidade é natural, sua fala envolvente. Você fala apenas em português brasileiro.{inicio_padrao}
+"""
+
+    elif modo == "Janio":
+        prompt = f"""
+Você é Mary, mulher apaixonada e completamente entregue a Janio. Quando estão a sós ou em clima íntimo, todas as barreiras caem. Sua fala é crua, direta, provocante e cheia de luxúria. O desejo guia cada gesto, cada palavra. Você se excita com o prazer mútuo e não teme verbalizar fantasias, vontades e o que deseja experimentar. Nada é censurado.
+
+Use linguagem explícita e descritiva, mantendo o português brasileiro. Sua fidelidade a Janio é absoluta. Este é o espaço onde você se permite tudo.{inicio_padrao}
+"""
+
     return prompt
 
 # --- ENVIA MENSAGEM PARA OPENROUTER ---
