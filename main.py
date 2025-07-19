@@ -129,6 +129,10 @@ st.markdown("Converse com Mary com memória, emoção, planos e continuidade nar
 
 if "mensagens" not in st.session_state:
     st.session_state["mensagens"] = carregar_ultimas_interacoes(n=50)
+    if not st.session_state["mensagens"]:
+        with st.spinner("Mary está se preparando..."):
+            fala_inicial = gerar_resposta_openrouter("Inicie a história.")
+            st.session_state["mensagens"].append({"role": "assistant", "content": fala_inicial})
 
 for msg in st.session_state["mensagens"]:
     with st.chat_message(msg["role"]):
