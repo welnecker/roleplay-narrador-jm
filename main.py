@@ -29,10 +29,11 @@ if "mensagens" not in st.session_state:
     ultimas = carregar_ultimas_interacoes(n=3)
     st.session_state["mensagens"] = []
     if ultimas:
-        resumo = '
-'.join(f"{m['role']}: {m['content']}" for m in ultimas)
-        st.session_state["mensagens"].append({"role": "assistant", "content": f"**Resumo do capítulo anterior:**
-{resumo}"})
+        resumo = '\n'.join(f"{m['role']}: {m['content']}" for m in ultimas)
+        st.session_state["mensagens"].append({
+            "role": "assistant",
+            "content": f"**Resumo do capítulo anterior:**\n{resumo}"
+        })
     else:
         with st.spinner("Mary está se preparando..."):
             fala_inicial = "Os primeiros raios de sol atravessam as cortinas..."
