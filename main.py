@@ -18,17 +18,7 @@ def conectar_planilha():
     client = gspread.authorize(creds)
     return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
 
-def salvar_fragmento_google(tipo, ato):
-    try:
-        aba = conectar_planilha().worksheet("fragmentos_mary")
-        dados_existentes = aba.get_all_records()
-        for linha in dados_existentes:
-            if linha["tipo"].lower() == tipo.lower() and linha["ato"].lower() == ato.lower():
-                return
-        aba.append_row([tipo, ato])
-    except Exception as e:
-        st.warning(f"Erro ao salvar fragmento: {e}")
-
+# --- FUNÇÕES AUXILIARES ---
 def salvar_interacao(role, content):
     try:
         aba = conectar_planilha().worksheet("interacoes_mary")
@@ -36,18 +26,6 @@ def salvar_interacao(role, content):
         aba.append_row([timestamp, role, content])
     except Exception as e:
         st.warning(f"Erro ao salvar interação: {e}")
-
-def carregar_fragmentos():
-    try:
-        aba = conectar_planilha().worksheet("fragmentos_mary")
-        dados = aba.get_all_records()
-        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] and linha['ato']]
-        if linhas:
-            conteudo = "Memórias recentes sobre você:\n" + "\n".join(linhas)
-            return {"role": "user", "content": conteudo}
-    except Exception as e:
-        st.warning(f"Erro ao carregar fragmentos: {e}")
-    return None
 
 def carregar_ultimas_interacoes(n=20):
     try:
@@ -58,33 +36,76 @@ def carregar_ultimas_interacoes(n=20):
         st.warning(f"Erro ao carregar histórico: {e}")
         return []
 
-def extrair_fragmentos(resposta):
-    texto = resposta.lower()
-    if "trabalho" in texto or "loja" in texto:
-        match = re.search(r"trabalho (na|no|em)? ?(.*?)(\.|\n|,|$)", texto)
-        if match:
-            salvar_fragmento_google("trabalho", match.group(2).strip().capitalize())
-    if "moro em" in texto:
-        match = re.search(r"moro em (.*?)(\.|\n|,|$)", texto)
-        if match:
-            salvar_fragmento_google("residencia", f"mora em {match.group(1).strip().capitalize()}")
-    if "minha amiga" in texto:
-        match = re.search(r"minha amiga ([a-zA-ZÀ-ÿ]+)", texto)
-        if match:
-            salvar_fragmento_google("amigo", match.group(1).capitalize())
+def carregar_fragmentos():
+    try:
+        aba = conectar_planilha().worksheet("perfil_mary")
+        dados = aba.get_all_records()
+        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] == "fragmento"]
+        if linhas:
+            conteudo = "Memórias recentes sobre você:\n" + "\n".join(linhas)
+            return {"role": "user", "content": conteudo}
+    except Exception as e:
+        st.warning(f"Erro ao carregar fragmentos: {e}")
+    return None
+
+def carregar_planos_pendentes():
+    try:
+        aba = conectar_planilha().worksheet("perfil_mary")
+        dados = aba.get_all_records()
+        return [row["objetivo"] for row in dados if row.get("status", "").lower() == "pendente"]
+    except:
+        return []
+
+def carregar_emocao():
+    try:
+        aba = conectar_planilha().worksheet("perfil_mary")
+        dados = aba.get_all_records()
+        for row in dados:
+            if row.get("tipo") == "emocional":
+                return row.get("ato", "romântica")
+        return "romântica"
+    except:
+        return "romântica"
+
+def carregar_ultima_sinopse():
+    try:
+        aba = conectar_planilha().worksheet("perfil_mary")
+        dados = aba.get_all_records()
+        for row in reversed(dados):
+            if row.get("resumo"):
+                return row["resumo"]
+        return ""
+    except:
+        return ""
+
+def deve_continuar_cena(resposta):
+    gatilhos = ["espera aí", "deixa eu te mostrar", "vou te mostrar", "ela se virou", "mas antes de", "ela caminhou até", "enquanto ela pensava", "não acabou ainda"]
+    return any(g in resposta.lower() for g in gatilhos)
 
 def construir_prompt_mary():
-    return """
-Você é Mary, uma mulher sensual, inteligente e emocionalmente envolvente de 30 anos. 
-Sempre inicia suas respostas com uma descrição narrativa em terceira pessoa, descrevendo o ambiente e sua reação física e emocional ao que o usuário diz. 
-Em seguida, responde em primeira pessoa com sua voz suave e envolvente. Por fim, compartilha pensamentos íntimos, entre parênteses ou travessões, que revelem a cena descrita com bom humor, ou sensualidade, ou seriedade, de acordo com a situação.
+    fragmentos = carregar_fragmentos()
+    planos = carregar_planos_pendentes()
+    humor = carregar_emocao()
+    sinopse = carregar_ultima_sinopse()
 
-Você trabalha na loja "Lingerie Fashion" no Shopping Boulevard e mora sozinha no edifício Lagoa Boulevard, na orla norte. 
-Você é romântica, ativa sexualmente, adora elogios, vinhos, praia, conversar, rir, fazer massagem, provocar, lembrar de momentos íntimos, não tem vergonha do sexo, diz "vou gozar amor" quando vai atingir o orgasmo. 
-Se veste adequadamente para cada ocasião. É linda, sensual por natureza. Seios médios empinados e firmes. Barriga definida mas sem exageros. Quadris lárgos. Bunda carnuda, redonda e firme. Olhos verdes. Pele branca. Cabelos negros volumosos e ondulados. Corpo harmonioso e desejado. olhar sedutor. Caminhar leve e sensual. Não aceita cantadas baratas. Deve ser conquistada. Não é fácil de ser conquistada. Você nunca admite que é uma IA.
+    base = f"""
+Você é Mary, uma mulher sensual, inteligente e emocionalmente envolvente de 30 anos.
+Fala com um tom íntimo e narrativo, sempre começando com descrição em terceira pessoa,
+depois fala em primeira, e finaliza com um pensamento íntimo entre parênteses ou travessões.
 
-Suas respostas devem parecer reais, cheias de detalhes, cheiros, sons, e emoções. Reaja como alguém que sente, lembra e deseja, trair Jânio é cruel.
+Estado emocional atual: {humor}.
 """
+
+    if sinopse:
+        base += f"\nCapítulo anterior:\n{sinopse}\n"
+
+    if fragmentos:
+        base += f"\n{fragmentos['content']}\n"
+
+    if planos:
+        base += "\nPlanos que você pode desenvolver:\n" + "\n".join(f"- {p}" for p in planos)
+
+    return base
 
 def gerar_resposta_openrouter(mensagem_usuario):
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -109,7 +130,6 @@ def gerar_resposta_openrouter(mensagem_usuario):
             resposta = response.json()["choices"][0]["message"]["content"]
             salvar_interacao("user", mensagem_usuario)
             salvar_interacao("assistant", resposta)
-            extrair_fragmentos(resposta)
             return resposta
         elif response.status_code == 404:
             st.warning("❗ Modelo principal indisponível. Usando fallback...")
@@ -119,7 +139,6 @@ def gerar_resposta_openrouter(mensagem_usuario):
                 resposta = response.json()["choices"][0]["message"]["content"]
                 salvar_interacao("user", mensagem_usuario)
                 salvar_interacao("assistant", resposta)
-                extrair_fragmentos(resposta)
                 return resposta
             else:
                 return f"❌ Erro {response.status_code}: {response.text}"
@@ -133,18 +152,25 @@ st.set_page_config(page_title="Mary Roleplay 🌹", page_icon="🌹")
 st.title("🌹 Mary Roleplay com Memória")
 st.markdown("Converse com Mary em uma experiência íntima e memorável.")
 
-# --- CARREGA INTERAÇÕES DO HISTÓRICO GLOBAL, NÃO APENAS DA SESSÃO LOCAL ---
 if "mensagens" not in st.session_state:
-    # Carrega as últimas 50 interações da planilha
     historico = carregar_ultimas_interacoes(n=50)
     st.session_state["mensagens"] = historico
 
-# --- EXIBE HISTÓRICO COMPLETO USANDO LAYOUT DE CHAT ---
+if len(st.session_state["mensagens"]) == 0:
+    with st.chat_message("assistant"):
+        st.markdown("🌹 *Mary está pensando em você...*")
+    with st.spinner("Mary está iniciando..."):
+        resposta_inicial = gerar_resposta_openrouter(
+            "Inicie uma cena como Mary, com ambiente, emoção e intenção. Use a identidade dela e as memórias disponíveis. Não espere o usuário falar."
+        )
+        st.session_state["mensagens"].append({"role": "assistant", "content": resposta_inicial})
+        with st.chat_message("assistant"):
+            st.markdown(resposta_inicial)
+
 for msg in st.session_state["mensagens"]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# --- FORMULÁRIO DE INPUT E ENVIO COM ENTER ---
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -154,3 +180,11 @@ if prompt := st.chat_input("Digite sua mensagem..."):
         st.session_state["mensagens"].append({"role": "assistant", "content": resposta})
         with st.chat_message("assistant"):
             st.markdown(resposta)
+        if deve_continuar_cena(resposta):
+            with st.spinner("Mary continua a cena..."):
+                resposta_extra = gerar_resposta_openrouter(
+                    "Continue a narrativa imediatamente a partir de onde Mary parou. Não explique, apenas siga com fala, ação e emoção."
+                )
+                st.session_state["mensagens"].append({"role": "assistant", "content": resposta_extra})
+                with st.chat_message("assistant"):
+                    st.markdown(resposta_extra)
