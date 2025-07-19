@@ -55,6 +55,9 @@ def carregar_perfil_mary():
         sheet = planilha.worksheet("perfil_mary")
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+        for linha in reversed(dados):  # percorre de baixo para cima
+            if not blocos["sinopse"] and linha.get("resumo"):
+                blocos["sinopse"] = linha["resumo"]
         for linha in dados:
             if linha.get("chave") == "estado_emocional":
                 blocos["emoção"] = linha.get("valor", "")
@@ -62,8 +65,6 @@ def carregar_perfil_mary():
                 blocos["planos"].append(f"- {linha['objetivo']}")
             if linha.get("tipo") == "memoria":
                 blocos["memorias"].append(f"{linha['chave']}: {linha['valor']}")
-            if linha.get("resumo"):
-                blocos["sinopse"] = linha["resumo"]
         return blocos
     except Exception as e:
         st.error(f"Erro ao carregar perfil: {e}")
@@ -118,7 +119,13 @@ Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, car
 ❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
 
 Sinopse do capítulo anterior:
-{perfil.get('sinopse', '') or '\n'.join(f"{i['role']}: {i['content']}" for i in historico)}
+"""
+    if perfil.get("sinopse"):
+        prompt += f"\n{perfil['sinopse']}"
+    else:
+        prompt += "\n[sem sinopse disponível]"
+
+    prompt += f"""
 
 Estado emocional atual: {perfil.get('emoção', '[não definido]')}
 
@@ -130,50 +137,6 @@ Memórias fixas:
 """
     return prompt
 
-# --- GERA RESPOSTA COM BASE NO PROMPT ---
-def gerar_resposta_openrouter(mensagem_usuario, modelo_escolhido):
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "https://share.streamlit.io/",
-        "Content-Type": "application/json"
-    }
-
-    mensagens = [
-        {"role": "system", "content": construir_prompt_mary()}
-    ]
-
-    frag = carregar_fragmentos() if 'carregar_fragmentos' in globals() else None
-    if frag:
-        mensagens.append(frag)
-
-    interacoes = carregar_ultimas_interacoes(n=20)
-    mensagens += interacoes
-
-    if mensagem_usuario.strip() != "*":
-        mensagens.append({"role": "user", "content": mensagem_usuario})
-
-    data = {
-        "model": modelo_escolhido,
-        "messages": mensagens,
-        "max_tokens": 1024,
-        "temperature": 0.9
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            resposta = response.json()["choices"][0]["message"]["content"]
-            if mensagem_usuario.strip() != "*":
-                salvar_interacao("user", mensagem_usuario)
-            salvar_interacao("assistant", resposta)
-            return resposta
-        else:
-            st.error(f"Erro {response.status_code}: {response.text}")
-            return "[Erro ao gerar resposta da IA]"
-    except Exception as e:
-        return f"Erro inesperado: {e}"
-
 # --- INTERFACE STREAMLIT ---
 st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
 st.title("🌹 Mary Roleplay com Inteligência Autônoma")
@@ -181,11 +144,15 @@ st.markdown("Converse com Mary com memória, emoção, planos e continuidade nar
 
 modelo_escolhido_id = "deepseek/deepseek-chat-v3-0324"
 
-
-
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = carregar_ultimas_interacoes(n=50)
-    if not st.session_state.mensagens:
+    interacoes = carregar_ultimas_interacoes(n=50)
+    st.session_state.mensagens = []
+    if interacoes:
+        resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
+        st.session_state.mensagens.append({"role": "assistant", "content": f"🧠 *No capítulo anterior...*
+
+> {resumo}"})
+    else:
         with st.spinner("Mary está se preparando..."):
             fala_inicial = gerar_resposta_openrouter("Inicie a história.", modelo_escolhido_id)
             st.session_state.mensagens.append({"role": "assistant", "content": fala_inicial})
@@ -196,6 +163,34 @@ for msg in st.session_state.mensagens:
 
 with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
+
+    if st.button("📝 Gerar resumo do capítulo"):
+        ultimas = carregar_ultimas_interacoes(n=3)
+        texto = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+        prompt = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto}\n\nResumo:"
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "HTTP-Referer": "https://share.streamlit.io/",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek/deepseek-chat-v3-0324",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 300,
+                "temperature": 0.7
+            }
+        )
+        if response.status_code == 200:
+            resumo_gerado = response.json()["choices"][0]["message"]["content"]
+            try:
+                planilha.worksheet("perfil_mary").append_row(["", "", "", "", "", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), resumo_gerado, ""])
+                st.success("Resumo inserido com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao inserir resumo: {e}")
+        else:
+            st.error("Erro ao gerar resumo automaticamente.")
 
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
