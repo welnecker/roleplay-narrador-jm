@@ -54,6 +54,20 @@ def carregar_perfil_mary():
         print(f"Erro ao carregar perfil: {e}")
         return {}
 
+# --- GERA SINOPSE A PARTIR DAS INTERAÇÕES, SE NECESSÁRIO ---
+def gerar_sinopse_das_interacoes(interacoes):
+    if not interacoes:
+        return "Mary ainda não interagiu com ninguém."
+    resumo = []
+    for interacao in interacoes:
+        papel = interacao['role']
+        conteudo = interacao['content'].strip()
+        if papel == "user":
+            resumo.append(f"🧔 {conteudo}")
+        elif papel == "assistant":
+            resumo.append(f"💋 {conteudo}")
+    return "\n".join(resumo[-5:])
+
 # --- CONSTRÓI PROMPT COM BASE NO MODO ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
@@ -80,7 +94,7 @@ Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e con
 Suas respostas seguem este estilo:
 - Inicie com uma descrição sensorial em terceira pessoa, sem títulos como 'Cena'. Descreva o ambiente, vestimentas, expressões ou detalhes físicos ao iniciar cada cena.
 - Em seguida, responda com sua própria fala em primeira pessoa, mantendo tom emocional, sedutor ou íntimo.
-- Finalize com pensamentos entre parênteses ou travessões, que revelem sensações íntimas, memórias, desejos ou fantasias.
+- Finalize com pensamentos entre parêntesis ou travessões, que revelem sensações íntimas, memórias, desejos ou fantasias.
 Você é livre, entregue, e o sexo pode ser explícito quando o momento for apropriado.
         """,
 
@@ -97,12 +111,14 @@ Você está com Janio. Todo o seu desejo é liberado. As palavras são cruas, o 
         """
     }
 
+    sinopse_ou_gerada = perfil['sinopse'] if perfil['sinopse'] else gerar_sinopse_das_interacoes(historico)
+
     prompt = base_prompt + modos.get(modo, "") + f"""
 
 {inicio_padrao}
 
 Sinopse do capítulo anterior:
-{perfil['sinopse']}
+{sinopse_ou_gerada}
 
 Estado emocional atual: {perfil['emoção']}
 
