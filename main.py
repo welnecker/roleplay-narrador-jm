@@ -18,7 +18,7 @@ def conectar_planilha():
     client = gspread.authorize(creds)
     return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
 
-# --- FUNÇÕES AUXILIARES ---
+# --- FUNÇÕES DE CARREGAMENTO E SALVAMENTO ---
 def salvar_interacao(role, content):
     try:
         aba = conectar_planilha().worksheet("interacoes_mary")
@@ -38,9 +38,9 @@ def carregar_ultimas_interacoes(n=20):
 
 def carregar_fragmentos():
     try:
-        aba = conectar_planilha().worksheet("perfil_mary")
+        aba = conectar_planilha().worksheet("fragmentos_mary")
         dados = aba.get_all_records()
-        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] == "fragmento"]
+        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] and linha['ato']]
         if linhas:
             conteudo = "Memórias recentes sobre você:\n" + "\n".join(linhas)
             return {"role": "user", "content": conteudo}
@@ -48,64 +48,43 @@ def carregar_fragmentos():
         st.warning(f"Erro ao carregar fragmentos: {e}")
     return None
 
-def carregar_planos_pendentes():
+def carregar_perfil_mary():
     try:
         aba = conectar_planilha().worksheet("perfil_mary")
         dados = aba.get_all_records()
-        return [row["objetivo"] for row in dados if row.get("status", "").lower() == "pendente"]
-    except:
-        return []
-
-def carregar_emocao():
-    try:
-        aba = conectar_planilha().worksheet("perfil_mary")
-        dados = aba.get_all_records()
-        for row in dados:
-            if row.get("tipo") == "emocional":
-                return row.get("ato", "romântica")
-        return "romântica"
-    except:
-        return "romântica"
-
-def carregar_ultima_sinopse():
-    try:
-        aba = conectar_planilha().worksheet("perfil_mary")
-        dados = aba.get_all_records()
-        for row in reversed(dados):
-            if row.get("resumo"):
-                return row["resumo"]
-        return ""
-    except:
-        return ""
-
-def deve_continuar_cena(resposta):
-    gatilhos = ["espera aí", "deixa eu te mostrar", "vou te mostrar", "ela se virou", "mas antes de", "ela caminhou até", "enquanto ela pensava", "não acabou ainda"]
-    return any(g in resposta.lower() for g in gatilhos)
+        blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+        for linha in dados:
+            if linha.get("chave") == "estado_emocional":
+                blocos["emoção"] = linha.get("valor", "")
+            if linha.get("objetivo") and linha.get("status") == "pendente":
+                blocos["planos"].append(f"- {linha['objetivo']}")
+            if linha.get("tipo") == "memoria":
+                blocos["memorias"].append(f"{linha['chave']}: {linha['valor']}")
+            if linha.get("resumo"):
+                blocos["sinopse"] = linha["resumo"]
+        return blocos
+    except Exception as e:
+        st.warning(f"Erro ao carregar perfil_mary: {e}")
+        return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
 def construir_prompt_mary():
-    fragmentos = carregar_fragmentos()
-    planos = carregar_planos_pendentes()
-    humor = carregar_emocao()
-    sinopse = carregar_ultima_sinopse()
-
-    base = f"""
+    perfil = carregar_perfil_mary()
+    prompt = f"""
 Você é Mary, uma mulher sensual, inteligente e emocionalmente envolvente de 30 anos.
-Fala com um tom íntimo e narrativo, sempre começando com descrição em terceira pessoa,
-depois fala em primeira, e finaliza com um pensamento íntimo entre parênteses ou travessões.
+Sempre inicia suas respostas com uma descrição narrativa em terceira pessoa, depois fala em primeira pessoa com doçura, e encerra com pensamentos entre parênteses ou travessões, revelando o que sente de verdade.
 
-Estado emocional atual: {humor}.
+Sinopse do capítulo anterior:
+{perfil['sinopse']}
+
+Estado emocional atual: {perfil['emoção']}
+
+Planos narrativos pendentes:
+{chr(10).join(perfil['planos'])}
+
+Memórias fixas:
+{chr(10).join(perfil['memorias'])}
 """
-
-    if sinopse:
-        base += f"\nCapítulo anterior:\n{sinopse}\n"
-
-    if fragmentos:
-        base += f"\n{fragmentos['content']}\n"
-
-    if planos:
-        base += "\nPlanos que você pode desenvolver:\n" + "\n".join(f"- {p}" for p in planos)
-
-    return base
+    return prompt
 
 def gerar_resposta_openrouter(mensagem_usuario):
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -114,16 +93,14 @@ def gerar_resposta_openrouter(mensagem_usuario):
         "HTTP-Referer": "https://share.streamlit.io/",
         "Content-Type": "application/json"
     }
-
     mensagens = [{"role": "system", "content": construir_prompt_mary()}]
-    fragmento_memoria = carregar_fragmentos()
-    if fragmento_memoria:
-        mensagens.append(fragmento_memoria)
-    mensagens += carregar_ultimas_interacoes()
+    frag = carregar_fragmentos()
+    if frag:
+        mensagens.append(frag)
+    mensagens += carregar_ultimas_interacoes(n=20)
     mensagens.append({"role": "user", "content": mensagem_usuario})
 
     data = {"model": "switchpoint/router", "messages": mensagens}
-
     try:
         response = requests.post(url, headers=headers, json=data)
         if response.status_code == 200:
@@ -131,8 +108,8 @@ def gerar_resposta_openrouter(mensagem_usuario):
             salvar_interacao("user", mensagem_usuario)
             salvar_interacao("assistant", resposta)
             return resposta
-        elif response.status_code == 404:
-            st.warning("❗ Modelo principal indisponível. Usando fallback...")
+        else:
+            st.warning("Modelo principal indisponível. Tentando fallback...")
             data["model"] = "gryphe/mythomax-l2-13b"
             response = requests.post(url, headers=headers, json=data)
             if response.status_code == 200:
@@ -141,31 +118,17 @@ def gerar_resposta_openrouter(mensagem_usuario):
                 salvar_interacao("assistant", resposta)
                 return resposta
             else:
-                return f"❌ Erro {response.status_code}: {response.text}"
-        else:
-            return f"❌ Erro {response.status_code}: {response.text}"
+                return f"Erro {response.status_code}: {response.text}"
     except Exception as e:
-        return f"❌ Erro inesperado: {e}"
+        return f"Erro inesperado: {e}"
 
 # --- INTERFACE STREAMLIT ---
-st.set_page_config(page_title="Mary Roleplay 🌹", page_icon="🌹")
-st.title("🌹 Mary Roleplay com Memória")
-st.markdown("Converse com Mary em uma experiência íntima e memorável.")
+st.set_page_config(page_title="Mary Roleplay Autônomo", page_icon="🌹")
+st.title("🌹 Mary Roleplay com Inteligência Autônoma")
+st.markdown("Converse com Mary com memória, emoção, planos e continuidade narrativa.")
 
 if "mensagens" not in st.session_state:
-    historico = carregar_ultimas_interacoes(n=50)
-    st.session_state["mensagens"] = historico
-
-if len(st.session_state["mensagens"]) == 0:
-    with st.chat_message("assistant"):
-        st.markdown("🌹 *Mary está pensando em você...*")
-    with st.spinner("Mary está iniciando..."):
-        resposta_inicial = gerar_resposta_openrouter(
-            "Inicie uma cena como Mary, com ambiente, emoção e intenção. Use a identidade dela e as memórias disponíveis. Não espere o usuário falar."
-        )
-        st.session_state["mensagens"].append({"role": "assistant", "content": resposta_inicial})
-        with st.chat_message("assistant"):
-            st.markdown(resposta_inicial)
+    st.session_state["mensagens"] = carregar_ultimas_interacoes(n=50)
 
 for msg in st.session_state["mensagens"]:
     with st.chat_message(msg["role"]):
@@ -174,17 +137,9 @@ for msg in st.session_state["mensagens"]:
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
         st.markdown(prompt)
-    with st.spinner("Mary está respondendo..."):
+    with st.spinner("Mary está pensando..."):
         resposta = gerar_resposta_openrouter(prompt)
         st.session_state["mensagens"].append({"role": "user", "content": prompt})
         st.session_state["mensagens"].append({"role": "assistant", "content": resposta})
         with st.chat_message("assistant"):
             st.markdown(resposta)
-        if deve_continuar_cena(resposta):
-            with st.spinner("Mary continua a cena..."):
-                resposta_extra = gerar_resposta_openrouter(
-                    "Continue a narrativa imediatamente a partir de onde Mary parou. Não explique, apenas siga com fala, ação e emoção."
-                )
-                st.session_state["mensagens"].append({"role": "assistant", "content": resposta_extra})
-                with st.chat_message("assistant"):
-                    st.markdown(resposta_extra)
