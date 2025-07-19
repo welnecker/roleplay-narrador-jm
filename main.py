@@ -149,9 +149,12 @@ if "mensagens" not in st.session_state:
     st.session_state.mensagens = []
     if interacoes:
         resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
-        st.session_state.mensagens.append({"role": "assistant", "content": f"🧠 *No capítulo anterior...*
+        st.session_state.mensagens.append({
+            "role": "assistant",
+            "content": f"""🧠 *No capítulo anterior...*
 
-> {resumo}"})
+> {resumo}"""
+        })
     else:
         with st.spinner("Mary está se preparando..."):
             fala_inicial = gerar_resposta_openrouter("Inicie a história.", modelo_escolhido_id)
