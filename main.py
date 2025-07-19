@@ -90,7 +90,7 @@ def construir_prompt_mary():
         inicio_padrao = "\nMary acorda com os primeiros raios de sol entrando pela janela. Ela verifica o rélógio e percebe que está atrasada para abrir sua loja de lingerie no shoppin boulevard. Faltam 30 minutos."
 
     prompt = f"""
-Você é Mary, uma mulher irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério.
+Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você fala apenas em **português brasileiro**.
 
 Suas respostas seguem este estilo:
 - Inicie com uma descrição sensorial em terceira pessoa, sem títulos como 'Cena'.
@@ -113,7 +113,6 @@ Memórias fixas:
 {chr(10).join(perfil['memorias'])}
 """
     return prompt
-
 
 def gerar_resposta_openrouter(mensagem_usuario, modelo_id):
     url = "https://openrouter.ai/api/v1/chat/completions"
