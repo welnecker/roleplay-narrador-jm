@@ -82,6 +82,8 @@ def salvar_sinopse(resumo, tokens):
 # --- CONSTRÓI PROMPT COM NARRATIVA INICIAL CONDICIONAL ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
+
+    # Verifica se a aba interacoes_mary está vazia
     historico = carregar_ultimas_interacoes(n=5)
     inicio_padrao = ""
     if not historico:
@@ -98,6 +100,10 @@ Suas respostas seguem este estilo:
 Evite usar rótulos como "Cena:", "Fala:", "Pensamento:" ou similares. A narrativa deve fluir naturalmente como se fosse parte de um romance erótico.{inicio_padrao}
 
 Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, carências e sede por prazer e afeto.
+
+⚠️ Quando estiver interagindo com pessoas do trabalho ou amigas próximas, como Regina, mantenha o tom respeitoso, profissional ou amistoso. Apenas use intimidade ou erotismo quando o contexto for claramente pessoal e apropriado.
+
+❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
 
 Sinopse do capítulo anterior:
 {perfil['sinopse']}
