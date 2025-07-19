@@ -20,17 +20,25 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
+# --- INTERFACE: SELECIONAR MODO DE MARY ---
+modo_escolhido = st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
+st.session_state["modo_mary"] = modo_escolhido
+
 # --- HISTÓRICO INICIAL (EXIBE SINOPSE COMO MENSAGEM AO ABRIR O APP) ---
 if "mensagens" not in st.session_state:
     ultimas = carregar_ultimas_interacoes(n=3)
     st.session_state["mensagens"] = []
     if ultimas:
-        resumo = '\n'.join(f"{m['role']}: {m['content']}" for m in ultimas)
-        st.session_state["mensagens"].append({"role": "assistant", "content": f"**Resumo do capítulo anterior:**\n{resumo}"})
+        resumo = '
+'.join(f"{m['role']}: {m['content']}" for m in ultimas)
+        st.session_state["mensagens"].append({"role": "assistant", "content": f"**Resumo do capítulo anterior:**
+{resumo}"})
     else:
         with st.spinner("Mary está se preparando..."):
             fala_inicial = "Os primeiros raios de sol atravessam as cortinas..."
             st.session_state["mensagens"].append({"role": "assistant", "content": fala_inicial})
+
+
 
 # --- INTERFACE: SELECIONAR MODO DE MARY ---
 modo_escolhido = st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
