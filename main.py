@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import gspread
 import json
-import re
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -80,10 +79,9 @@ def salvar_sinopse(resumo, tokens):
     except Exception as e:
         st.warning(f"Erro ao salvar sinopse: {e}")
 
+# --- CONSTRÓI PROMPT COM NARRATIVA INICIAL CONDICIONAL ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
-
-    # Verifica se a aba interacoes_mary está vazia
     historico = carregar_ultimas_interacoes(n=5)
     inicio_padrao = ""
     if not historico:
@@ -114,15 +112,7 @@ Memórias fixas:
 """
     return prompt
 
-# --- INTERFACE STREAMLIT ---
-if "mensagens" not in st.session_state:
-    st.session_state["mensagens"] = carregar_ultimas_interacoes(n=50)
-    if not st.session_state["mensagens"]:
-        with st.spinner("Mary está se preparando..."):
-            fala_inicial = gerar_resposta_openrouter("Por favor, inicie a história de forma envolvente, sensual e em português brasileiro.", modelo_escolhido_id)
-            st.session_state["mensagens"].append({"role": "assistant", "content": fala_inicial})
-
-
+# --- ENVIA MENSAGEM PARA OPENROUTER ---
 def gerar_resposta_openrouter(mensagem_usuario, modelo_id):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -131,6 +121,7 @@ def gerar_resposta_openrouter(mensagem_usuario, modelo_id):
         "X-Title": "Mary Roleplay App",
         "Content-Type": "application/json"
     }
+
     mensagens = [{"role": "system", "content": construir_prompt_mary()}]
     frag = carregar_fragmentos()
     if frag:
@@ -175,6 +166,9 @@ def gerar_resposta_openrouter(mensagem_usuario, modelo_id):
                 return f"Erro {response.status_code}: {response.text}"
     except Exception as e:
         return f"Erro inesperado: {e}"
+
+# (A interface Streamlit permanece no seu código principal e está funcional, apenas excluímos duplicação do canvas)
+
 
 # --- INTERFACE STREAMLIT ---
 st.set_page_config(page_title="Mary Roleplay Autônomo", page_icon="🌹")
