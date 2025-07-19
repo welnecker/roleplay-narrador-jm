@@ -67,6 +67,19 @@ def carregar_perfil_mary():
         st.warning(f"Erro ao carregar perfil_mary: {e}")
         return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
+def salvar_sinopse(resumo, tokens):
+    try:
+        aba = conectar_planilha().worksheet("perfil_mary")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for i, linha in enumerate(aba.get_all_records(), start=2):
+            if not linha.get("resumo"):
+                aba.update(f"K{i}", timestamp)
+                aba.update(f"L{i}", resumo)
+                aba.update(f"M{i}", tokens)
+                break
+    except Exception as e:
+        st.warning(f"Erro ao salvar sinopse: {e}")
+
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
     prompt = f"""
@@ -97,16 +110,24 @@ def gerar_resposta_openrouter(mensagem_usuario):
     frag = carregar_fragmentos()
     if frag:
         mensagens.append(frag)
-    mensagens += carregar_ultimas_interacoes(n=20)
-    mensagens.append({"role": "user", "content": mensagem_usuario})
+    historico = carregar_ultimas_interacoes(n=20)
+    mensagens += historico
+    if mensagem_usuario.strip() != "*":
+        mensagens.append({"role": "user", "content": mensagem_usuario})
 
     data = {"model": "switchpoint/router", "messages": mensagens}
     try:
         response = requests.post(url, headers=headers, json=data)
         if response.status_code == 200:
             resposta = response.json()["choices"][0]["message"]["content"]
-            salvar_interacao("user", mensagem_usuario)
+            if mensagem_usuario.strip() != "*":
+                salvar_interacao("user", mensagem_usuario)
             salvar_interacao("assistant", resposta)
+            # Gera sinopse com base nas últimas 5 interações
+            interacoes_resumidas = historico[-5:] + ([{"role": "user", "content": mensagem_usuario}] if mensagem_usuario.strip() != "*" else []) + [{"role": "assistant", "content": resposta}]
+            texto_base = "\n".join([msg["content"] for msg in interacoes_resumidas])
+            resumo = texto_base[:200] + "..." if len(texto_base) > 200 else texto_base
+            salvar_sinopse(resumo, len(texto_base.split()))
             return resposta
         else:
             st.warning("Modelo principal indisponível. Tentando fallback...")
@@ -114,7 +135,8 @@ def gerar_resposta_openrouter(mensagem_usuario):
             response = requests.post(url, headers=headers, json=data)
             if response.status_code == 200:
                 resposta = response.json()["choices"][0]["message"]["content"]
-                salvar_interacao("user", mensagem_usuario)
+                if mensagem_usuario.strip() != "*":
+                    salvar_interacao("user", mensagem_usuario)
                 salvar_interacao("assistant", resposta)
                 return resposta
             else:
@@ -143,7 +165,8 @@ if prompt := st.chat_input("Digite sua mensagem..."):
         st.markdown(prompt)
     with st.spinner("Mary está pensando..."):
         resposta = gerar_resposta_openrouter(prompt)
-        st.session_state["mensagens"].append({"role": "user", "content": prompt})
+        if prompt.strip() != "*":
+            st.session_state["mensagens"].append({"role": "user", "content": prompt})
         st.session_state["mensagens"].append({"role": "assistant", "content": resposta})
         with st.chat_message("assistant"):
             st.markdown(resposta)
