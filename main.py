@@ -19,6 +19,20 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
+# --- HISTÓRICO INICIAL (EXIBE SINOPSE COMO MENSAGEM AO ABRIR O APP) ---
+if "mensagens" not in st.session_state:
+    ultimas = carregar_ultimas_interacoes(n=3)
+    st.session_state["mensagens"] = []
+    if ultimas:
+        resumo = '
+'.join(f"{m['role']}: {m['content']}" for m in ultimas)
+        st.session_state["mensagens"].append({"role": "assistant", "content": f"**Resumo do capítulo anterior:**
+{resumo}"})
+    else:
+        with st.spinner("Mary está se preparando..."):
+            fala_inicial = "Os primeiros raios de sol atravessam as cortinas..."
+            st.session_state["mensagens"].append({"role": "assistant", "content": fala_inicial})
+
 # --- INTERFACE: SELECIONAR MODO DE MARY ---
 modo_escolhido = st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
 st.session_state["modo_mary"] = modo_escolhido
@@ -37,6 +51,9 @@ def carregar_ultimas_interacoes(n=20):
         aba = planilha.worksheet("interacoes_mary")
         dados = aba.get_all_records()
         return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
+    except Exception as e:
+        print(f"Erro ao carregar histórico: {e}")
+        return []
     except Exception as e:
         print(f"Erro ao carregar histórico: {e}")
         return []
@@ -74,7 +91,7 @@ def carregar_perfil_mary():
 
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
-    historico = carregar_ultimas_interacoes(n=5)
+    historico = carregar_ultimas_interacoes(n=3)
     inicio_padrao = ""
     if not historico:
         inicio_padrao = (
@@ -120,7 +137,8 @@ Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, car
 ❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
 
 Sinopse do capítulo anterior:
-{perfil.get('sinopse', '')}
+{perfil.get('sinopse', '') or '
+'.join(f"{i['role']}: {i['content']}" for i in historico)}
 
 Estado emocional atual: {perfil.get('emoção', '[não definido]')}
 
