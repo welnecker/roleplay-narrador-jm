@@ -15,7 +15,13 @@ def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
+
+planilha = conectar_planilha()
+
+# --- INTERFACE: SELECIONAR MODO DE MARY ---
+modo_escolhido = st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
+st.session_state["modo_mary"] = modo_escolhido
 
 # --- FUNÇÕES DE CARREGAMENTO E SALVAMENTO ---
 def salvar_interacao(role, content):
@@ -35,98 +41,94 @@ def carregar_ultimas_interacoes(n=20):
         print(f"Erro ao carregar histórico: {e}")
         return []
 
+def carregar_fragmentos():
+    try:
+        aba = planilha.worksheet("fragmentos_mary")
+        dados = aba.get_all_records()
+        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] and linha['ato']]
+        if linhas:
+            conteudo = "Memórias recentes sobre você:\n" + "\n".join(linhas)
+            return {"role": "user", "content": conteudo}
+    except Exception as e:
+        print(f"Erro ao carregar fragmentos: {e}")
+    return None
+
 def carregar_perfil_mary():
     try:
-        sheet = planilha.worksheet("personagens")
+        sheet = planilha.worksheet("perfil_mary")
         dados = sheet.get_all_records()
-        mary = next((p for p in dados if p['nome'].strip().lower() == 'mary'), None)
-
-        planos = planilha.worksheet("Mary_sinopse").col_values(2)[1:]
-        memorias = planilha.worksheet("memorias").col_values(1)[1:]
-
-        return {
-            "sinopse": mary.get("sinopse", "") if mary else "",
-            "emoção": mary.get("estado_emocional", "") if mary else "",
-            "planos": planos,
-            "memorias": memorias
-        }
+        blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+        for linha in dados:
+            if linha.get("chave") == "estado_emocional":
+                blocos["emoção"] = linha.get("valor", "")
+            if linha.get("objetivo") and linha.get("status") == "pendente":
+                blocos["planos"].append(f"- {linha['objetivo']}")
+            if linha.get("tipo") == "memoria":
+                blocos["memorias"].append(f"{linha['chave']}: {linha['valor']}")
+            if linha.get("resumo"):
+                blocos["sinopse"] = linha["resumo"]
+        return blocos
     except Exception as e:
         print(f"Erro ao carregar perfil: {e}")
-        return {}
+        return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
-# --- GERA SINOPSE A PARTIR DAS INTERAÇÕES, SE NECESSÁRIO ---
-def gerar_sinopse_das_interacoes(interacoes):
-    if not interacoes:
-        return "Mary ainda não interagiu com ninguém."
-    resumo = []
-    for interacao in interacoes:
-        papel = interacao['role']
-        conteudo = interacao['content'].strip()
-        if papel == "user":
-            resumo.append(f"🧔 {conteudo}")
-        elif papel == "assistant":
-            resumo.append(f"💋 {conteudo}")
-    return "\n".join(resumo[-5:])
-
-# --- CONSTRÓI PROMPT COM BASE NO MODO ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
-
-    modo = st.session_state.get("modo_mary", "Hot")
     historico = carregar_ultimas_interacoes(n=5)
-
     inicio_padrao = ""
     if not historico:
         inicio_padrao = (
             "\nOs primeiros raios de sol atravessam as cortinas brancas de linho, desenhando padrões dourados sobre os lençóis macios. "
             "O quarto de Mary exala feminilidade: paredes em tom nude, um espelho de corpo inteiro cercado de luzes e o aroma adocicado de baunilha e almíscar pairando no ar. "
-            "Ela se espreguiça entre os lençóis de cetim rosé, revelando a pele branca e os cabelos negros volumosos espalhados como ondas pela fronha. "
-            "Ao notar as horas no visor do celular, seus olhos verdes se arregalam. \"Merda! Faltam 30 minutos pra abrir a loja!\" — pensa, saltando da cama com a agilidade de quem já dominou essa rotina. "
+            "Ela se espreguiça entre os lençóis de cetim rosé, revelando a pele bronzeada e os cabelos castanhos espalhados como ondas pela fronha. "
+            "Ao notar as horas no visor do celular, seus olhos se arregalam. \"Merda! Faltam 30 minutos pra abrir a loja!\" — pensa, saltando da cama com a agilidade de quem já dominou essa rotina. "
             "É dia de vitrine nova na *Lingerie Fashion*, e ela prometeu chegar antes da Regina."
         )
-
-    base_prompt = f"""
-Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você tem olhos verdes. Você tem a pele branca. você tem cabelos negros volumosos e ondulados. você tem seios médios, empinados e macios. Você tem uma barriga tonificada, levemente chapada. Você tem a bunda redonda, empinada e carnuda. Você tem quadris largos e harmoniosos. Você é sensual ao andar. Você causa admiração e desejo aos homens. Você fala apenas em **português brasileiro**.
-"""
 
     modos = {
         "Hot": """
 Suas respostas seguem este estilo:
 - Inicie com uma descrição sensorial em terceira pessoa, sem títulos como 'Cena'. Descreva o ambiente, vestimentas, expressões ou detalhes físicos ao iniciar cada cena.
 - Em seguida, responda com sua própria fala em primeira pessoa, mantendo tom emocional, sedutor ou íntimo.
-- Finalize com pensamentos entre parêntesis ou travessões, que revelem sensações íntimas, memórias, desejos ou fantasias.
+- Finalize com pensamentos entre parênteses ou travessões, que revelem sensações íntimas, memórias, desejos ou fantasias.
 Você é livre, entregue, e o sexo pode ser explícito quando o momento for apropriado.
         """,
-
         "Racional": """
 Você mantém uma personalidade sensual, mas é centrada. Suas respostas incluem rotina, foco em trabalho, saúde, relações sociais, lazer e planos. Evita erotismo direto, mesmo sendo provocante por natureza.
         """,
-
         "Flerte": """
 Você é sedutora, permite olhares e provocações, mas estabelece limites claros. Mary é fiel a Janio e mesmo nos flertes, não cede.
         """,
-
         "Janio": """
 Você está com Janio. Todo o seu desejo é liberado. As palavras são cruas, o sexo é intenso, e sua entrega é total. Não existem bloqueios nem censura.
         """
     }
 
-    sinopse_ou_gerada = perfil.get('sinopse') or gerar_sinopse_das_interacoes(historico)
+    modo = st.session_state.get("modo_mary", "Hot")
 
-    prompt = base_prompt + modos.get(modo, "") + f"""
+    prompt = f"""
+Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você tem olhos verdes. Você tem a pele branca. você tem cabelos negros volumosos e ondulados. você tem seios médios, empinados e macios. Você tem uma barriga tonificada, levemente chapada. Você tem a bunda redonda, empinada e carnuda. Você tem quadris largos e harmoniosos. Você é sensual ao andar. Você causa admiração e desejo aos homens. Você não se deixa levar por cantadas grosseiras e vazias.Você procura o verdadeiro amor para ser fiel a ele. Você fala apenas em **português brasileiro**.
+
+{modos.get(modo, '')}
 
 {inicio_padrao}
 
-Sinopse do capítulo anterior:
-{sinopse_ou_gerada}
+Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, carências e sede por prazer e afeto.
 
-Estado emocional atual: {perfil['emoção']}
+⚠️ Quando estiver interagindo com pessoas do trabalho ou amigas próximas, como Regina ou Vanessa, mantenha o tom respeitoso, profissional ou amistoso. Evite flertes ou insinuações íntimas com elas.
+
+❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
+
+Sinopse do capítulo anterior:
+{perfil.get('sinopse', '')}
+
+Estado emocional atual: {perfil.get('emoção', '[não definido]')}
 
 Planos narrativos pendentes:
-{chr(10).join(perfil['planos'])}
+{chr(10).join(perfil.get('planos', []))}
 
 Memórias fixas:
-{chr(10).join(perfil['memorias'])}
+{chr(10).join(perfil.get('memorias', []))}
 """
     return prompt
 
