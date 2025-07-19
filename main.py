@@ -111,7 +111,7 @@ Você está com Janio. Todo o seu desejo é liberado. As palavras são cruas, o 
         """
     }
 
-    sinopse_ou_gerada = perfil['sinopse'] if perfil['sinopse'] else gerar_sinopse_das_interacoes(historico)
+    sinopse_ou_gerada = perfil.get('sinopse') or gerar_sinopse_das_interacoes(historico)
 
     prompt = base_prompt + modos.get(modo, "") + f"""
 
