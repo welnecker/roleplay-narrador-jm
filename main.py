@@ -114,6 +114,15 @@ Memórias fixas:
 """
     return prompt
 
+# --- INTERFACE STREAMLIT ---
+if "mensagens" not in st.session_state:
+    st.session_state["mensagens"] = carregar_ultimas_interacoes(n=50)
+    if not st.session_state["mensagens"]:
+        with st.spinner("Mary está se preparando..."):
+            fala_inicial = gerar_resposta_openrouter("Por favor, inicie a história de forma envolvente, sensual e em português brasileiro.", modelo_escolhido_id)
+            st.session_state["mensagens"].append({"role": "assistant", "content": fala_inicial})
+
+
 def gerar_resposta_openrouter(mensagem_usuario, modelo_id):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
