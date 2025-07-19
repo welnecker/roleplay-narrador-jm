@@ -73,9 +73,9 @@ def salvar_sinopse(resumo, tokens):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for i, linha in enumerate(aba.get_all_records(), start=2):
             if linha.get("tipo", "").lower() == "sinopse":
-                aba.update_cell(i, 7, timestamp)  # Coluna G
-                aba.update_cell(i, 8, resumo)     # Coluna H
-                aba.update_cell(i, 9, tokens)     # Coluna I
+                aba.update_cell(i, 7, timestamp)
+                aba.update_cell(i, 8, resumo)
+                aba.update_cell(i, 9, tokens)
                 break
     except Exception as e:
         st.warning(f"Erro ao salvar sinopse: {e}")
@@ -110,6 +110,7 @@ def gerar_resposta_openrouter(mensagem_usuario, modelo_id):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "HTTP-Referer": "https://share.streamlit.io/",
+        "X-Title": "Mary Roleplay App",
         "Content-Type": "application/json"
     }
     mensagens = [{"role": "system", "content": construir_prompt_mary()}]
@@ -162,9 +163,8 @@ st.set_page_config(page_title="Mary Roleplay Autônomo", page_icon="🌹")
 st.title("🌹 Mary Roleplay com Inteligência Autônoma")
 st.markdown("Converse com Mary com memória, emoção, planos e continuidade narrativa.")
 
-# --- Seletor de modelo ---
 modelos_disponiveis = {
-    "DeepSeek V3": "deepseek-ai/DeepSeek-V3-Chat",
+    "DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
     "MythoMax 13B": "gryphe/mythomax-l2-13b",
     "Mistral Nemo": "mistralai/mistral-nemo"
 }
