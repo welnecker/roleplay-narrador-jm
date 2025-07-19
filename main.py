@@ -194,7 +194,8 @@ for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
+with st.sidebar:
+    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
 
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
