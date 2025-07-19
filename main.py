@@ -72,10 +72,10 @@ def salvar_sinopse(resumo, tokens):
         aba = conectar_planilha().worksheet("perfil_mary")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for i, linha in enumerate(aba.get_all_records(), start=2):
-            if not linha.get("resumo"):
-                aba.update(f"K{i}", timestamp)
-                aba.update(f"L{i}", resumo)
-                aba.update(f"M{i}", tokens)
+            if linha.get("tipo", "").lower() == "sinopse":
+                aba.update_cell(i, 7, timestamp)  # Coluna G
+                aba.update_cell(i, 8, resumo)     # Coluna H
+                aba.update_cell(i, 9, tokens)     # Coluna I
                 break
     except Exception as e:
         st.warning(f"Erro ao salvar sinopse: {e}")
