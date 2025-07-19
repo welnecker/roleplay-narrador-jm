@@ -24,8 +24,7 @@ if "mensagens" not in st.session_state:
     ultimas = carregar_ultimas_interacoes(n=3)
     st.session_state["mensagens"] = []
     if ultimas:
-        resumo = '
-'.join(f"{m['role']}: {m['content']}" for m in ultimas)
+        resumo = '\n'.join(f"{m['role']}: {m['content']}" for m in ultimas)
         st.session_state["mensagens"].append({"role": "assistant", "content": f"**Resumo do capítulo anterior:**
 {resumo}"})
     else:
@@ -137,8 +136,7 @@ Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, car
 ❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
 
 Sinopse do capítulo anterior:
-{perfil.get('sinopse', '') or '
-'.join(f"{i['role']}: {i['content']}" for i in historico)}
+{perfil.get('sinopse', '') or '\n'.join(f"{i['role']}: {i['content']}" for i in historico)}
 
 Estado emocional atual: {perfil.get('emoção', '[não definido]')}
 
@@ -149,6 +147,7 @@ Memórias fixas:
 {chr(10).join(perfil.get('memorias', []))}
 """
     return prompt
+
 
 # --- GERA RESPOSTA COM BASE NO PROMPT ---
 def gerar_resposta_openrouter(mensagem_usuario, modelo_escolhido):
