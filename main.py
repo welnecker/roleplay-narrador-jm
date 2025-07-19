@@ -20,105 +20,6 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
-# --- INTERFACE: SELECIONAR MODO DE MARY ---
-modo_escolhido = st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
-st.session_state["modo_mary"] = modo_escolhido
-
-# --- HISTÓRICO INICIAL (EXIBE SINOPSE COMO MENSAGEM AO ABRIR O APP) ---
-if "mensagens" not in st.session_state:
-    ultimas = carregar_ultimas_interacoes(n=3)
-    st.session_state["mensagens"] = []
-    if ultimas:
-        resumo = '\n'.join(f"{m['role']}: {m['content']}" for m in ultimas)
-        st.session_state["mensagens"].append({
-            "role": "assistant",
-            "content": f"**Resumo do capítulo anterior:**\n{resumo}"
-        })
-    else:
-        with st.spinner("Mary está se preparando..."):
-            fala_inicial = "Os primeiros raios de sol atravessam as cortinas..."
-            st.session_state["mensagens"].append({"role": "assistant", "content": fala_inicial})
-
-
-
-# --- INTERFACE: SELECIONAR MODO DE MARY ---
-modo_escolhido = st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
-st.session_state["modo_mary"] = modo_escolhido
-
-# --- FUNÇÕES DE CARREGAMENTO E SALVAMENTO ---
-def salvar_interacao(role, content):
-    try:
-        aba = planilha.worksheet("interacoes_mary")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        aba.append_row([timestamp, role, content])
-    except Exception as e:
-        print(f"Erro ao salvar interação: {e}")
-
-def carregar_ultimas_interacoes(n=20):
-    try:
-        aba = planilha.worksheet("interacoes_mary")
-        dados = aba.get_all_records()
-        return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
-    except Exception as e:
-        print(f"Erro ao carregar histórico: {e}")
-        return []
-    except Exception as e:
-        print(f"Erro ao carregar histórico: {e}")
-        return []
-
-def carregar_fragmentos():
-    try:
-        aba = planilha.worksheet("fragmentos_mary")
-        dados = aba.get_all_records()
-        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] and linha['ato']]
-        if linhas:
-            conteudo = "Memórias recentes sobre você:\n" + "\n".join(linhas)
-            return {"role": "user", "content": conteudo}
-    except Exception as e:
-        print(f"Erro ao carregar fragmentos: {e}")
-    return None
-
-def carregar_perfil_mary():
-    try:
-        sheet = planilha.worksheet("perfil_mary")
-        dados = sheet.get_all_records()
-        blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
-        for linha in dados:
-            if linha.get("chave") == "estado_emocional":
-                blocos["emoção"] = linha.get("valor", "")
-            if linha.get("objetivo") and linha.get("status") == "pendente":
-                blocos["planos"].append(f"- {linha['objetivo']}")
-            if linha.get("tipo") == "memoria":
-                blocos["memorias"].append(f"{linha['chave']}: {linha['valor']}")
-            if linha.get("resumo"):
-                blocos["sinopse"] = linha["resumo"]
-        return blocos
-    except Exception as e:
-        print(f"Erro ao carregar perfil: {e}")
-        return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
-
-import streamlit as st
-import requests
-import gspread
-import json
-import re
-from datetime import datetime
-from oauth2client.service_account import ServiceAccountCredentials
-
-# --- CONFIGURAÇÕES ---
-OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
-
-# --- CONECTA À PLANILHA GOOGLE ---
-def conectar_planilha():
-    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
-
-planilha = conectar_planilha()
-
 # --- FUNÇÕES DE CARREGAMENTO E SALVAMENTO ---
 def salvar_interacao(role, content):
     try:
@@ -280,7 +181,7 @@ st.markdown("Converse com Mary com memória, emoção, planos e continuidade nar
 
 modelo_escolhido_id = "deepseek/deepseek-chat-v3-0324"
 
-modo_escolhido = st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
+st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
 
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = carregar_ultimas_interacoes(n=50)
