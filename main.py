@@ -181,7 +181,7 @@ st.markdown("Converse com Mary com memória, emoção, planos e continuidade nar
 
 modelo_escolhido_id = "deepseek/deepseek-chat-v3-0324"
 
-st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
+
 
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = carregar_ultimas_interacoes(n=50)
@@ -193,6 +193,8 @@ if "mensagens" not in st.session_state:
 for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+
+st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
 
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
