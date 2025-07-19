@@ -105,7 +105,7 @@ Memórias fixas:
 """
     return prompt
 
-def gerar_resposta_openrouter(mensagem_usuario):
+def gerar_resposta_openrouter(mensagem_usuario, modelo_id):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -121,7 +121,13 @@ def gerar_resposta_openrouter(mensagem_usuario):
     if mensagem_usuario.strip() != "*":
         mensagens.append({"role": "user", "content": mensagem_usuario})
 
-    data = {"model": "switchpoint/router", "messages": mensagens}
+    data = {
+        "model": modelo_id,
+        "messages": mensagens,
+        "max_tokens": 1024,
+        "temperature": 0.9
+    }
+
     try:
         response = requests.post(url, headers=headers, json=data)
         if response.status_code == 200:
@@ -129,14 +135,14 @@ def gerar_resposta_openrouter(mensagem_usuario):
             if mensagem_usuario.strip() != "*":
                 salvar_interacao("user", mensagem_usuario)
             salvar_interacao("assistant", resposta)
-            # Gera sinopse com base nas últimas 5 interações
             interacoes_resumidas = historico[-5:] + ([{"role": "user", "content": mensagem_usuario}] if mensagem_usuario.strip() != "*" else []) + [{"role": "assistant", "content": resposta}]
             texto_base = "\n".join([msg["content"] for msg in interacoes_resumidas])
             resumo = texto_base[:200] + "..." if len(texto_base) > 200 else texto_base
             salvar_sinopse(resumo, len(texto_base.split()))
+            st.info(f"✅ Resposta gerada com: **{st.session_state['modelo_nome']}**")
             return resposta
         else:
-            st.warning("Modelo principal indisponível. Tentando fallback...")
+            st.warning(f"⚠️ Modelo '{modelo_id}' indisponível. Usando fallback MythoMax...")
             data["model"] = "gryphe/mythomax-l2-13b"
             response = requests.post(url, headers=headers, json=data)
             if response.status_code == 200:
@@ -144,6 +150,7 @@ def gerar_resposta_openrouter(mensagem_usuario):
                 if mensagem_usuario.strip() != "*":
                     salvar_interacao("user", mensagem_usuario)
                 salvar_interacao("assistant", resposta)
+                st.info("✅ Resposta gerada com: **MythoMax 13B** (fallback)")
                 return resposta
             else:
                 return f"Erro {response.status_code}: {response.text}"
@@ -155,11 +162,32 @@ st.set_page_config(page_title="Mary Roleplay Autônomo", page_icon="🌹")
 st.title("🌹 Mary Roleplay com Inteligência Autônoma")
 st.markdown("Converse com Mary com memória, emoção, planos e continuidade narrativa.")
 
+# --- Seletor de modelo ---
+modelos_disponiveis = {
+    "DeepSeek V3": "deepseek-ai/DeepSeek-V3-Chat",
+    "MythoMax 13B": "gryphe/mythomax-l2-13b",
+    "Mistral Nemo": "mistralai/mistral-nemo"
+}
+
+if "modelo_nome" not in st.session_state:
+    st.session_state["modelo_nome"] = "DeepSeek V3"
+
+modelo_escolhido_nome = st.selectbox(
+    "🧠 Modelo de IA",
+    list(modelos_disponiveis.keys()),
+    index=list(modelos_disponiveis.keys()).index(st.session_state["modelo_nome"])
+)
+
+if modelo_escolhido_nome != st.session_state["modelo_nome"]:
+    st.session_state["modelo_nome"] = modelo_escolhido_nome
+
+modelo_escolhido_id = modelos_disponiveis[st.session_state["modelo_nome"]]
+
 if "mensagens" not in st.session_state:
     st.session_state["mensagens"] = carregar_ultimas_interacoes(n=50)
     if not st.session_state["mensagens"]:
         with st.spinner("Mary está se preparando..."):
-            fala_inicial = gerar_resposta_openrouter("Inicie a história.")
+            fala_inicial = gerar_resposta_openrouter("Inicie a história.", modelo_escolhido_id)
             st.session_state["mensagens"].append({"role": "assistant", "content": fala_inicial})
 
 for msg in st.session_state["mensagens"]:
@@ -170,7 +198,7 @@ if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
         st.markdown(prompt)
     with st.spinner("Mary está pensando..."):
-        resposta = gerar_resposta_openrouter(prompt)
+        resposta = gerar_resposta_openrouter(prompt, modelo_escolhido_id)
         if prompt.strip() != "*":
             st.session_state["mensagens"].append({"role": "user", "content": prompt})
         st.session_state["mensagens"].append({"role": "assistant", "content": resposta})
