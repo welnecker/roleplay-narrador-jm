@@ -209,9 +209,6 @@ st.markdown("Converse com Mary com memória, emoção, planos e continuidade nar
 
 modelo_escolhido_id = "deepseek/deepseek-chat-v3-0324"
 
-modo_escolhido = st.selectbox("\U0001F499 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_select")
-st.session_state.modo_mary = modo_escolhido
-
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = carregar_ultimas_interacoes(n=50)
     if not st.session_state.mensagens:
