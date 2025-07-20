@@ -156,3 +156,49 @@ with st.sidebar:
 
 resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
 st.info(f"\U0001f9e0 *No capítulo anterior...*\n\n> {resumo}")
+
+# --- EXIBIÇÃO DAS MENSAGENS ---
+if "mensagens" not in st.session_state:
+    interacoes = carregar_ultimas_interacoes(n=50)
+    st.session_state.mensagens = interacoes if interacoes else []
+
+for msg in st.session_state.mensagens:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# --- ENTRADA DO USUÁRIO ---
+if prompt := st.chat_input("Digite sua mensagem..."):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    salvar_interacao("user", prompt)
+    st.session_state.mensagens.append({"role": "user", "content": prompt})
+
+    with st.spinner("Mary está pensando..."):
+        mensagens = [{"role": "system", "content": construir_prompt_mary()}]
+        fragmentos = carregar_fragmentos()
+        if fragmentos:
+            mensagens.append(fragmentos)
+        mensagens += st.session_state.mensagens[-10:]
+
+        resposta = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek/deepseek-chat-v3-0324",
+                "messages": mensagens,
+                "max_tokens": 1200,
+                "temperature": 0.9
+            }
+        )
+
+        if resposta.status_code == 200:
+            conteudo = resposta.json()["choices"][0]["message"]["content"]
+            with st.chat_message("assistant"):
+                st.markdown(conteudo)
+            salvar_interacao("assistant", conteudo)
+            st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
+        else:
+            st.error("Erro ao obter resposta da Mary.")
