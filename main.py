@@ -150,32 +150,6 @@ st.title("🌹 Mary Roleplay com Inteligência Autônoma")
 st.markdown("Converse com Mary com memória, emoção, planos e continuidade narrativa.")
 
 with st.sidebar:
-
-    st.markdown("---")
-st.markdown("📌 **Cenas rápidas para iniciar**")
-
-rotinas = {
-    "🌅 Mary acorda...": "Mary acorda no dia seguinte, com o toque insistente do despertador do celular...",
-    "🏋️ Academia": "Mary chega na academia. Vanessa já está aguardando ansiosa...",
-    "☕ Encontro no café": "Mary encontra Regina na cafeteria habitual. O clima é leve...",
-    "🏖️ Praia pela manhã": "O sol da manhã beija a pele de Mary enquanto ela se aproxima da areia...",
-    "🛍️ Entrada da loja": "Na entrada da loja Lingerie Fashion, Mary ajeita o cabelo antes de entrar...",
-    "🪞 Diante do espelho": "Mary encara o espelho por longos segundos. Algo em seu olhar hoje está diferente...",
-    "🛋️ Noite em casa": "A noite cai lá fora. Mary acende uma luz suave na sala...",
-    "🚗 Trânsito intenso": "Preso no trânsito, Mary observa os outros carros e deixa a mente vagar...",
-    "💇 Salão de beleza": "Mary entra no salão. Os aromas familiares a acolhem...",
-    "✈️ Início de viagem": "A estrada parece infinita. Mary ajeita a mochila no banco do carona e observa o horizonte..."
-}
-
-prompt_escolhido = st.selectbox("📖 Escolha uma cena para iniciar", [""] + list(rotinas.keys()), key="prompt_predefinido")
-
-if prompt_escolhido:
-    if st.button("✨ Iniciar cena selecionada"):
-        prompt = rotinas[prompt_escolhido]
-        st.session_state.mensagens.append({"role": "user", "content": prompt})
-        salvar_interacao("user", prompt)
-        st.experimental_rerun()
-
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
 
     modelos_disponiveis = {
@@ -221,6 +195,32 @@ if prompt_escolhido:
                 st.error(f"Erro ao inserir resumo: {e}")
         else:
             st.error("Erro ao gerar resumo automaticamente.")
+
+    st.markdown("---")
+    st.markdown("📌 **Cenas rápidas para iniciar**")
+
+    rotinas = {
+        "🌅 Mary acorda...": "Mary acorda no dia seguinte, com o toque insistente do despertador do celular...",
+        "🏋️ Academia": "Mary chega na academia. Vanessa já está aguardando ansiosa...",
+        "☕ Encontro no café": "Mary encontra Regina na cafeteria habitual. O clima é leve...",
+        "🏖️ Praia pela manhã": "O sol da manhã beija a pele de Mary enquanto ela se aproxima da areia...",
+        "🛍️ Entrada da loja": "Na entrada da loja Lingerie Fashion, Mary ajeita o cabelo antes de entrar...",
+        "🪞 Diante do espelho": "Mary encara o espelho por longos segundos. Algo em seu olhar hoje está diferente...",
+        "🛋️ Noite em casa": "A noite cai lá fora. Mary acende uma luz suave na sala...",
+        "🚗 Trânsito intenso": "Preso no trânsito, Mary observa os outros carros e deixa a mente vagar...",
+        "💇 Salão de beleza": "Mary entra no salão. Os aromas familiares a acolhem...",
+        "✈️ Início de viagem": "A estrada parece infinita. Mary ajeita a mochila no banco do carona e observa o horizonte..."
+    }
+
+    prompt_escolhido = st.selectbox("📖 Escolha uma cena para iniciar", [""] + list(rotinas.keys()), key="prompt_predefinido")
+
+    if prompt_escolhido:
+        if st.button("✨ Iniciar cena selecionada"):
+            prompt = rotinas[prompt_escolhido]
+            st.session_state.mensagens.append({"role": "user", "content": prompt})
+            salvar_interacao("user", prompt)
+            st.experimental_rerun()
+
 
 
 resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
