@@ -23,7 +23,7 @@ def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
 
 planilha = conectar_planilha()
 
@@ -116,7 +116,7 @@ modelos_disponiveis = {
     "Llama3 LumiMaid": "neversleep/llama-3-lumimaid-8b"
 }
 
-modelo_escolhido_label = st.selectbox("🧠 Escolha o modelo de IA", list(modelos_disponiveis.keys()))
+modelo_escolhido_label = st.selectbox("🧠 Escolha o modelo de IA", list(modelos_disponiveis.keys()), index=0)
 modelo_escolhido_id = modelos_disponiveis[modelo_escolhido_label]
 
 # --- EXIBIÇÃO DE ÍCONE DA IMAGEM NA SIDEBAR ---
@@ -178,6 +178,7 @@ else:
             estilo = "mary" if msg["role"] == "assistant" else "usuario"
             classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
             st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 
 # --- PERFIL E PROMPT DA PERSONAGEM ---
