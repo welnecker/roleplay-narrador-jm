@@ -151,7 +151,7 @@ st.markdown("Converse com Mary com memória, emoção, planos e continuidade nar
 
 with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
-    if st.button("🎬 Ver vídeo atual"):
+    if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
 resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
