@@ -145,9 +145,21 @@ Memórias fixas:
     return prompt.strip()
 
 # --- INTERFACE STREAMLIT ---
-st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
-st.title("🌹 Mary Roleplay com Inteligência Autônoma")
-st.markdown("Converse com Mary com memória, emoção, planos e continuidade narrativa.")
+# --- AVATAR CIRCULAR FIXO COM HTML ---
+st.markdown(
+    """
+    <div style="display: flex; align-items: center;">
+        <img src="https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/Mary_fundo1.jpg" 
+             style="border-radius: 50%; width: 60px; margin-right: 10px;">
+        <div>
+            <h1 style="margin-bottom: 0;">🌹 Mary Roleplay com Inteligência Autônoma</h1>
+            <p style="margin-top: 0;">Converse com Mary com memória, emoção, planos e continuidade narrativa.</p>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
