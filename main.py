@@ -163,8 +163,22 @@ with st.sidebar:
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    if st.button("🎮 Ver vídeo atual"):
+    # Inicializa a flag se não existir
+    if "mostrar_video" not in st.session_state:
+        st.session_state.mostrar_video = False
+    
+    # Botões para mostrar ou fechar o vídeo
+    if not st.session_state.mostrar_video:
+        if st.button("🎮 Ver vídeo atual"):
+            st.session_state.mostrar_video = True
+    else:
+        if st.button("❌ Fechar vídeo"):
+            st.session_state.mostrar_video = False
+    
+    # Exibição condicional do vídeo (fora do botão)
+    if st.session_state.mostrar_video:
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+
 
     if st.button("📝 Gerar resumo do capítulo"):
         ultimas = carregar_ultimas_interacoes(n=3)
