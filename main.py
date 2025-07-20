@@ -162,7 +162,7 @@ st.markdown(
         <img src="https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/Mary_fundo1.jpg" 
              style="border-radius: 50%; width: 60px; margin-right: 10px;">
         <div>
-            <h1 style="margin-bottom: 0;">🌹 Mary Roleplay com Inteligência Autônoma</h1>
+            <h1 style="margin-bottom: 0;">🌹 Mary </h1>
             <p style="margin-top: 0;">Converse com Mary com memória, emoção, planos e continuidade narrativa.</p>
         </div>
     </div>
