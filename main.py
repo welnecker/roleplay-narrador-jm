@@ -163,7 +163,7 @@ st.markdown(
              style="border-radius: 50%; width: 60px; margin-right: 10px;">
         <div>
             <h1 style="margin-bottom: 0;">🌹 Mary </h1>
-            <p style="margin-top: 0;">Converse com Mary. Ela é linda. Mas cuidado: sua paiixão não tem limites!</p>
+            <p style="margin-top: 0;">Interaja com Mary. Ela é linda. Mas cuidado: sua paixão não tem limites!</p>
         </div>
     </div>
     """,
