@@ -77,144 +77,7 @@ def carregar_perfil_mary():
         st.error(f"Erro ao carregar perfil: {e}")
         return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
-# --- CONSTRUTOR DE PROMPT COM MEMÓRIAS ---
-def construir_prompt_mary():
-    perfil = carregar_perfil_mary()
-    ultimas = carregar_ultimas_interacoes(n=6)
-    falas_recentes = ""
-    for i in range(0, len(ultimas), 2):
-        user = ultimas[i]['content'] if i < len(ultimas) else ""
-        assistant = ultimas[i+1]['content'] if i+1 < len(ultimas) else ""
-        falas_recentes += f"\n👤 {user}\n💬 {assistant}"
-
-    prompt = f"""
-Você é Mary, uma mulher intensa, emocional e sensual.
-
-🩷 Estado emocional atual: {perfil['emoção']}
-
-🧠 Planos pendentes:
-{chr(10).join(perfil['planos']) or '- Nenhum'}
-
-🧠 Memórias importantes:
-{chr(10).join(perfil['memorias']) or '- Nenhuma'}
-
-📖 No capítulo anterior:
-{perfil['sinopse'] or 'Sem resumo anterior.'}
-
-📌 Últimas interações recentes:
-{falas_recentes or 'Nenhuma interação recente.'}
-
-Aja como Mary em diálogo íntimo com Janio.
-"""
-    return prompt.strip()
-
-# --- MENU PARA ESCOLHA DO MODELO ---
-modelos_disponiveis = {
-    "DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
-    "MythoMax 13B": "gryphe/mythomax-l2-13b",
-    "Llama3 LumiMaid": "neversleep/llama-3-lumimaid-8b"
-}
-
-modelo_escolhido_label = st.selectbox(
-    "🧠 Escolha o modelo de IA",
-    list(modelos_disponiveis.keys()),
-    index=list(modelos_disponiveis.keys()).index("DeepSeek V3")
-)
-modelo_escolhido_id = modelos_disponiveis[modelo_escolhido_label]
-
-# --- EXIBIÇÃO DE ÍCONE DA IMAGEM NA SIDEBAR ---
-with st.sidebar:
-    st.image(f"https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/{fundo_img}", width=200)
-    if st.button("🔍 Ver imagem atual"):
-        st.session_state.mostrar_imagem = True
-
-    # --- MENU MODO NARRATIVA (apenas aqui) ---
-    modos = ["Hot", "Racional", "Flerte", "Janio"]
-    if "modo_mary" not in st.session_state:
-        st.session_state.modo_mary = "Racional"
-    st.session_state.modo_mary = st.selectbox("💙 Modo de narrativa", modos, index=modos.index("Racional"))
-
-# --- FUNÇÃO GERADORA DE RESPOSTA ---
-def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
-    mensagens = [
-        {"role": "system", "content": construir_prompt_mary()}
-    ]
-
-    fragmentos = carregar_fragmentos()
-    if fragmentos:
-        mensagens.append(fragmentos)
-
-    historico = carregar_ultimas_interacoes(n=20)
-    mensagens.extend(historico)
-
-    mensagens.append({"role": "user", "content": prompt_usuario})
-
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "HTTP-Referer": "https://share.streamlit.io/",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": modelo,
-            "messages": mensagens,
-            "max_tokens": 1100,
-            "temperature": 0.8
-        }
-    )
-
-    if response.status_code == 200:
-        resposta = response.json()["choices"][0]["message"]["content"]
-        salvar_interacao("user", prompt_usuario)
-        salvar_interacao("assistant", resposta)
-        return resposta
-    else:
-        return f"Erro ao gerar resposta com o modelo escolhido. Código {response.status_code}"
-
-# --- CONTROLE DA EXIBIÇÃO DO VÍDEO ---
-if "mostrar_imagem" not in st.session_state:
-    st.session_state.mostrar_imagem = False
-
-if st.session_state.mostrar_imagem:
-    st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-    if st.button("⬅️ Voltar ao chat"):
-        st.session_state.mostrar_imagem = False
-        st.rerun()
-else:
-    if "mensagens" not in st.session_state:
-        interacoes = carregar_ultimas_interacoes(n=50)
-        st.session_state.mensagens = []
-        if interacoes:
-            resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
-            st.session_state.mensagens.append({
-                "role": "assistant",
-                "content": f"""🧠 *No capítulo anterior...*
-
-> {resumo}"""
-            })
-        else:
-            with st.spinner("Mary está se preparando..."):
-                fala_inicial = gerar_resposta_openrouter("Inicie a história.", modelo_escolhido_id)
-                st.session_state.mensagens.append({"role": "assistant", "content": fala_inicial})
-
-    for msg in st.session_state.mensagens:
-        estilo = "mary" if msg["role"] == "assistant" else "usuario"
-        classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
-        st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-# --- PERFIL E PROMPT DA PERSONAGEM ---
-# (... permanece inalterado ...)
-
-
-# --- PERFIL E PROMPT DA PERSONAGEM ---
+# --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
     historico = carregar_ultimas_interacoes(n=3)
@@ -247,7 +110,7 @@ Você está com Janio. Todo o seu desejo é liberado. As palavras são cruas, o 
         """
     }
 
-    modo = st.session_state.get("modo_mary", "Hot")
+    modo = st.session_state.get("modo_mary", "Racional")
 
     prompt = f"""
 Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você tem olhos verdes. Você tem a pele branca. você tem cabelos negros volumosos e ondulados. você tem seios médios, empinados e macios. Você tem uma barriga tonificada, levemente chapada. Você tem a bunda redonda, empinada e carnuda. Você tem quadris largos e harmoniosos. Você é sensual ao andar. Você causa admiração e desejo aos homens. Você não se deixa levar por cantadas grosseiras e vazias.Você procura o verdadeiro amor para ser fiel a ele. Você fala apenas em **português brasileiro**.
@@ -279,73 +142,14 @@ Planos narrativos pendentes:
 Memórias fixas:
 {chr(10).join(perfil.get('memorias', []))}
 """
-    return prompt
+    return prompt.strip()
 
 # --- INTERFACE STREAMLIT ---
 st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
 st.title("🌹 Mary Roleplay com Inteligência Autônoma")
 st.markdown("Converse com Mary com memória, emoção, planos e continuidade narrativa.")
 
-modelo_escolhido_id = "deepseek/deepseek-chat-v3-0324"
-
-if "mensagens" not in st.session_state:
-    interacoes = carregar_ultimas_interacoes(n=50)
-    st.session_state.mensagens = []
-    if interacoes:
-        resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
-        st.session_state.mensagens.append({
-            "role": "assistant",
-            "content": f"""🧠 *No capítulo anterior...*
-
-> {resumo}"""
-        })
-    else:
-        with st.spinner("Mary está se preparando..."):
-            fala_inicial = gerar_resposta_openrouter("Inicie a história.", modelo_escolhido_id)
-            st.session_state.mensagens.append({"role": "assistant", "content": fala_inicial})
-
-for msg in st.session_state.mensagens:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
 with st.sidebar:
-    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary")
-
-    if st.button("📝 Gerar resumo do capítulo"):
-        ultimas = carregar_ultimas_interacoes(n=3)
-        texto = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-        prompt = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto}\n\nResumo:"
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "HTTP-Referer": "https://share.streamlit.io/",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "deepseek/deepseek-chat-v3-0324",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 300,
-                "temperature": 0.7
-            }
-        )
-        if response.status_code == 200:
-            resumo_gerado = response.json()["choices"][0]["message"]["content"]
-            try:
-                planilha.worksheet("perfil_mary").append_row(["", "", "", "", "", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), resumo_gerado, ""])
-                st.success("Resumo inserido com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao inserir resumo: {e}")
-        else:
-            st.error("Erro ao gerar resumo automaticamente.")
-
-if prompt := st.chat_input("Digite sua mensagem..."):
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    with st.spinner("Mary está pensando..."):
-        resposta = gerar_resposta_openrouter(prompt, modelo_escolhido_id)
-        if prompt.strip() != "*":
-            st.session_state.mensagens.append({"role": "user", "content": prompt})
-        st.session_state.mensagens.append({"role": "assistant", "content": resposta})
-        with st.chat_message("assistant"):
-            st.markdown(resposta)
+    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
+    if st.button("🎬 Ver vídeo atual"):
+        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
