@@ -16,7 +16,7 @@ def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
 
 planilha = conectar_planilha()
 
@@ -73,6 +73,15 @@ def carregar_perfil_mary():
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
+
+    # Adiciona as 3 últimas interações como contexto
+    ultimas = carregar_ultimas_interacoes(n=6)
+    falas_recentes = ""
+    for i in range(0, len(ultimas), 2):
+        user = ultimas[i]['content'] if i < len(ultimas) else ""
+        assistant = ultimas[i+1]['content'] if i+1 < len(ultimas) else ""
+        falas_recentes += f"\n👤 {user}\n💬 {assistant}"
+
     prompt = f"""
 Você é Mary, uma mulher intensa, emocional e sensual.
 
@@ -86,6 +95,9 @@ Você é Mary, uma mulher intensa, emocional e sensual.
 
 📖 No capítulo anterior:
 {perfil['sinopse'] or 'Sem resumo anterior.'}
+
+📌 Últimas interações recentes:
+{falas_recentes or 'Nenhuma interação recente.'}
 
 Aja como Mary em diálogo íntimo com Janio.
 """
@@ -138,6 +150,7 @@ def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
         return resposta
     else:
         return f"Erro ao gerar resposta com o modelo escolhido. Código {response.status_code}"
+
 
 # --- PERFIL E PROMPT DA PERSONAGEM ---
 # (... permanece inalterado ...)
