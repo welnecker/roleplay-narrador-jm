@@ -55,7 +55,7 @@ def carregar_perfil_mary():
         sheet = planilha.worksheet("perfil_mary")
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
-        for linha in reversed(dados):  # percorre de baixo para cima
+        for linha in reversed(dados):
             if not blocos["sinopse"] and linha.get("resumo"):
                 blocos["sinopse"] = linha["resumo"]
         for linha in dados:
@@ -104,9 +104,18 @@ modelo_escolhido_id = modelos_disponiveis[modelo_escolhido_label]
 # --- FUNÇÃO GERADORA DE RESPOSTA ---
 def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
     mensagens = [
-        {"role": "system", "content": construir_prompt_mary()},
-        {"role": "user", "content": prompt_usuario}
+        {"role": "system", "content": construir_prompt_mary()}
     ]
+
+    fragmentos = carregar_fragmentos()
+    if fragmentos:
+        mensagens.append(fragmentos)
+
+    historico = carregar_ultimas_interacoes(n=20)
+    mensagens.extend(historico)
+
+    mensagens.append({"role": "user", "content": prompt_usuario})
+
     response = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers={
@@ -117,14 +126,18 @@ def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
         json={
             "model": modelo,
             "messages": mensagens,
-            "max_tokens": 800,
+            "max_tokens": 1100,
             "temperature": 0.8
         }
     )
+
     if response.status_code == 200:
-        return response.json()["choices"][0]["message"]["content"]
+        resposta = response.json()["choices"][0]["message"]["content"]
+        salvar_interacao("user", prompt_usuario)
+        salvar_interacao("assistant", resposta)
+        return resposta
     else:
-        return "Erro ao gerar resposta com o modelo escolhido."
+        return f"Erro ao gerar resposta com o modelo escolhido. Código {response.status_code}"
 
 # --- PERFIL E PROMPT DA PERSONAGEM ---
 # (... permanece inalterado ...)
