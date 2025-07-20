@@ -80,7 +80,6 @@ def carregar_perfil_mary():
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
-
     ultimas = carregar_ultimas_interacoes(n=6)
     falas_recentes = ""
     for i in range(0, len(ultimas), 2):
@@ -203,6 +202,7 @@ else:
         estilo = "mary" if msg["role"] == "assistant" else "usuario"
         classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
         st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 
 
