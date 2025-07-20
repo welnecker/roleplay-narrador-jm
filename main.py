@@ -152,13 +152,14 @@ st.markdown("Converse com Mary com memória, emoção, planos e continuidade nar
 with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
 
-    modelos_disponiveis = {
-    "DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
-    "DeepSeek R1 0528": "deepseek/deepseek-r1-0528",
-    "MythoMax 13B": "gryphe/mythomax-l2-13b",
-    "LLaMA3 Lumimaid 8B": "neversleep/llama-3-lumimaid-8b",
-    "WizardLM 8x22B": "microsoft/wizardlm-2-8x22b"
+   modelos_disponiveis = {
+    "💬 DeepSeek V3 ($) - Criativo, econômico e versátil.": "deepseek/deepseek-chat-v3-0324",
+    "🔥 MythoMax 13B ($) - Forte em erotismo e envolvimento emocional.": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ($) - Ousado, direto e criativo para fantasias rápidas.": "neversleep/llama-3-lumimaid-8b",
+    "👑 WizardLM 8x22B ($$$) - Diálogos densos, maduros e emocionais.": "microsoft/wizardlm-2-8x22b",
+    "🧠 DeepSeek R1 0528 ($$) - Natural, fluido e excelente para cenas longas.": "deepseek/deepseek-r1-0528"
 }
+
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
