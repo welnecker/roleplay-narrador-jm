@@ -153,3 +153,6 @@ with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
     if st.button("🎬 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+
+resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
+st.info(f"\U0001f9e0 *No capítulo anterior...*\n\n> {resumo}")
