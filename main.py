@@ -9,6 +9,36 @@ from oauth2client.service_account import ServiceAccountCredentials
 # --- CONFIGURAÇÕES ---
 OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 
+# --- IMAGEM DE FUNDO DINÂMICA ---
+def imagem_de_fundo():
+    indice = len(st.session_state.get("mensagens", [])) // 10 + 1
+    return f"https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/Mary_fundo{indice}.jpeg"
+
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url('{imagem_de_fundo()}');
+        background-size: cover;
+        background-position: center;
+    }}
+    .chatbox {{
+        background-color: rgba(0,0,0,0.6);
+        padding: 1em;
+        border-radius: 1em;
+        margin-bottom: 0.5em;
+    }}
+    .mary {{
+        color: #ff99cc;
+    }}
+    .usuario {{
+        color: #ccffff;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # --- CONECTA À PLANILHA GOOGLE ---
 def conectar_planilha():
     creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
@@ -74,7 +104,6 @@ def carregar_perfil_mary():
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
 
-    # Adiciona as 3 últimas interações como contexto
     ultimas = carregar_ultimas_interacoes(n=6)
     falas_recentes = ""
     for i in range(0, len(ultimas), 2):
@@ -150,6 +179,17 @@ def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
         return resposta
     else:
         return f"Erro ao gerar resposta com o modelo escolhido. Código {response.status_code}"
+
+# --- BOTÃO PARA VER IMAGEM ATUAL ---
+if st.button("🔍 Ver imagem atual"):
+    st.image(imagem_de_fundo(), caption="Cena atual", use_column_width=True)
+
+# --- EXIBIÇÃO DAS MENSAGENS COM ESTILO ---
+if "mensagens" in st.session_state:
+    for msg in st.session_state.mensagens:
+        estilo = "mary" if msg["role"] == "assistant" else "usuario"
+        st.markdown(f'<div class="chatbox {estilo}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 
 
