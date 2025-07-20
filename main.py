@@ -23,11 +23,9 @@ st.markdown(
         background-position: center;
     }}
     .chatbox {{
-        background-color: rgba(255, 255, 255, 0.6);
         padding: 1em;
         border-radius: 1em;
         margin-bottom: 0.5em;
-        backdrop-filter: blur(4px);
     }}
     .mary {{
         color: #ff99cc;
@@ -35,10 +33,18 @@ st.markdown(
     .usuario {{
         color: #ccffff;
     }}
+    .resumo {{
+        background-color: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(4px);
+    }}
     </style>
     """,
     unsafe_allow_html=True
 )
+
+# --- CONTROLE DE EXIBIÇÃO DA IMAGEM ---
+if "mostrar_imagem" not in st.session_state:
+    st.session_state.mostrar_imagem = False
 
 # --- CONECTA À PLANILHA GOOGLE ---
 def conectar_planilha():
@@ -181,15 +187,22 @@ def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
     else:
         return f"Erro ao gerar resposta com o modelo escolhido. Código {response.status_code}"
 
-# --- BOTÃO PARA VER IMAGEM ATUAL ---
+# --- CONTROLE DA EXIBIÇÃO DA IMAGEM ATUAL ---
 if st.button("🔍 Ver imagem atual"):
-    st.image(imagem_de_fundo(), caption="Cena atual", use_column_width=True)
+    st.session_state.mostrar_imagem = True
 
-# --- EXIBIÇÃO DAS MENSAGENS COM ESTILO ---
-if "mensagens" in st.session_state:
-    for msg in st.session_state.mensagens:
-        estilo = "mary" if msg["role"] == "assistant" else "usuario"
-        st.markdown(f'<div class="chatbox {estilo}">{msg["content"]}</div>', unsafe_allow_html=True)
+if st.session_state.mostrar_imagem:
+    st.image(imagem_de_fundo(), caption="Cena atual", use_container_width=True)
+    if st.button("⬅️ Voltar ao chat"):
+        st.session_state.mostrar_imagem = False
+        st.experimental_rerun()
+else:
+    if "mensagens" in st.session_state:
+        for msg in st.session_state.mensagens:
+            estilo = "mary" if msg["role"] == "assistant" else "usuario"
+            classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
+            st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 # --- PERFIL E PROMPT DA PERSONAGEM ---
 # (... permanece inalterado ...)
