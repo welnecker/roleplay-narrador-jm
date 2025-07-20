@@ -70,6 +70,41 @@ def carregar_perfil_mary():
         st.error(f"Erro ao carregar perfil: {e}")
         return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
+# --- MENU PARA ESCOLHA DO MODELO ---
+modelos_disponiveis = {
+    "DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
+    "MythoMax 13B": "gryphe/mythomax-l2-13b",
+    "Llama3 LumiMaid": "neversleep/llama-3-lumimaid-8b"
+}
+
+modelo_escolhido_label = st.selectbox("🧠 Escolha o modelo de IA", list(modelos_disponiveis.keys()))
+modelo_escolhido_id = modelos_disponiveis[modelo_escolhido_label]
+
+# --- FUNÇÃO GERADORA DE RESPOSTA ---
+def gerar_resposta_openrouter(prompt, modelo=modelo_escolhido_id):
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://share.streamlit.io/",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": modelo,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 800,
+            "temperature": 0.8
+        }
+    )
+    if response.status_code == 200:
+        return response.json()["choices"][0]["message"]["content"]
+    else:
+        return "Erro ao gerar resposta com o modelo escolhido."
+
+# --- PERFIL E PROMPT DA PERSONAGEM ---
+# (... permanece inalterado ...)
+
+
 # --- PERFIL E PROMPT DA PERSONAGEM ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
