@@ -57,6 +57,17 @@ def carregar_fragmentos():
         st.error(f"Erro ao carregar fragmentos: {e}")
     return None
 
+def carregar_memorias():
+    try:
+        dados = planilha.worksheet("memorias").col_values(1)[1:]
+        memorias_filtradas = [m.strip() for m in dados if m.strip()]
+        if memorias_filtradas:
+            conteudo = "\n".join(f"- {m}" for m in memorias_filtradas)
+            return {"role": "system", "content": f"Considere as seguintes memórias permanentes da Mary:\n{conteudo}"}
+    except Exception as e:
+        st.error(f"Erro ao carregar memorias: {e}")
+    return None
+
 def carregar_perfil_mary():
     try:
         sheet = planilha.worksheet("perfil_mary")
@@ -80,6 +91,7 @@ def carregar_perfil_mary():
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
+    memorias_livres = carregar_memorias()
     historico = carregar_ultimas_interacoes(n=3)
     inicio_padrao = ""
     if not historico:
@@ -126,13 +138,7 @@ Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, car
 ❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
 
 Sinopse do capítulo anterior:
-"""
-    if perfil.get("sinopse"):
-        prompt += f"\n{perfil['sinopse']}"
-    else:
-        prompt += "\n[sem sinopse disponível]"
-
-    prompt += f"""
+{perfil.get('sinopse', '[sem sinopse disponível]')}
 
 Estado emocional atual: {perfil.get('emoção', '[não definido]')}
 
@@ -141,7 +147,11 @@ Planos narrativos pendentes:
 
 Memórias fixas:
 {chr(10).join(perfil.get('memorias', []))}
+
 """
+    if memorias_livres:
+        prompt += "\n" + memorias_livres["content"]
+
     return prompt.strip()
 
 # --- INTERFACE STREAMLIT ---
@@ -178,19 +188,16 @@ with st.sidebar:
     # Inicializa a flag se não existir
     if "mostrar_video" not in st.session_state:
         st.session_state.mostrar_video = False
-    
-    # Botões para mostrar ou fechar o vídeo
+
     if not st.session_state.mostrar_video:
         if st.button("🎮 Ver vídeo atual"):
             st.session_state.mostrar_video = True
     else:
         if st.button("❌ Fechar vídeo"):
             st.session_state.mostrar_video = False
-    
-    # Exibição condicional do vídeo (fora do botão)
+
     if st.session_state.mostrar_video:
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-
 
     if st.button("📝 Gerar resumo do capítulo"):
         ultimas = carregar_ultimas_interacoes(n=3)
@@ -239,13 +246,35 @@ with st.sidebar:
     }
 
     prompt_escolhido = st.selectbox("📖 Escolha uma cena para iniciar", [""] + list(rotinas.keys()), key="prompt_predefinido")
-
     if prompt_escolhido:
         if st.button("✨ Iniciar cena selecionada"):
             prompt = rotinas[prompt_escolhido]
             st.session_state.mensagens.append({"role": "user", "content": prompt})
             salvar_interacao("user", prompt)
             st.experimental_rerun()
+
+    st.markdown("---")
+    st.markdown("🧠 **Inserir nova memória permanente**")
+
+    nova_memoria = st.text_area("Descreva uma memória marcante entre Janio e Mary:")
+    if st.button("💾 Salvar memória"):
+        try:
+            planilha.worksheet("memorias").append_row([nova_memoria])
+            st.success("Memória salva com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao salvar memória: {e}")
+
+    st.markdown("---")
+    st.markdown("📚 **Memórias fixas salvas**")
+
+    try:
+        aba_memorias = planilha.worksheet("memorias")
+        linhas = aba_memorias.get_all_values()
+        for idx, linha in enumerate(linhas, 1):
+            if linha and linha[0].strip():
+                st.markdown(f"**{idx}.** {linha[0]}")
+    except Exception as e:
+        st.error(f"Erro ao carregar memórias: {e}")
 
 
 
