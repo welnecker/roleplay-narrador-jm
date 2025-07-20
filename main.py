@@ -12,13 +12,15 @@ OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 # --- IMAGEM DE FUNDO DINÂMICA ---
 def imagem_de_fundo():
     indice = len(st.session_state.get("mensagens", [])) // 10 + 1
-    return f"https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/Mary_fundo{indice}.jpeg"
+    return f"Mary_fundo{indice}.jpeg", f"Mary_V{indice}.mp4"
+
+fundo_img, fundo_video = imagem_de_fundo()
 
 st.markdown(
     f"""
     <style>
     .stApp {{
-        background-image: url('{imagem_de_fundo()}');
+        background-image: url('https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/{fundo_img}');
         background-size: cover;
         background-position: center;
     }}
@@ -192,17 +194,16 @@ if st.button("🔍 Ver imagem atual"):
     st.session_state.mostrar_imagem = True
 
 if st.session_state.mostrar_imagem:
-    st.image(imagem_de_fundo(), caption="Cena atual", use_container_width=True)
+    st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
     if st.button("⬅️ Voltar ao chat"):
         st.session_state.mostrar_imagem = False
-        st.experimental_rerun()
+        st.rerun()
 else:
     if "mensagens" in st.session_state:
         for msg in st.session_state.mensagens:
             estilo = "mary" if msg["role"] == "assistant" else "usuario"
             classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
             st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
-
 
 # --- PERFIL E PROMPT DA PERSONAGEM ---
 # (... permanece inalterado ...)
