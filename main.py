@@ -70,6 +70,27 @@ def carregar_perfil_mary():
         st.error(f"Erro ao carregar perfil: {e}")
         return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
+# --- CONSTRUTOR DE PROMPT COM MEMÓRIAS ---
+def construir_prompt_mary():
+    perfil = carregar_perfil_mary()
+    prompt = f"""
+Você é Mary, uma mulher intensa, emocional e sensual.
+
+🩷 Estado emocional atual: {perfil['emoção']}
+
+🧠 Planos pendentes:
+{chr(10).join(perfil['planos']) or '- Nenhum'}
+
+🧠 Memórias importantes:
+{chr(10).join(perfil['memorias']) or '- Nenhuma'}
+
+📖 No capítulo anterior:
+{perfil['sinopse'] or 'Sem resumo anterior.'}
+
+Aja como Mary em diálogo íntimo com Janio.
+"""
+    return prompt.strip()
+
 # --- MENU PARA ESCOLHA DO MODELO ---
 modelos_disponiveis = {
     "DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
@@ -81,7 +102,11 @@ modelo_escolhido_label = st.selectbox("🧠 Escolha o modelo de IA", list(modelo
 modelo_escolhido_id = modelos_disponiveis[modelo_escolhido_label]
 
 # --- FUNÇÃO GERADORA DE RESPOSTA ---
-def gerar_resposta_openrouter(prompt, modelo=modelo_escolhido_id):
+def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
+    mensagens = [
+        {"role": "system", "content": construir_prompt_mary()},
+        {"role": "user", "content": prompt_usuario}
+    ]
     response = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers={
@@ -91,7 +116,7 @@ def gerar_resposta_openrouter(prompt, modelo=modelo_escolhido_id):
         },
         json={
             "model": modelo,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": mensagens,
             "max_tokens": 800,
             "temperature": 0.8
         }
