@@ -129,10 +129,10 @@ with st.sidebar:
         st.session_state.mostrar_imagem = True
 
     # --- MENU MODO NARRATIVA (apenas aqui) ---
-    modos = ["hot", "racional", "flerte", "janio"]
-    if "modo_narrativa" not in st.session_state:
-        st.session_state.modo_narrativa = "racional"
-    st.session_state.modo_narrativa = st.selectbox("🎭 Modo narrativa", modos, index=modos.index("racional"))
+    modos = ["Hot", "Racional", "Flerte", "Janio"]
+    if "modo_mary" not in st.session_state:
+        st.session_state.modo_mary = "Racional"
+    st.session_state.modo_mary = st.selectbox("💙 Modo de narrativa", modos, index=modos.index("Racional"))
 
 # --- FUNÇÃO GERADORA DE RESPOSTA ---
 def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
@@ -202,6 +202,7 @@ else:
         estilo = "mary" if msg["role"] == "assistant" else "usuario"
         classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
         st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 
 
