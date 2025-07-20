@@ -153,6 +153,7 @@ def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
 
 
 
+
 # --- PERFIL E PROMPT DA PERSONAGEM ---
 # (... permanece inalterado ...)
 
