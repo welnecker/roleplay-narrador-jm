@@ -183,11 +183,27 @@ if st.session_state.mostrar_imagem:
         st.session_state.mostrar_imagem = False
         st.rerun()
 else:
-    if "mensagens" in st.session_state:
-        for msg in st.session_state.mensagens:
-            estilo = "mary" if msg["role"] == "assistant" else "usuario"
-            classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
-            st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+    if "mensagens" not in st.session_state:
+        interacoes = carregar_ultimas_interacoes(n=50)
+        st.session_state.mensagens = []
+        if interacoes:
+            resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
+            st.session_state.mensagens.append({
+                "role": "assistant",
+                "content": f"""🧠 *No capítulo anterior...*
+
+> {resumo}"""
+            })
+        else:
+            with st.spinner("Mary está se preparando..."):
+                fala_inicial = gerar_resposta_openrouter("Inicie a história.", modelo_escolhido_id)
+                st.session_state.mensagens.append({"role": "assistant", "content": fala_inicial})
+
+    for msg in st.session_state.mensagens:
+        estilo = "mary" if msg["role"] == "assistant" else "usuario"
+        classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
+        st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 
 
