@@ -168,8 +168,10 @@ st.info(f"\U0001f9e0 *No capítulo anterior...*\n\n> {resumo}")
 
 # --- EXIBIÇÃO DAS MENSAGENS ---
 if "mensagens" not in st.session_state:
-    interacoes = carregar_ultimas_interacoes(n=50)
-    st.session_state.mensagens = interacoes if interacoes else []
+    st.session_state.mensagens = [{
+        "role": "assistant",
+        "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
+    }]
 
 for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
