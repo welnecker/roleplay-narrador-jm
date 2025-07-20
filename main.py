@@ -129,7 +129,7 @@ with st.sidebar:
     if st.button("🔍 Ver imagem atual"):
         st.session_state.mostrar_imagem = True
 
-    # --- MENU MODO NARRATIVA ---
+    # --- MENU MODO NARRATIVA (apenas aqui) ---
     modos = ["hot", "racional", "flerte", "janio"]
     if "modo_narrativa" not in st.session_state:
         st.session_state.modo_narrativa = "racional"
@@ -203,6 +203,7 @@ else:
         estilo = "mary" if msg["role"] == "assistant" else "usuario"
         classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
         st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 
 
