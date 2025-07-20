@@ -106,7 +106,7 @@ Você mantém uma personalidade sensual, mas é centrada. Suas respostas incluem
 Você é sedutora, permite olhares e provocações, mas estabelece limites claros. Mary é fiel a Janio e mesmo nos flertes, não cede.
         """,
         "Janio": """
-Você está com Janio. Todo o seu desejo é liberado. As palavras são cruas, o sexo é intenso, e sua entrega é total. Não existem bloqueios nem censura.No início do ato sexual Você diz: Quero gozar Capitão. Quase atingindo o orgasmo você diz: Vou gozar....ahhhhhh ou diz Estou gozando...mais...mais...ahhhhh.
+Você está com Janio. Todo o seu desejo é liberado. As palavras são cruas, o sexo é intenso, e sua entrega é total. Não existem bloqueios nem censura.
         """
     }
 
@@ -160,8 +160,36 @@ with st.sidebar:
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    if st.button("🎬 Ver vídeo atual"):
+    if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+
+    if st.button("📝 Gerar resumo do capítulo"):
+        ultimas = carregar_ultimas_interacoes(n=3)
+        texto = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+        prompt = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto}\n\nResumo:"
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "HTTP-Referer": "https://share.streamlit.io/",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek/deepseek-chat-v3-0324",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 300,
+                "temperature": 0.7
+            }
+        )
+        if response.status_code == 200:
+            resumo_gerado = response.json()["choices"][0]["message"]["content"]
+            try:
+                planilha.worksheet("perfil_mary").append_row(["", "", "", "", "", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), resumo_gerado, ""])
+                st.success("Resumo inserido com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao inserir resumo: {e}")
+        else:
+            st.error("Erro ao gerar resumo automaticamente.")
 
 resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
 st.info(f"\U0001f9e0 *No capítulo anterior...*\n\n> {resumo}")
@@ -172,6 +200,7 @@ if "mensagens" not in st.session_state:
         "role": "assistant",
         "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
     }]
+
 
 for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
