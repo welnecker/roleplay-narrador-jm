@@ -23,10 +23,11 @@ st.markdown(
         background-position: center;
     }}
     .chatbox {{
-        background-color: rgba(0,0,0,0.6);
+        background-color: rgba(255, 255, 255, 0.6);
         padding: 1em;
         border-radius: 1em;
         margin-bottom: 0.5em;
+        backdrop-filter: blur(4px);
     }}
     .mary {{
         color: #ff99cc;
@@ -189,10 +190,6 @@ if "mensagens" in st.session_state:
     for msg in st.session_state.mensagens:
         estilo = "mary" if msg["role"] == "assistant" else "usuario"
         st.markdown(f'<div class="chatbox {estilo}">{msg["content"]}</div>', unsafe_allow_html=True)
-
-
-
-
 
 # --- PERFIL E PROMPT DA PERSONAGEM ---
 # (... permanece inalterado ...)
