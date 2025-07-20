@@ -12,7 +12,7 @@ OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 # --- IMAGEM DE FUNDO DINÂMICA ---
 def imagem_de_fundo():
     indice = len(st.session_state.get("mensagens", [])) // 10 + 1
-    return f"Mary_fundo{indice}.jpeg", f"Mary_V{indice}.mp4"
+    return f"Mary_fundo{indice}.jpg", f"Mary_V{indice}.mp4"
 
 fundo_img, fundo_video = imagem_de_fundo()
 
@@ -116,7 +116,11 @@ modelos_disponiveis = {
     "Llama3 LumiMaid": "neversleep/llama-3-lumimaid-8b"
 }
 
-modelo_escolhido_label = st.selectbox("🧠 Escolha o modelo de IA", list(modelos_disponiveis.keys()), index=0)
+modelo_escolhido_label = st.selectbox(
+    "🧠 Escolha o modelo de IA",
+    list(modelos_disponiveis.keys()),
+    index=list(modelos_disponiveis.keys()).index("DeepSeek V3")
+)
 modelo_escolhido_id = modelos_disponiveis[modelo_escolhido_label]
 
 # --- EXIBIÇÃO DE ÍCONE DA IMAGEM NA SIDEBAR ---
@@ -124,6 +128,12 @@ with st.sidebar:
     st.image(f"https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/{fundo_img}", width=200)
     if st.button("🔍 Ver imagem atual"):
         st.session_state.mostrar_imagem = True
+
+    # --- MENU MODO NARRATIVA ---
+    modos = ["hot", "racional", "flerte", "janio"]
+    if "modo_narrativa" not in st.session_state:
+        st.session_state.modo_narrativa = "racional"
+    st.session_state.modo_narrativa = st.selectbox("🎭 Modo narrativa", modos, index=modos.index("racional"))
 
 # --- FUNÇÃO GERADORA DE RESPOSTA ---
 def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
@@ -178,6 +188,7 @@ else:
             estilo = "mary" if msg["role"] == "assistant" else "usuario"
             classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
             st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 
 
