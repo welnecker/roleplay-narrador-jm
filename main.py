@@ -16,38 +16,6 @@ def imagem_de_fundo():
 
 fundo_img, fundo_video = imagem_de_fundo()
 
-st.markdown(
-    f"""
-    <style>
-    .stApp {{
-        background-image: url('https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/{fundo_img}');
-        background-size: cover;
-        background-position: center;
-    }}
-    .chatbox {{
-        padding: 1em;
-        border-radius: 1em;
-        margin-bottom: 0.5em;
-    }}
-    .mary {{
-        color: #ff99cc;
-    }}
-    .usuario {{
-        color: #ccffff;
-    }}
-    .resumo {{
-        background-color: rgba(255, 255, 255, 0.6);
-        backdrop-filter: blur(4px);
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# --- CONTROLE DE EXIBIÇÃO DA IMAGEM ---
-if "mostrar_imagem" not in st.session_state:
-    st.session_state.mostrar_imagem = False
-
 # --- CONECTA À PLANILHA GOOGLE ---
 def conectar_planilha():
     creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
@@ -151,6 +119,12 @@ modelos_disponiveis = {
 modelo_escolhido_label = st.selectbox("🧠 Escolha o modelo de IA", list(modelos_disponiveis.keys()))
 modelo_escolhido_id = modelos_disponiveis[modelo_escolhido_label]
 
+# --- EXIBIÇÃO DE ÍCONE DA IMAGEM NA SIDEBAR ---
+with st.sidebar:
+    st.image(f"https://raw.githubusercontent.com/welnecker/roleplay_imagens/main/{fundo_img}", width=200)
+    if st.button("🔍 Ver imagem atual"):
+        st.session_state.mostrar_imagem = True
+
 # --- FUNÇÃO GERADORA DE RESPOSTA ---
 def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
     mensagens = [
@@ -189,9 +163,9 @@ def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
     else:
         return f"Erro ao gerar resposta com o modelo escolhido. Código {response.status_code}"
 
-# --- CONTROLE DA EXIBIÇÃO DA IMAGEM ATUAL ---
-if st.button("🔍 Ver imagem atual"):
-    st.session_state.mostrar_imagem = True
+# --- CONTROLE DA EXIBIÇÃO DO VÍDEO ---
+if "mostrar_imagem" not in st.session_state:
+    st.session_state.mostrar_imagem = False
 
 if st.session_state.mostrar_imagem:
     st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
@@ -204,6 +178,7 @@ else:
             estilo = "mary" if msg["role"] == "assistant" else "usuario"
             classe_extra = "resumo" if msg["content"].startswith("🧠") or msg["content"].startswith("📖") else ""
             st.markdown(f'<div class="chatbox {estilo} {classe_extra}">{msg["content"]}</div>', unsafe_allow_html=True)
+
 
 # --- PERFIL E PROMPT DA PERSONAGEM ---
 # (... permanece inalterado ...)
