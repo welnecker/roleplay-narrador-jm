@@ -11,13 +11,12 @@ OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 
 # --- CONECTA À PLANILHA GOOGLE ---
 def conectar_planilha():
-creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client = gspread.authorize(creds)
-return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
-
+    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
 
 planilha = conectar_planilha()
 
@@ -151,6 +150,7 @@ def gerar_resposta_openrouter(prompt_usuario, modelo=modelo_escolhido_id):
         return resposta
     else:
         return f"Erro ao gerar resposta com o modelo escolhido. Código {response.status_code}"
+
 
 
 # --- PERFIL E PROMPT DA PERSONAGEM ---
