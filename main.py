@@ -151,7 +151,16 @@ st.markdown("Converse com Mary com memória, emoção, planos e continuidade nar
 
 with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
-    if st.button("🎮 Ver vídeo atual"):
+
+    modelos_disponiveis = {
+        "DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
+        "MythoMax 13B": "gryphe/mythomax-l2-13b",
+        "LLaMA3 Lumimaid 8B": "neversleep/llama-3-lumimaid-8b"
+    }
+    modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
+    modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+
+    if st.button("🎬 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
 resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
@@ -159,10 +168,8 @@ st.info(f"\U0001f9e0 *No capítulo anterior...*\n\n> {resumo}")
 
 # --- EXIBIÇÃO DAS MENSAGENS ---
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{
-        "role": "assistant",
-        "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
-    }]
+    interacoes = carregar_ultimas_interacoes(n=50)
+    st.session_state.mensagens = interacoes if interacoes else []
 
 for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
@@ -189,7 +196,7 @@ if prompt := st.chat_input("Digite sua mensagem..."):
                 "Content-Type": "application/json"
             },
             json={
-                "model": "deepseek/deepseek-chat-v3-0324",
+                "model": modelo_escolhido_id,
                 "messages": mensagens,
                 "max_tokens": 1200,
                 "temperature": 0.9
