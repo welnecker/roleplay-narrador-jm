@@ -73,7 +73,7 @@ def carregar_perfil_mary():
         sheet = planilha.worksheet("perfil_mary")
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
-                for linha in reversed(dados):
+        for linha in reversed(dados):
             if linha.get("resumo") and isinstance(linha.get("resumo"), str):
                 resumo = linha["resumo"].strip()
                 if resumo:
@@ -351,4 +351,3 @@ if prompt := st.chat_input("Digite sua mensagem..."):
             st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
         else:
             st.error("Erro ao obter resposta da Mary.")
-
