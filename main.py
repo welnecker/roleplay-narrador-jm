@@ -151,6 +151,25 @@ Estado emocional atual: {perfil.get("emoção", "[não definido]")}
 
 
 with st.sidebar:
+
+    # --- TÍTULO DA PÁGINA E RESUMO ---
+    st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
+    st.title("🌹 Mary Roleplay com Inteligência Autônoma")
+    st.markdown("Converse com Mary com memória, emoção, fragmentos e continuidade narrativa.")
+
+# Carrega resumo para exibir no início
+resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
+
+# Inicializa a sessão com o resumo como primeira fala, se ainda não iniciado
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = [{
+        "role": "assistant",
+        "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
+    }]
+
+# Exibe a caixa com o resumo
+    st.info(f"🧠 *No capítulo anterior...*\n\n> {resumo}")
+
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
 
     modelos_disponiveis = {
