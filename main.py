@@ -28,6 +28,7 @@ def conectar_planilha():
 planilha = conectar_planilha()
 
 # --- FUNÇÕES DE CARREGAMENTO E SALVAMENTO ---
+
 def salvar_interacao(role, content):
     try:
         aba = planilha.worksheet("interacoes_mary")
@@ -49,7 +50,7 @@ def carregar_fragmentos():
     try:
         aba = planilha.worksheet("fragmentos_mary")
         dados = aba.get_all_records()
-        linhas = [f"{linha['tipo']}: {linha['ato']}" for linha in dados if linha['tipo'] and linha['ato']]
+        linhas = [f"{linha['tipo'].strip()}: {linha['ato'].strip()}" for linha in dados if linha['tipo'] and linha['ato']]
         if linhas:
             conteudo = "Memórias recentes sobre você:\n" + "\n".join(linhas)
             return {"role": "user", "content": conteudo}
@@ -63,15 +64,17 @@ def carregar_perfil_mary():
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
+        # Pega a última sinopse disponível
         for linha in reversed(dados):
             if not blocos["sinopse"] and linha.get("resumo"):
-                blocos["sinopse"] = linha["resumo"]
+                blocos["sinopse"] = linha["resumo"].strip()
 
+        # Extrai os outros blocos
         for linha in dados:
             if linha.get("chave") == "estado_emocional":
-                blocos["emoção"] = linha.get("valor", "")
+                blocos["emoção"] = linha.get("valor", "").strip()
             if linha.get("objetivo") and linha.get("status") == "pendente":
-                blocos["planos"].append(f"- {linha['objetivo']}")
+                blocos["planos"].append(f"- {linha['objetivo'].strip()}")
             if linha.get("tipo") == "memoria":
                 chave = linha.get("chave", "").strip()
                 valor = linha.get("valor", "").strip()
@@ -95,7 +98,6 @@ def carregar_memorias():
     except Exception as e:
         st.error(f"Erro ao carregar memórias: {e}")
     return None
-
 
 
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
