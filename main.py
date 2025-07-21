@@ -88,6 +88,21 @@ def carregar_perfil_mary():
         st.error(f"Erro ao carregar perfil: {e}")
         return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
+def carregar_acoes_especiais():
+    try:
+        aba = planilha.worksheet("acao_mary")
+        linhas = aba.get_all_values()
+        acoes = []
+        for linha in linhas[1:]:  # Ignora o cabeçalho
+            if len(linha) >= 2 and linha[0].strip() and linha[1].strip():
+                tipo = linha[0].strip()
+                descricao = linha[1].strip()
+                acoes.append(f"{tipo}: {descricao}")
+        return acoes
+    except Exception as e:
+        st.error(f"Erro ao carregar ações especiais: {e}")
+        return []
+
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
