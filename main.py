@@ -206,29 +206,41 @@ with st.sidebar:
         ultimas = carregar_ultimas_interacoes(n=3)
         texto = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
         prompt = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto}\n\nResumo:"
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "HTTP-Referer": "https://share.streamlit.io/",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "deepseek/deepseek-chat-v3-0324",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 300,
-                "temperature": 0.7
-            }
-        )
-        if response.status_code == 200:
-            resumo_gerado = response.json()["choices"][0]["message"]["content"]
-            try:
-                planilha.worksheet("perfil_mary").append_row(["", "", "", "", "", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), resumo_gerado, ""])
-                st.success("Resumo inserido com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao inserir resumo: {e}")
-        else:
-            st.error("Erro ao gerar resumo automaticamente.")
+
+    # --- Aplica temperatura conforme o modo selecionado ---
+    mapa_temperatura = {
+        "Hot": 0.9,
+        "Flerte": 0.8,
+        "Racional": 0.5,
+        "Janio": 1.0
+    }
+    modo_atual = st.session_state.get("modo_mary", "Racional")
+    temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
+
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://share.streamlit.io/",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "deepseek/deepseek-chat-v3-0324",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 800,
+            "temperature": temperatura_escolhida
+        }
+    )
+
+    if response.status_code == 200:
+        resumo_gerado = response.json()["choices"][0]["message"]["content"]
+        try:
+            planilha.worksheet("perfil_mary").append_row(["", "", "", "", "", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), resumo_gerado, ""])
+            st.success("Resumo inserido com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao inserir resumo: {e}")
+    else:
+        st.error("Erro ao gerar resumo automaticamente.")
 
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
@@ -263,7 +275,20 @@ if prompt := st.chat_input("Digite sua mensagem..."):
         fragmentos = carregar_fragmentos()
         if fragmentos:
             mensagens.append(fragmentos)
+        memorias = carregar_memorias()
+        if memorias:
+            mensagens.append(memorias)
         mensagens += st.session_state.mensagens[-10:]
+
+        # --- DEFINE TEMPERATURA CONFORME MODO ---
+        mapa_temperatura = {
+            "Hot": 0.9,
+            "Flerte": 0.8,
+            "Racional": 0.5,
+            "Janio": 1.0
+        }
+        modo_atual = st.session_state.get("modo_mary", "Racional")
+        temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
 
         resposta = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -275,7 +300,7 @@ if prompt := st.chat_input("Digite sua mensagem..."):
                 "model": modelo_escolhido_id,
                 "messages": mensagens,
                 "max_tokens": 1200,
-                "temperature": 0.9
+                "temperature": temperatura_escolhida
             }
         )
 
