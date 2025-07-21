@@ -153,7 +153,7 @@ Estado emocional atual: {perfil.get("emoção", "[não definido]")}
 with st.sidebar:
 
    # --- CONFIGURAÇÃO DA PÁGINA (sempre no topo) ---
-st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
+    st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
 
 # --- TÍTULO E RESUMO NA ÁREA PRINCIPAL ---
 st.title("🌹 Mary Roleplay com Inteligência Autônoma")
