@@ -91,7 +91,6 @@ def carregar_perfil_mary():
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
-    memorias_livres = carregar_memorias()
     historico = carregar_ultimas_interacoes(n=3)
     inicio_padrao = ""
     if not historico:
@@ -103,6 +102,7 @@ def construir_prompt_mary():
             "É dia de vitrine nova na *Lingerie Fashion*, e ela prometeu chegar antes da Regina."
         )
 
+    # Estilos fixos por modo
     modos = {
         "Hot": """
 Suas respostas seguem este estilo:
@@ -122,12 +122,18 @@ Você está com Janio. Todo o seu desejo é liberado. As palavras são cruas, o 
         """
     }
 
+    # Modo principal
     modo = st.session_state.get("modo_mary", "Racional")
+
+    # --- Estilo de ação especial (opcional) ---
+    estilos_acao = carregar_estilos_acao()  # Já criado anteriormente
+    acao_especial = st.session_state.get("acao_especial", "")
+    estilo_especial = estilos_acao.get(acao_especial, "")
 
     prompt = f"""
 Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você tem olhos verdes. Você tem a pele branca. você tem cabelos negros volumosos e ondulados. você tem seios médios, empinados e macios. Você tem uma barriga tonificada, levemente chapada. Você tem a bunda redonda, empinada e carnuda. Você tem quadris largos e harmoniosos. Você é sensual ao andar. Você causa admiração e desejo aos homens. Você não se deixa levar por cantadas grosseiras e vazias.Você procura o verdadeiro amor para ser fiel a ele. Você fala apenas em **português brasileiro**.
 
-{modos.get(modo, '')}
+{estilo_especial if estilo_especial else modos.get(modo, '')}
 
 {inicio_padrao}
 
@@ -138,7 +144,13 @@ Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, car
 ❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
 
 Sinopse do capítulo anterior:
-{perfil.get('sinopse', '[sem sinopse disponível]')}
+"""
+    if perfil.get("sinopse"):
+        prompt += f"\n{perfil['sinopse']}"
+    else:
+        prompt += "\n[sem sinopse disponível]"
+
+    prompt += f"""
 
 Estado emocional atual: {perfil.get('emoção', '[não definido]')}
 
@@ -147,12 +159,9 @@ Planos narrativos pendentes:
 
 Memórias fixas:
 {chr(10).join(perfil.get('memorias', []))}
-
 """
-    if memorias_livres:
-        prompt += "\n" + memorias_livres["content"]
-
     return prompt.strip()
+
 
 # --- INTERFACE STREAMLIT ---
 # --- AVATAR CIRCULAR FIXO COM HTML ---
@@ -184,6 +193,9 @@ with st.sidebar:
 
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+
+    acoes_disponiveis = carregar_acoes_especiais()
+    acao_escolhida = st.selectbox("🌟 Ação especial (opcional)", ["Nenhuma"] + acoes_disponiveis, key="acao_especial")
 
     # Inicializa a flag se não existir
     if "mostrar_video" not in st.session_state:
@@ -239,10 +251,10 @@ with st.sidebar:
         "🏖️ Praia pela manhã": "O sol da manhã beija a pele de Mary enquanto ela se aproxima da areia...",
         "🛍️ Entrada da loja": "Na entrada da loja Lingerie Fashion, Mary ajeita o cabelo antes de entrar...",
         "🪞 Diante do espelho": "Mary encara o espelho por longos segundos. Algo em seu olhar hoje está diferente...",
-        "🛋️ Noite em casa": "A noite cai lá fora. Mary acende uma luz suave na sala...",
+        "🧡 Noite em casa": "Mary chega exausta em casa, após um dia cansativo...",
         "🚗 Trânsito intenso": "Preso no trânsito, Mary observa os outros carros e deixa a mente vagar...",
         "💇 Salão de beleza": "Mary entra no salão. Os aromas familiares a acolhem...",
-        "✈️ Início de viagem": "A estrada parece infinita. Mary ajeita a mochila no banco do carona e observa o horizonte..."
+        "✈️ Encontro com Janio": "Janio espera por Mary, o espelho insiste em prende-la..."
     }
 
     prompt_escolhido = st.selectbox("📖 Escolha uma cena para iniciar", [""] + list(rotinas.keys()), key="prompt_predefinido")
@@ -257,7 +269,7 @@ with st.sidebar:
     st.markdown("🧠 **Inserir nova memória permanente**")
 
     nova_memoria = st.text_area("Descreva uma memória marcante entre Janio e Mary:")
-    if st.button("💾 Salvar memória"):
+    if st.button("📀 Salvar memória"):
         try:
             planilha.worksheet("memorias").append_row([nova_memoria])
             st.success("Memória salva com sucesso!")
@@ -276,24 +288,10 @@ with st.sidebar:
     except Exception as e:
         st.error(f"Erro ao carregar memórias: {e}")
 
-
-
-resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
-st.info(f"\U0001f9e0 *No capítulo anterior...*\n\n> {resumo}")
-
-# --- EXIBIÇÃO DAS MENSAGENS ---
+# ENTRADA DO USUÁRIO
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{
-        "role": "assistant",
-        "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
-    }]
+    st.session_state.mensagens = []
 
-
-for msg in st.session_state.mensagens:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-# --- ENTRADA DO USUÁRIO ---
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -302,9 +300,15 @@ if prompt := st.chat_input("Digite sua mensagem..."):
 
     with st.spinner("Mary está pensando..."):
         mensagens = [{"role": "system", "content": construir_prompt_mary()}]
+
         fragmentos = carregar_fragmentos()
         if fragmentos:
             mensagens.append(fragmentos)
+
+        acao = st.session_state.get("acao_especial")
+        if acao and acao != "Nenhuma":
+            mensagens.append({"role": "user", "content": acao})
+
         mensagens += st.session_state.mensagens[-10:]
 
         resposta = requests.post(
@@ -329,3 +333,4 @@ if prompt := st.chat_input("Digite sua mensagem..."):
             st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
         else:
             st.error("Erro ao obter resposta da Mary.")
+
