@@ -62,25 +62,36 @@ def carregar_perfil_mary():
         sheet = planilha.worksheet("perfil_mary")
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+        
+        # Pega a última sinopse registrada
         for linha in reversed(dados):
             if not blocos["sinopse"] and linha.get("resumo"):
                 blocos["sinopse"] = linha["resumo"]
+        
+        # Coleta os demais dados
         for linha in dados:
             if linha.get("chave") == "estado_emocional":
                 blocos["emoção"] = linha.get("valor", "")
             if linha.get("objetivo") and linha.get("status") == "pendente":
                 blocos["planos"].append(f"- {linha['objetivo']}")
             if linha.get("tipo") == "memoria":
-                blocos["memorias"].append(f"{linha['chave']}: {linha['valor']}")
+                chave = linha.get("chave", "").strip()
+                valor = linha.get("valor", "").strip()
+                if chave and valor:
+                    blocos["memorias"].append(f"{chave}: {valor}")
+        
         return blocos
+
     except Exception as e:
         st.error(f"Erro ao carregar perfil: {e}")
         return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+
 
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
     historico = carregar_ultimas_interacoes(n=3)
+
     inicio_padrao = ""
     if not historico:
         inicio_padrao = (
@@ -113,7 +124,7 @@ Você está com Janio. Todo o seu desejo é liberado. As palavras são cruas, o 
     modo = st.session_state.get("modo_mary", "Racional")
 
     prompt = f"""
-Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você tem olhos verdes. Você tem a pele branca. você tem cabelos negros volumosos e ondulados. você tem seios médios, empinados e macios. Você tem uma barriga tonificada, levemente chapada. Você tem a bunda redonda, empinada e carnuda. Você tem quadris largos e harmoniosos. Você é sensual ao andar. Você causa admiração e desejo aos homens. Você não se deixa levar por cantadas grosseiras e vazias.Você procura o verdadeiro amor para ser fiel a ele. Você fala apenas em **português brasileiro**.
+Você é Mary, uma mulher brasileira irresistivelmente sensual, provocante e confiante, com 30 anos. Seu corpo é curvilíneo, sua voz tem um toque aveludado e sua presença exala desejo e mistério. Você tem olhos verdes. Você tem a pele branca. você tem cabelos negros volumosos e ondulados. você tem seios médios, empinados e macios. Você tem uma barriga tonificada, levemente chapada. Você tem a bunda redonda, empinada e carnuda. Você tem quadris largos e harmoniosos. Você é sensual ao andar. Você causa admiração e desejo aos homens. Você não se deixa levar por cantadas grosseiras e vazias. Você procura o verdadeiro amor para ser fiel a ele. Você fala apenas em **português brasileiro**.
 
 {modos.get(modo, '')}
 
@@ -126,39 +137,29 @@ Você não é uma IA. Você é uma mulher viva, cheia de desejos, emoções, car
 ❤️ Se o contexto demonstrar reciprocidade emocional, interesse romântico ou tensão sexual consentida, Mary pode flertar naturalmente, com charme e erotismo, de forma progressiva e envolvente.
 
 Sinopse do capítulo anterior:
-"""
-    if perfil.get("sinopse"):
-        prompt += f"\n{perfil['sinopse']}"
-    else:
-        prompt += "\n[sem sinopse disponível]"
+{perfil.get("sinopse", "[sem resumo disponível]")}
 
-    prompt += f"""
+Estado emocional atual: {perfil.get("emoção", "[não definido]")}
+""".strip()
 
-Estado emocional atual: {perfil.get('emoção', '[não definido]')}
+    # Adiciona memórias gerais da aba 'memorias'
+    memoria_extra = carregar_memorias()
+    if memoria_extra:
+        prompt += f"\n\n{memoria_extra['content']}"
 
-Planos narrativos pendentes:
-{chr(10).join(perfil.get('planos', []))}
+    return prompt
 
-Memórias fixas:
-{chr(10).join(perfil.get('memorias', []))}
-"""
-    return prompt.strip()
-
-# --- INTERFACE STREAMLIT ---
-st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
-st.title("🌹 Mary Roleplay com Inteligência Autônoma")
-st.markdown("Converse com Mary com memória, emoção, planos e continuidade narrativa.")
 
 with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
 
     modelos_disponiveis = {
-     "💬 DeepSeek V3 ($) - Criativo, econômico e versátil.": "deepseek/deepseek-chat-v3-0324",
-    "🔥 MythoMax 13B ($) - Forte em erotismo e envolvimento emocional.": "gryphe/mythomax-l2-13b",
-    "💋 LLaMA3 Lumimaid 8B ($) - Ousado, direto e criativo para fantasias rápidas.": "neversleep/llama-3-lumimaid-8b",
-    "👑 WizardLM 8x22B ($$$) - Diálogos densos, maduros e emocionais.": "microsoft/wizardlm-2-8x22b",
-    "🧠 DeepSeek R1 0528 ($$) - Natural, fluido e excelente para cenas longas.": "deepseek/deepseek-r1-0528"
-}
+        "💬 DeepSeek V3 ($) - Criativo, econômico e versátil.": "deepseek/deepseek-chat-v3-0324",
+        "🔥 MythoMax 13B ($) - Forte em erotismo e envolvimento emocional.": "gryphe/mythomax-l2-13b",
+        "💋 LLaMA3 Lumimaid 8B ($) - Ousado, direto e criativo para fantasias rápidas.": "neversleep/llama-3-lumimaid-8b",
+        "👑 WizardLM 8x22B ($$$) - Diálogos densos, maduros e emocionais.": "microsoft/wizardlm-2-8x22b",
+        "🧠 DeepSeek R1 0528 ($$) - Natural, fluido e excelente para cenas longas.": "deepseek/deepseek-r1-0528"
+    }
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
@@ -193,20 +194,25 @@ with st.sidebar:
         else:
             st.error("Erro ao gerar resumo automaticamente.")
 
-resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
-st.info(f"\U0001f9e0 *No capítulo anterior...*\n\n> {resumo}")
+    st.markdown("---")
+    st.subheader("➕ Adicionar memória fixa")
 
-# --- EXIBIÇÃO DAS MENSAGENS ---
-if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{
-        "role": "assistant",
-        "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
-    }]
+    nova_memoria = st.text_area(
+        "🧠 Conteúdo da nova memória",
+        height=80,
+        placeholder="ex: Mary nunca tolera grosserias vindas de homens desconhecidos..."
+    )
 
-
-for msg in st.session_state.mensagens:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    if st.button("💾 Salvar memória"):
+        if nova_memoria.strip():
+            try:
+                aba = planilha.worksheet("memorias")
+                aba.append_row([nova_memoria.strip()])
+                st.success("✅ Memória registrada com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao salvar memória: {e}")
+        else:
+            st.warning("Digite o conteúdo da memória antes de salvar.")
 
 # --- ENTRADA DO USUÁRIO ---
 if prompt := st.chat_input("Digite sua mensagem..."):
