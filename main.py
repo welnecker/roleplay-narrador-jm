@@ -74,11 +74,11 @@ def carregar_perfil_mary():
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
-        for linha in reversed(dados):
-            resumo = linha.get("resumo", "").strip()
-            if resumo:
-                blocos["sinopse"] = resumo
-                break  # Sai do loop ao encontrar o primeiro resumo válido
+        valores = sheet.get_all_values()
+        for linha in reversed(valores[1:]):  # Ignora cabeçalho
+            if len(linha) >= 8 and linha[7].strip():
+                blocos["sinopse"] = linha[7].strip()
+                break
 
         for linha in dados:
             if linha.get("chave") == "estado_emocional":
@@ -278,13 +278,10 @@ with st.sidebar:
     }
 
     prompt_escolhido = st.selectbox("📖 Escolha uma cena para iniciar", [""] + list(rotinas.keys()), key="prompt_predefinido")
-    if prompt_escolhido:
-        if st.button("✨ Iniciar cena selecionada"):
-            prompt = rotinas[prompt_escolhido]
-            st.session_state.mensagens.append({"role": "user", "content": prompt})
-            salvar_interacao("user", prompt)
-            st.experimental_rerun()
-
+    if st.button("✨ Iniciar cena selecionada"):
+     if prompt_escolhido:
+        st.session_state["prompt_pendente"] = rotinas[prompt_escolhido]
+        st.experimental_rerun()
     st.markdown("---")
     st.markdown("🧠 **Inserir nova memória permanente**")
 
@@ -311,6 +308,13 @@ with st.sidebar:
 # ENTRADA DO USUÁRIO
 if "mensagens" not in st.session_state:
     st.session_state.mensagens = []
+
+# --- INSERE CENA PENDENTE AUTOMATICAMENTE ---
+if "prompt_pendente" in st.session_state:
+    cena = st.session_state.pop("prompt_pendente")
+    st.session_state.mensagens.append({"role": "user", "content": cena})
+    salvar_interacao("user", cena)
+
 
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
