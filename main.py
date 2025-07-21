@@ -62,13 +62,11 @@ def carregar_perfil_mary():
         sheet = planilha.worksheet("perfil_mary")
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
-        
-        # Pega a última sinopse registrada
+
         for linha in reversed(dados):
             if not blocos["sinopse"] and linha.get("resumo"):
                 blocos["sinopse"] = linha["resumo"]
-        
-        # Coleta os demais dados
+
         for linha in dados:
             if linha.get("chave") == "estado_emocional":
                 blocos["emoção"] = linha.get("valor", "")
@@ -79,12 +77,25 @@ def carregar_perfil_mary():
                 valor = linha.get("valor", "").strip()
                 if chave and valor:
                     blocos["memorias"].append(f"{chave}: {valor}")
-        
+
         return blocos
 
     except Exception as e:
         st.error(f"Erro ao carregar perfil: {e}")
         return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+
+def carregar_memorias():
+    try:
+        aba = planilha.worksheet("memorias")
+        dados = aba.get_all_values()
+        blocos = [linha[0].strip() for linha in dados if linha and linha[0].strip()]
+        if blocos:
+            conteudo = "💾 Memórias fixas importantes:\n" + "\n".join(blocos)
+            return {"role": "user", "content": conteudo}
+    except Exception as e:
+        st.error(f"Erro ao carregar memórias: {e}")
+    return None
+
 
 
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
