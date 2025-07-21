@@ -73,11 +73,12 @@ def carregar_perfil_mary():
         sheet = planilha.worksheet("perfil_mary")
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
-        for linha in reversed(dados):
-            resumo = linha.get("resumo", "").strip()
-            if resumo:
-                blocos["sinopse"] = resumo
-                break
+                for linha in reversed(dados):
+            if linha.get("resumo") and isinstance(linha.get("resumo"), str):
+                resumo = linha["resumo"].strip()
+                if resumo:
+                    blocos["sinopse"] = resumo
+                    break
         for linha in dados:
             if linha.get("chave") == "estado_emocional":
                 blocos["emoção"] = linha.get("valor", "")
