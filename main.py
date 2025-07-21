@@ -75,7 +75,7 @@ def carregar_perfil_mary():
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
         valores = sheet.get_all_values()
-        for linha in reversed(valores[1:]):  # Ignora cabeçalho
+        for linha in reversed(valores[1:]):
             if len(linha) >= 8 and linha[7].strip():
                 blocos["sinopse"] = linha[7].strip()
                 break
@@ -97,7 +97,7 @@ def carregar_acoes_especiais():
         aba = planilha.worksheet("acao_mary")
         linhas = aba.get_all_values()
         acoes = []
-        for linha in linhas[1:]:  # Ignora o cabeçalho
+        for linha in linhas[1:]:
             if len(linha) >= 2 and linha[0].strip() and linha[1].strip():
                 tipo = linha[0].strip()
                 descricao = linha[1].strip()
@@ -106,6 +106,7 @@ def carregar_acoes_especiais():
     except Exception as e:
         st.error(f"Erro ao carregar ações especiais: {e}")
         return []
+
 
 
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
@@ -181,6 +182,15 @@ Memórias fixas:
 {chr(10).join(perfil.get('memorias', []))}
 """
     return prompt.strip()
+
+# --- INSERE CENA PENDENTE ---
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = []
+
+if "prompt_pendente" in st.session_state:
+    cena = st.session_state.pop("prompt_pendente")
+    st.session_state.mensagens.append({"role": "user", "content": cena})
+    salvar_interacao("user", cena)
 
 
 # --- INTERFACE STREAMLIT ---
