@@ -74,7 +74,7 @@ def carregar_perfil_mary():
         dados = sheet.get_all_records()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
         for linha in reversed(dados):
-            if linha.get("resumo") and isinstance(linha.get("resumo"), str):
+            if "resumo" in linha and isinstance(linha["resumo"], str):
                 resumo = linha["resumo"].strip()
                 if resumo:
                     blocos["sinopse"] = resumo
@@ -105,6 +105,7 @@ def carregar_acoes_especiais():
     except Exception as e:
         st.error(f"Erro ao carregar ações especiais: {e}")
         return []
+
 
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
 def construir_prompt_mary():
