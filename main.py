@@ -199,6 +199,19 @@ with st.sidebar:
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
+    # --- Se interações sumiram (por troca de modelo), reexibir visualmente a última troca ---
+    if "mensagens" not in st.session_state or not st.session_state.mensagens:
+        try:
+            aba = planilha.worksheet("interacoes_mary")
+            dados = aba.get_all_records()
+            if len(dados) >= 2:
+                st.markdown("---")
+                st.markdown("🔁 Última interação antes da troca de modelo:")
+                st.chat_message(dados[-2]["role"]).markdown(dados[-2]["content"])
+                st.chat_message(dados[-1]["role"]).markdown(dados[-1]["content"])
+        except Exception as e:
+            st.warning("Não foi possível recuperar a última interação.")
+
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
@@ -234,18 +247,14 @@ with st.sidebar:
 
             if response.status_code == 200:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
-                planilha.worksheet("perfil_mary").append_row([
-                    "", "", "", "", "", "", 
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    resumo_gerado,
-                    ""
-                ])
+                planilha.worksheet("perfil_mary").append_row(["", "", "", "", "", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), resumo_gerado, ""])
                 st.success("Resumo inserido com sucesso!")
             else:
                 st.error("Erro ao gerar resumo automaticamente.")
 
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
+
 
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
