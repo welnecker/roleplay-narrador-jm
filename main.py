@@ -228,10 +228,11 @@ resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
 
 # Inicializa com a primeira mensagem, se for a primeira vez
 if "mensagens" not in st.session_state:
+    resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
     st.session_state.mensagens = [{
         "role": "assistant",
         "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
-    }]
+    }]    }]
 
 # Exibe o resumo no corpo principal
 st.info(f"🧠 *No capítulo anterior...*\n\n> {resumo}")
@@ -344,14 +345,13 @@ with st.sidebar:
 entrada = st.chat_input("Digite sua mensagem...")
 
 if entrada:
+    if "mensagens" not in st.session_state:
+        st.session_state.mensagens = []
+
     with st.chat_message("user"):
         st.markdown(entrada)
 
     salvar_interacao("user", entrada)
-
-    if "mensagens" not in st.session_state:
-        st.session_state.mensagens = []
-
     st.session_state.mensagens.append({"role": "user", "content": entrada})
 
     with st.spinner("Mary está pensando..."):
