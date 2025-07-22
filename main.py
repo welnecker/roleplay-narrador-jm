@@ -37,7 +37,6 @@ def salvar_interacao(role, content):
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
-
 def carregar_ultimas_interacoes(n=20):
     try:
         aba = planilha.worksheet("interacoes_mary")
@@ -46,7 +45,6 @@ def carregar_ultimas_interacoes(n=20):
     except Exception as e:
         st.error(f"Erro ao carregar histórico: {e}")
         return []
-
 
 def carregar_fragmentos():
     try:
@@ -60,11 +58,10 @@ def carregar_fragmentos():
         st.error(f"Erro ao carregar fragmentos: {e}")
     return None
 
-
 def carregar_perfil_mary():
     try:
         sheet = planilha.worksheet("perfil_mary")
-        dados = sheet.get_all_values()  # retorna matriz bruta
+        dados = sheet.get_all_values()
         blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
         # Lê diretamente o resumo da COLUNA 7
@@ -90,12 +87,6 @@ def carregar_perfil_mary():
         st.error(f"Erro ao carregar perfil: {e}")
         return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
-
-    except Exception as e:
-        st.error(f"Erro ao carregar perfil: {e}")
-        return {"emoção": "", "memorias": [], "sinopse": ""}
-
-
 def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias")
@@ -108,32 +99,24 @@ def carregar_memorias():
         st.error(f"Erro ao carregar memórias: {e}")
     return None
 
-
 def carregar_objetivos_por_status():
     try:
         aba = planilha.worksheet("perfil_mary")
-        dados = aba.get_all_records()
+        dados = aba.get_all_values()
         gatilhos_disponiveis = {}
 
-        for linha in dados:
-            objetivo = linha.get("objetivo", "").strip()
-            status = linha.get("status", "").strip().lower()
-
-            if objetivo and status:
-                gatilhos_disponiveis.setdefault(status, []).append(f"- {objetivo}")
+        for linha in dados[1:]:  # Ignora cabeçalho
+            if len(linha) >= 5:
+                objetivo = linha[3].strip()
+                status = linha[4].strip().lower()
+                if objetivo and status:
+                    gatilhos_disponiveis.setdefault(status, []).append(f"- {objetivo}")
 
         return gatilhos_disponiveis
     except Exception as e:
         st.error(f"Erro ao carregar objetivos por status: {e}")
         return {}
 
-
-# --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
-def construir_prompt_mary():
-    perfil = carregar_perfil_mary()
-    historico = carregar_ultimas_interacoes(n=3)
-    gatilhos_disponiveis = carregar_objetivos_por_status()
-    gatilho_ativo = st.session_state.get("gatilho_mary", "Nenhum")
 
     inicio_padrao = ""
     if not historico:
