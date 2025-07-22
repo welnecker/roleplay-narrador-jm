@@ -290,7 +290,7 @@ with st.sidebar:
             mapa_temperatura = {
                 "Hot": 0.9,
                 "Flerte": 0.8,
-                "Racional": 0.5,
+                "Racional": 0.7,
                 "Janio": 1.0
             }
             modo_atual = st.session_state.get("modo_mary", "Racional")
