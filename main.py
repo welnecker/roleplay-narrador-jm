@@ -348,6 +348,10 @@ if entrada:
         st.markdown(entrada)
 
     salvar_interacao("user", entrada)
+
+    if "mensagens" not in st.session_state:
+        st.session_state.mensagens = []
+
     st.session_state.mensagens.append({"role": "user", "content": entrada})
 
     with st.spinner("Mary está pensando..."):
