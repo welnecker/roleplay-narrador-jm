@@ -375,3 +375,62 @@ with st.sidebar:
         else:
             st.warning("Digite o conteúdo da memória antes de salvar.")
 
+# --- EXIBIR HISTÓRICO DE MENSAGENS ---
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = []
+
+for m in st.session_state.mensagens:
+    with st.chat_message(m["role"]):
+        st.markdown(m["content"])
+
+# --- PROMPT DO USUÁRIO ---
+entrada = st.chat_input("Digite sua mensagem para Mary...")
+
+if entrada:
+    # Mostra mensagem do usuário
+    with st.chat_message("user"):
+        st.markdown(entrada)
+
+    # Salva e exibe no histórico
+    salvar_interacao("user", entrada)
+    st.session_state.mensagens.append({"role": "user", "content": entrada})
+
+    with st.spinner("Mary está pensando..."):
+        mensagens = [{"role": "system", "content": construir_prompt_mary()}]
+        mensagens += carregar_ultimas_interacoes(n=20)
+
+        mapa_temperatura = {
+            "Hot": 0.9,
+            "Flerte": 0.8,
+            "Racional": 0.5,
+            "Janio": 1.0
+        }
+        modo_atual = st.session_state.get("modo_mary", "Racional")
+        temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
+
+        resposta = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": modelo_escolhido_id,
+                "messages": mensagens,
+                "max_tokens": 1200,
+                "temperature": temperatura_escolhida
+            }
+        )
+
+        if resposta.status_code == 200:
+            conteudo = resposta.json()["choices"][0]["message"]["content"]
+
+            with st.chat_message("assistant"):
+                st.markdown(conteudo)
+
+            salvar_interacao("assistant", conteudo)
+            st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
+        else:
+            st.error("Erro ao obter resposta da Mary.")
+
+
