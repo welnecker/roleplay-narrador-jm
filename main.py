@@ -258,24 +258,18 @@ with st.sidebar:
 
    # --- CONFIGURAÇÃO DA PÁGINA (sempre no topo) ---
     st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
-
 # --- TÍTULO E RESUMO NA ÁREA PRINCIPAL ---
 st.title("🌹 Mary Roleplay com Inteligência Autônoma")
 st.markdown("Converse com Mary com memória, emoção, fragmentos e continuidade narrativa.")
 
-# --- Carrega o resumo do capítulo anterior ---
-resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
-
-# Inicializa com a primeira mensagem, se for a primeira vez
+# --- Inicializa com o resumo apenas uma vez ---
 if "mensagens" not in st.session_state:
     resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
     st.session_state.mensagens = [{
         "role": "assistant",
         "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
- }]
+    }]
 
-# Exibe o resumo no corpo principal
-st.info(f"🧠 *No capítulo anterior...*\n\n> {resumo}")
 
 # --- SIDEBAR ---
 with st.sidebar:
