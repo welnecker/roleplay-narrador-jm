@@ -364,6 +364,12 @@ with st.sidebar:
 
 
 
+# --- EXIBIR TODO O HISTÓRICO DE MENSAGENS ---
+if "mensagens" in st.session_state:
+    for m in st.session_state.mensagens:
+        with st.chat_message(m["role"]):
+            st.markdown(m["content"])
+
 # --- ENTRADA DO USUÁRIO ---
 entrada = st.chat_input("Digite sua mensagem...")
 
@@ -371,6 +377,7 @@ if entrada:
     if "mensagens" not in st.session_state:
         st.session_state.mensagens = []
 
+    # Exibe a mensagem do usuário
     with st.chat_message("user"):
         st.markdown(entrada)
 
