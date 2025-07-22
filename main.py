@@ -270,7 +270,6 @@ if "mensagens" not in st.session_state:
         "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
     }]
 
-
 # --- SIDEBAR ---
 with st.sidebar:
     st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
@@ -290,7 +289,7 @@ with st.sidebar:
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    # Gatilhos narrativos por status da aba perfil_mary
+    # Gatilhos narrativos
     gatilhos_disponiveis = carregar_objetivos_por_status()
     opcoes_gatilhos = ["Nenhum"] + list(gatilhos_disponiveis.keys())
     st.selectbox("🎯 Gatilho narrativo (ativa objetivos)", opcoes_gatilhos, key="gatilho_mary", index=0)
@@ -345,8 +344,13 @@ with st.sidebar:
 
             if response.status_code == 200:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
-                planilha.worksheet("perfil_mary").append_row(["", "", "", "", "", "", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), resumo_gerado, ""])
-                st.success("Resumo inserido com sucesso!")
+
+                aba = planilha.worksheet("perfil_mary")
+                dados = aba.get_all_values()
+                proxima_linha = len(dados) + 1  # próxima linha livre
+                aba.update_cell(proxima_linha, 7, resumo_gerado)  # Coluna G = 7
+
+                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
             else:
                 st.error("Erro ao gerar resumo automaticamente.")
         except Exception as e:
@@ -371,62 +375,3 @@ with st.sidebar:
                 st.error(f"Erro ao salvar memória: {e}")
         else:
             st.warning("Digite o conteúdo da memória antes de salvar.")
-
-
-
-
-# --- EXIBIR TODO O HISTÓRICO DE MENSAGENS ---
-if "mensagens" in st.session_state:
-    for m in st.session_state.mensagens:
-        with st.chat_message(m["role"]):
-            st.markdown(m["content"])
-
-# --- ENTRADA DO USUÁRIO ---
-entrada = st.chat_input("Digite sua mensagem...")
-
-if entrada:
-    if "mensagens" not in st.session_state:
-        st.session_state.mensagens = []
-
-    # Exibe a mensagem do usuário
-    with st.chat_message("user"):
-        st.markdown(entrada)
-
-    salvar_interacao("user", entrada)
-    st.session_state.mensagens.append({"role": "user", "content": entrada})
-
-    with st.spinner("Mary está pensando..."):
-        mensagens = [{"role": "system", "content": construir_prompt_mary()}]
-        mensagens += carregar_ultimas_interacoes(n=20)
-
-        mapa_temperatura = {
-            "Hot": 0.9,
-            "Flerte": 0.8,
-            "Racional": 0.5,
-            "Janio": 1.0
-        }
-        modo_atual = st.session_state.get("modo_mary", "Racional")
-        temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
-
-        resposta = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": modelo_escolhido_id,
-                "messages": mensagens,
-                "max_tokens": 1200,
-                "temperature": temperatura_escolhida
-            }
-        )
-
-        if resposta.status_code == 200:
-            conteudo = resposta.json()["choices"][0]["message"]["content"]
-            with st.chat_message("assistant"):
-                st.markdown(conteudo)
-            salvar_interacao("assistant", conteudo)
-            st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
-        else:
-            st.error("Erro ao obter resposta da Mary.")
