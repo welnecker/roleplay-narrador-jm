@@ -118,7 +118,7 @@ def carregar_objetivos_por_status():
         return {}
 
     def construir_prompt_mary():
-    perfil = carregar_perfil_mary()
+        perfil = carregar_perfil_mary()
     gatilho_ativo = st.session_state.get("gatilho_mary", "Nenhum")
     gatilhos_disponiveis = carregar_objetivos_por_status()
     historico = st.session_state.get("mensagens", [])
