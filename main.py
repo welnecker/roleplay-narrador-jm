@@ -64,25 +64,32 @@ def carregar_fragmentos():
 def carregar_perfil_mary():
     try:
         sheet = planilha.worksheet("perfil_mary")
-        dados = sheet.get_all_records()
-        blocos = {"emoção": "", "memorias": [], "sinopse": ""}
+        dados = sheet.get_all_values()  # retorna matriz bruta
+        blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
 
-        # Última sinopse (campo 'resumo')
-        for linha in reversed(dados):
-            if not blocos["sinopse"] and linha.get("resumo"):
-                blocos["sinopse"] = linha["resumo"].strip()
+        # Lê diretamente o resumo da COLUNA 7
+        for linha in reversed(dados[1:]):  # ignora cabeçalho
+            if len(linha) >= 7 and linha[6].strip():
+                blocos["sinopse"] = linha[6].strip()
+                break
 
-        # Estado emocional + memórias personalizadas
-        for linha in dados:
-            if linha.get("chave") == "estado_emocional":
-                blocos["emoção"] = linha.get("valor", "").strip()
-            if linha.get("tipo") == "memoria":
-                chave = linha.get("chave", "").strip()
-                valor = linha.get("valor", "").strip()
+        for linha in dados[1:]:
+            if len(linha) >= 2 and linha[0].strip() == "estado_emocional":
+                blocos["emoção"] = linha[2].strip()
+            if len(linha) >= 5 and linha[3].strip() and linha[4].strip().lower() in ["ativo", "quente", "urgente"]:
+                blocos["planos"].append(f"- {linha[3].strip()}")
+            if len(linha) >= 3 and linha[0].strip() == "memoria":
+                chave = linha[1].strip()
+                valor = linha[2].strip()
                 if chave and valor:
                     blocos["memorias"].append(f"{chave}: {valor}")
 
         return blocos
+
+    except Exception as e:
+        st.error(f"Erro ao carregar perfil: {e}")
+        return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+
 
     except Exception as e:
         st.error(f"Erro ao carregar perfil: {e}")
