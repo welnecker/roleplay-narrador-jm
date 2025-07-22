@@ -272,7 +272,6 @@ if "mensagens" not in st.session_state:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
     st.title("🧠 Configurações")
 
     # Modo narrativo
@@ -304,7 +303,7 @@ with st.sidebar:
                 st.markdown("🔁 Última interação antes da troca de modelo:")
                 st.chat_message(dados[-2]["role"]).markdown(dados[-2]["content"])
                 st.chat_message(dados[-1]["role"]).markdown(dados[-1]["content"])
-        except Exception as e:
+        except Exception:
             st.warning("Não foi possível recuperar a última interação.")
 
     # Ver vídeo dinâmico
@@ -345,10 +344,10 @@ with st.sidebar:
             if response.status_code == 200:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
 
+                # Salva na coluna G (índice 7), com colunas anteriores vazias
                 aba = planilha.worksheet("perfil_mary")
-                dados = aba.get_all_values()
-                proxima_linha = len(dados) + 1  # próxima linha livre
-                aba.update_cell(proxima_linha, 7, resumo_gerado)  # Coluna G = 7
+                nova_linha = [""] * 6 + [resumo_gerado] + [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+                aba.append_row(nova_linha)
 
                 st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
             else:
@@ -375,3 +374,4 @@ with st.sidebar:
                 st.error(f"Erro ao salvar memória: {e}")
         else:
             st.warning("Digite o conteúdo da memória antes de salvar.")
+
