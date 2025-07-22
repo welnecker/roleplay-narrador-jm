@@ -287,13 +287,18 @@ if prompt := st.chat_input("Digite sua mensagem..."):
 
     with st.spinner("Mary está pensando..."):
         mensagens = [{"role": "system", "content": construir_prompt_mary()}]
+
         fragmentos = carregar_fragmentos()
         if fragmentos:
             mensagens.append(fragmentos)
+        
         memorias = carregar_memorias()
         if memorias:
             mensagens.append(memorias)
-        mensagens += st.session_state.mensagens[-10:]
+        
+        interacoes_passadas = carregar_ultimas_interacoes(n=20)
+        mensagens += interacoes_passadas
+
 
         # --- DEFINE TEMPERATURA CONFORME MODO ---
         mapa_temperatura = {
