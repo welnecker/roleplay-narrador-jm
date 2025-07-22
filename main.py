@@ -278,13 +278,14 @@ with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
 
     # Modelos disponíveis
-    modelos_disponiveis = {
+   modelos_disponiveis = {
     "💬 DeepSeek V3 ($) - Criativo, econômico e versátil.": "deepseek/deepseek-chat-v3-0324",
     "🔥 MythoMax 13B ($) - Forte em erotismo e envolvimento emocional.": "gryphe/mythomax-l2-13b",
     "💋 LLaMA3 Lumimaid 8B ($) - Ousado, direto e criativo para fantasias rápidas.": "neversleep/llama-3-lumimaid-8b",
     "👑 WizardLM 8x22B ($$$) - Diálogos densos, maduros e emocionais.": "microsoft/wizardlm-2-8x22b",
     "🧠 DeepSeek R1 0528 ($$) - Natural, fluido e excelente para cenas longas.": "deepseek/deepseek-r1-0528",
-    "👑 Qwen 235B 2507 (PAID) - Máxima coerência e desempenho.": "qwen/qwen3-235b-a22b-07-25"
+    "👑 Qwen 235B 2507 (PAID) - Máxima coerência e desempenho.": "qwen/qwen3-235b-a22b-07-25",
+    "🧠 GPT-4.1 (1M ctx) - Narrativa profunda, coerente e emocional.": "openai/gpt-4.1"
 }
 
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
