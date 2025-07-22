@@ -37,6 +37,7 @@ def salvar_interacao(role, content):
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
+
 def carregar_ultimas_interacoes(n=20):
     try:
         aba = planilha.worksheet("interacoes_mary")
@@ -45,6 +46,7 @@ def carregar_ultimas_interacoes(n=20):
     except Exception as e:
         st.error(f"Erro ao carregar histórico: {e}")
         return []
+
 
 def carregar_fragmentos():
     try:
@@ -58,23 +60,22 @@ def carregar_fragmentos():
         st.error(f"Erro ao carregar fragmentos: {e}")
     return None
 
+
 def carregar_perfil_mary():
     try:
         sheet = planilha.worksheet("perfil_mary")
         dados = sheet.get_all_records()
-        blocos = {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+        blocos = {"emoção": "", "memorias": [], "sinopse": ""}
 
-        # Pega a última sinopse disponível
+        # Última sinopse (campo 'resumo')
         for linha in reversed(dados):
             if not blocos["sinopse"] and linha.get("resumo"):
                 blocos["sinopse"] = linha["resumo"].strip()
 
-        # Extrai os outros blocos
+        # Estado emocional + memórias personalizadas
         for linha in dados:
             if linha.get("chave") == "estado_emocional":
                 blocos["emoção"] = linha.get("valor", "").strip()
-            if linha.get("objetivo") and linha.get("status") == "pendente":
-                blocos["planos"].append(f"- {linha['objetivo'].strip()}")
             if linha.get("tipo") == "memoria":
                 chave = linha.get("chave", "").strip()
                 valor = linha.get("valor", "").strip()
@@ -85,7 +86,8 @@ def carregar_perfil_mary():
 
     except Exception as e:
         st.error(f"Erro ao carregar perfil: {e}")
-        return {"emoção": "", "planos": [], "memorias": [], "sinopse": ""}
+        return {"emoção": "", "memorias": [], "sinopse": ""}
+
 
 def carregar_memorias():
     try:
@@ -100,10 +102,31 @@ def carregar_memorias():
     return None
 
 
+def carregar_objetivos_por_status():
+    try:
+        aba = planilha.worksheet("perfil_mary")
+        dados = aba.get_all_records()
+        gatilhos_disponiveis = {}
+
+        for linha in dados:
+            objetivo = linha.get("objetivo", "").strip()
+            status = linha.get("status", "").strip().lower()
+
+            if objetivo and status:
+                gatilhos_disponiveis.setdefault(status, []).append(f"- {objetivo}")
+
+        return gatilhos_disponiveis
+    except Exception as e:
+        st.error(f"Erro ao carregar objetivos por status: {e}")
+        return {}
+
+
 # --- CONSTRUTOR DE PROMPT COM MEMÓRIAS E MODO ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
     historico = carregar_ultimas_interacoes(n=3)
+    gatilhos_disponiveis = carregar_objetivos_por_status()
+    gatilho_ativo = st.session_state.get("gatilho_mary", "Nenhum")
 
     inicio_padrao = ""
     if not historico:
@@ -155,10 +178,20 @@ Sinopse do capítulo anterior:
 Estado emocional atual: {perfil.get("emoção", "[não definido]")}
 """.strip()
 
-    # Adiciona memórias gerais da aba 'memorias'
+    # Adiciona memórias fixas da aba 'memorias'
     memoria_extra = carregar_memorias()
     if memoria_extra:
         prompt += f"\n\n{memoria_extra['content']}"
+
+    # Adiciona memórias personalizadas da aba 'perfil_mary'
+    if perfil.get("memorias"):
+        prompt += "\n\n🧠 Memórias pessoais:\n" + "\n".join(perfil["memorias"])
+
+    # Se um gatilho foi selecionado, adiciona os objetivos correspondentes
+    if gatilho_ativo != "Nenhum":
+        objetivos_gatilho = gatilhos_disponiveis.get(gatilho_ativo.lower(), [])
+        if objetivos_gatilho:
+            prompt += f"\n\n🎯 Ação ativada: {gatilho_ativo.capitalize()}\n" + "\n".join(objetivos_gatilho)
 
     return prompt
 
@@ -187,8 +220,13 @@ st.info(f"🧠 *No capítulo anterior...*\n\n> {resumo}")
 
 # --- SIDEBAR ---
 with st.sidebar:
+    st.set_page_config(page_title="Mary Roleplay Autônoma", page_icon="🌹")
+    st.title("🧠 Configurações")
+
+    # Modo narrativo
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
 
+    # Modelos disponíveis
     modelos_disponiveis = {
         "💬 DeepSeek V3 ($) - Criativo, econômico e versátil.": "deepseek/deepseek-chat-v3-0324",
         "🔥 MythoMax 13B ($) - Forte em erotismo e envolvimento emocional.": "gryphe/mythomax-l2-13b",
@@ -199,7 +237,12 @@ with st.sidebar:
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    # --- Se interações sumiram (por troca de modelo), reexibir visualmente a última troca ---
+    # Gatilhos narrativos por status da aba perfil_mary
+    gatilhos_disponiveis = carregar_objetivos_por_status()
+    opcoes_gatilhos = ["Nenhum"] + list(gatilhos_disponiveis.keys())
+    st.selectbox("🎯 Gatilho narrativo (ativa objetivos)", opcoes_gatilhos, key="gatilho_mary", index=0)
+
+    # Visualizar última troca de mensagens
     if "mensagens" not in st.session_state or not st.session_state.mensagens:
         try:
             aba = planilha.worksheet("interacoes_mary")
@@ -212,9 +255,11 @@ with st.sidebar:
         except Exception as e:
             st.warning("Não foi possível recuperar a última interação.")
 
+    # Ver vídeo dinâmico
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
+    # Gerar resumo do capítulo
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             ultimas = carregar_ultimas_interacoes(n=3)
@@ -251,10 +296,8 @@ with st.sidebar:
                 st.success("Resumo inserido com sucesso!")
             else:
                 st.error("Erro ao gerar resumo automaticamente.")
-
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
-
 
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
@@ -278,29 +321,24 @@ with st.sidebar:
 
 
 
+
 # --- ENTRADA DO USUÁRIO ---
 if prompt := st.chat_input("Digite sua mensagem..."):
     with st.chat_message("user"):
         st.markdown(prompt)
+
     salvar_interacao("user", prompt)
     st.session_state.mensagens.append({"role": "user", "content": prompt})
 
     with st.spinner("Mary está pensando..."):
+        # Prompt completo com perfil, emoção, memórias e gatilho
         mensagens = [{"role": "system", "content": construir_prompt_mary()}]
 
-        fragmentos = carregar_fragmentos()
-        if fragmentos:
-            mensagens.append(fragmentos)
-        
-        memorias = carregar_memorias()
-        if memorias:
-            mensagens.append(memorias)
-        
+        # Adiciona histórico real da conversa
         interacoes_passadas = carregar_ultimas_interacoes(n=20)
         mensagens += interacoes_passadas
 
-
-        # --- DEFINE TEMPERATURA CONFORME MODO ---
+        # Define temperatura conforme modo
         mapa_temperatura = {
             "Hot": 0.9,
             "Flerte": 0.8,
@@ -310,6 +348,7 @@ if prompt := st.chat_input("Digite sua mensagem..."):
         modo_atual = st.session_state.get("modo_mary", "Racional")
         temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
 
+        # Chamada para a IA via OpenRouter
         resposta = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
