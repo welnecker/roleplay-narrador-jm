@@ -232,7 +232,7 @@ if "mensagens" not in st.session_state:
     st.session_state.mensagens = [{
         "role": "assistant",
         "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
-    }]    }]
+ }]
 
 # Exibe o resumo no corpo principal
 st.info(f"🧠 *No capítulo anterior...*\n\n> {resumo}")
