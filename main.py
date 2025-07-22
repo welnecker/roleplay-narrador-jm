@@ -117,6 +117,23 @@ def carregar_objetivos_por_status():
         st.error(f"Erro ao carregar objetivos por status: {e}")
         return {}
 
+# --- FUNÇÃO PARA SALVAR RESUMO NA PRÓXIMA LINHA VAZIA DA COLUNA 7 (G) ---
+def salvar_resumo(resumo):
+    try:
+        aba = planilha.worksheet("perfil_mary")
+        dados = aba.get_all_values()
+
+        for i, linha in enumerate(dados[1:], start=2):  # ignora cabeçalho
+            if len(linha) < 7 or not linha[6].strip():
+                aba.update_cell(i, 7, resumo)
+                return
+
+        proxima_linha = len(dados) + 1
+        aba.update_cell(proxima_linha, 7, resumo)
+
+    except Exception as e:
+        st.error(f"Erro ao salvar resumo: {e}")
+
 # --- AGORA DEFINIMOS A FUNÇÃO CONSTRUIR_PROMPT_MARY CORRETAMENTE ---
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
