@@ -344,22 +344,19 @@ with st.sidebar:
 
 
 # --- ENTRADA DO USUÁRIO ---
-if prompt := st.chat_input("Digite sua mensagem..."):
-    with st.chat_message("user"):
-        st.markdown(prompt)
+entrada = st.chat_input("Digite sua mensagem...")
 
-    salvar_interacao("user", prompt)
-    st.session_state.mensagens.append({"role": "user", "content": prompt})
+if entrada:
+    with st.chat_message("user"):
+        st.markdown(entrada)
+
+    salvar_interacao("user", entrada)
+    st.session_state.mensagens.append({"role": "user", "content": entrada})
 
     with st.spinner("Mary está pensando..."):
-        # Prompt completo com perfil, emoção, memórias e gatilho
         mensagens = [{"role": "system", "content": construir_prompt_mary()}]
+        mensagens += carregar_ultimas_interacoes(n=20)
 
-        # Adiciona histórico real da conversa
-        interacoes_passadas = carregar_ultimas_interacoes(n=20)
-        mensagens += interacoes_passadas
-
-        # Define temperatura conforme modo
         mapa_temperatura = {
             "Hot": 0.9,
             "Flerte": 0.8,
@@ -369,7 +366,6 @@ if prompt := st.chat_input("Digite sua mensagem..."):
         modo_atual = st.session_state.get("modo_mary", "Racional")
         temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
 
-        # Chamada para a IA via OpenRouter
         resposta = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
