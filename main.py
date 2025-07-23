@@ -391,64 +391,66 @@ with st.sidebar:
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
     # Gerar resumo do capítulo
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            ultimas = carregar_ultimas_interacoes(n=3)
-            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
+if st.button("📝 Gerar resumo do capítulo"):
+    try:
+        ultimas = carregar_ultimas_interacoes(n=3)
+        texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+        prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
-            mapa_temperatura = {
-                "Hot": 0.9,
-                "Flerte": 0.8,
-                "Racional": 0.7,
-                "Janio": 1.0
+        mapa_temperatura = {
+            "Hot": 0.9,
+            "Flerte": 0.8,
+            "Racional": 0.7,
+            "Janio": 1.0
+        }
+        modo_atual = st.session_state.get("modo_mary", "Racional")
+        temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
+
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "HTTP-Referer": "https://share.streamlit.io/",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek/deepseek-chat-v3-0324",
+                "messages": [{"role": "user", "content": prompt_resumo}],
+                "max_tokens": 800,
+                "temperature": temperatura_escolhida
             }
-            modo_atual = st.session_state.get("modo_mary", "Racional")
-            temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
+        )
 
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://share.streamlit.io/",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": temperatura_escolhida
-                }
-            )
-
-            if response.status_code == 200:
-    resumo_gerado = response.json()["choices"][0]["message"]["content"]
-    salvar_resumo(resumo_gerado)  # <- aqui está o segredo
-    st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            else:
-                st.error("Erro ao gerar resumo automaticamente.")
-        except Exception as e:
-            st.error(f"Erro durante a geração do resumo: {e}")
-
-    st.markdown("---")
-    st.subheader("➕ Adicionar memória fixa")
-
-    nova_memoria = st.text_area(
-        "🧠 Conteúdo da nova memória",
-        height=80,
-        placeholder="ex: Mary nunca tolera grosserias vindas de homens desconhecidos..."
-    )
-
-    if st.button("💾 Salvar memória"):
-        if nova_memoria.strip():
-            try:
-                aba = planilha.worksheet("memorias")
-                aba.append_row([nova_memoria.strip()])
-                st.success("✅ Memória registrada com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao salvar memória: {e}")
+        if response.status_code == 200:
+            resumo_gerado = response.json()["choices"][0]["message"]["content"]
+            salvar_resumo(resumo_gerado)
+            st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
         else:
-            st.warning("Digite o conteúdo da memória antes de salvar.")
+            st.error("Erro ao gerar resumo automaticamente.")
+
+    except Exception as e:
+        st.error(f"Erro durante a geração do resumo: {e}")
+
+st.markdown("---")
+st.subheader("➕ Adicionar memória fixa")
+
+nova_memoria = st.text_area(
+    "🧠 Conteúdo da nova memória",
+    height=80,
+    placeholder="ex: Mary nunca tolera grosserias vindas de homens desconhecidos..."
+)
+
+if st.button("💾 Salvar memória"):
+    if nova_memoria.strip():
+        try:
+            aba = planilha.worksheet("memorias")
+            aba.append_row([nova_memoria.strip()])
+            st.success("✅ Memória registrada com sucesso!")
+        except Exception as e:
+            st.error(f"Erro ao salvar memória: {e}")
+    else:
+        st.warning("Digite o conteúdo da memória antes de salvar.")
+
 
 # --- EXIBIR HISTÓRICO DE MENSAGENS ---
 if "mensagens" not in st.session_state:
