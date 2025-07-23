@@ -364,7 +364,7 @@ with st.sidebar:
 
 
 
-    modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
+    modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=3)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
     # Gatilhos narrativos
