@@ -245,13 +245,32 @@ Estado emocional atual: {perfil.get("emoção", "[não definido]")}
     if perfil.get("memorias"):
         prompt += "\n\n🧠 Memórias pessoais:\n" + "\n".join(perfil["memorias"])
 
-    # Se um gatilho foi selecionado, adiciona os objetivos correspondentes
+        # Se um gatilho foi selecionado, adiciona os objetivos correspondentes
     if gatilho_ativo != "Nenhum":
         objetivos_gatilho = gatilhos_disponiveis.get(gatilho_ativo.lower(), [])
         if objetivos_gatilho:
             prompt += f"\n\n🎯 Ação ativada: {gatilho_ativo.capitalize()}\n" + "\n".join(objetivos_gatilho)
 
+    # --- Checa se o usuário sinalizou continuidade com '*'
+    continuar_cena = False
+    if "mensagens" in st.session_state:
+        for m in reversed(st.session_state["mensagens"]):
+            if m["role"] == "user":
+                conteudo = m["content"].strip()
+                if conteudo == "*" or conteudo.endswith("*"):
+                    continuar_cena = True
+                break
+
+    if continuar_cena:
+        prompt += """
+
+🔁 Esta mensagem é continuação direta da cena anterior. Mantenha o mesmo ambiente, clima e linha emocional.
+Não reinicie o cenário. Continue do ponto exato onde parou — como se fosse o próximo parágrafo do mesmo capítulo.
+Não explique novamente o contexto. Apenas continue a ação, a fala ou o pensamento anterior.
+"""
+
     return prompt
+
 
 
 with st.sidebar:
