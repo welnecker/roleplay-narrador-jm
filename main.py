@@ -318,7 +318,7 @@ with st.sidebar:
    # --- CONFIGURAÇÃO DA PÁGINA (sempre no topo) ---
     st.set_page_config(page_title="Mary", page_icon="🌹")
 # --- TÍTULO E RESUMO NA ÁREA PRINCIPAL ---
-st.title("🌹 Mary Roleplay com Inteligência Autônoma")
+st.title("🌹 Mary ")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
 # --- Inicializa com o resumo apenas uma vez ---
