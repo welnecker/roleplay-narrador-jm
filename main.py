@@ -333,7 +333,8 @@ with st.sidebar:
     st.title("🧠 Configurações")
 
     # Modo narrativo
-    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
+    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio", "Livre"], key="modo_mary", index=1)
+
 # Modelos disponíveis
     modelos_disponiveis = {
     # --- FLUÊNCIA E NARRATIVA COERENTE ---
