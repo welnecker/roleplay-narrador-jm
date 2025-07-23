@@ -422,14 +422,9 @@ with st.sidebar:
             )
 
             if response.status_code == 200:
-                resumo_gerado = response.json()["choices"][0]["message"]["content"]
-
-                # Salva na coluna G (índice 7), com colunas anteriores vazias
-                aba = planilha.worksheet("perfil_mary")
-                nova_linha = [""] * 6 + [resumo_gerado] + [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
-                aba.append_row(nova_linha)
-
-                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+    resumo_gerado = response.json()["choices"][0]["message"]["content"]
+    salvar_resumo(resumo_gerado)  # <- aqui está o segredo
+    st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
             else:
                 st.error("Erro ao gerar resumo automaticamente.")
         except Exception as e:
