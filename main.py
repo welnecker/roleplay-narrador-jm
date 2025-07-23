@@ -309,7 +309,8 @@ with st.sidebar:
 
     # Modo narrativo
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
-modelos_disponiveis = {
+# Modelos disponíveis
+    modelos_disponiveis = {
     # --- FLUÊNCIA E NARRATIVA COERENTE ---
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
@@ -334,6 +335,7 @@ modelos_disponiveis = {
     "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
     "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
 }
+
 
 
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
