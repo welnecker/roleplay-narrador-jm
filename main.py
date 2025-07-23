@@ -141,6 +141,7 @@ def construir_prompt_mary():
     gatilhos_disponiveis = carregar_objetivos_por_status()
     historico = st.session_state.get("mensagens", [])
 
+
          
     inicio_padrao = ""
     if not historico:
