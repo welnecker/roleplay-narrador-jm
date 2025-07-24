@@ -346,34 +346,25 @@ with st.sidebar:
     # Modo narrativo
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio", "Livre"], key="modo_mary", index=4)
 
-# Modelos disponíveis
+    # Modelos disponíveis
     modelos_disponiveis = {
-    # --- FLUÊNCIA E NARRATIVA COERENTE ---
-    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
-    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-
-    # --- EMOÇÃO E PROFUNDIDADE ---
-    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-    "🦋 EVA Qwen2.5 32B ★★★★★ (RP Pro)": "eva-unit-01/qwen2.5-32b-eva",
-    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-
-    # --- EROTISMO E CRIATIVIDADE ---
-    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-
-    # --- ATMOSFÉRICO E ESTÉTICO ---
-    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
-}
-
-
+        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
+        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+        "🦋 EVA Qwen2.5 32B ★★★★★ (RP Pro)": "eva-unit-01/qwen2.5-32b-eva",
+        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
+    }
 
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=3)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
@@ -383,7 +374,7 @@ with st.sidebar:
     opcoes_gatilhos = ["Nenhum"] + list(gatilhos_disponiveis.keys())
     st.selectbox("🎯 Gatilho narrativo (ativa objetivos)", opcoes_gatilhos, key="gatilho_mary", index=0)
 
-    # Visualizar última troca de mensagens
+    # Última troca de mensagens
     if "mensagens" not in st.session_state or not st.session_state.mensagens:
         try:
             aba = planilha.worksheet("interacoes_mary")
@@ -396,7 +387,7 @@ with st.sidebar:
         except Exception:
             st.warning("Não foi possível recuperar a última interação.")
 
-    # Ver vídeo dinâmico
+    # Ver vídeo atual
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
@@ -441,6 +432,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
 
+    # Adicionar memória fixa
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
 
@@ -461,10 +453,9 @@ with st.sidebar:
         else:
             st.warning("Digite o conteúdo da memória antes de salvar.")
 
-    # Botão de atualizar app (para exibir o novo resumo)
+    # Atualizar app para exibir novo resumo
     if st.button("🔁 Atualizar resumo colado"):
-        st.experimental_rerun()
-
+        st.session_state["forcar_rerun"] = True
 
 
 # --- EXIBIR HISTÓRICO DE MENSAGENS ---
@@ -479,11 +470,9 @@ for m in st.session_state.mensagens:
 entrada = st.chat_input("Digite sua mensagem para Mary...")
 
 if entrada:
-    # Mostra mensagem do usuário
     with st.chat_message("user"):
         st.markdown(entrada)
 
-    # Salva e exibe no histórico
     salvar_interacao("user", entrada)
     st.session_state.mensagens.append({"role": "user", "content": entrada})
 
@@ -524,3 +513,9 @@ if entrada:
             st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
         else:
             st.error("Erro ao obter resposta da Mary.")
+
+# --- Executa o rerun se ativado ---
+if st.session_state.get("forcar_rerun"):
+    st.session_state["forcar_rerun"] = False
+    st.experimental_rerun()
+
