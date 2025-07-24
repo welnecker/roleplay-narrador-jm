@@ -355,7 +355,7 @@ with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio", "Livre"], key="modo_mary", index=4)
 
 # Modelos disponíveis
-    modelos_disponiveis = {
+modelos_disponiveis = {
     # --- FLUÊNCIA E NARRATIVA COERENTE ---
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
@@ -365,7 +365,8 @@ with st.sidebar:
     # --- EMOÇÃO E PROFUNDIDADE ---
     "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
     "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-    "🦋 EVA Qwen2.5 32B ★★★★★ (RP Pro)": "eva-unit-01/qwen2.5-32b-eva",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
     "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
 
     # --- EROTISMO E CRIATIVIDADE ---
@@ -380,6 +381,7 @@ with st.sidebar:
     "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
     "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
 }
+
 
 
 
