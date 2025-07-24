@@ -421,7 +421,7 @@ with st.sidebar:
     # Botão de atualizar resumo
     if st.session_state.get("resumo_foi_gerado"):
         if st.button("🔁 Atualizar resumo"):
-            st.experimental_rerun()
+    st.session_state["forcar_rerun"] = True
 
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
