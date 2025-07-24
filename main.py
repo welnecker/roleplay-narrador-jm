@@ -323,22 +323,6 @@ Não explique novamente o contexto. Apenas continue a ação, a fala ou o pensam
 
 
 
-with st.sidebar:
-
-   # --- CONFIGURAÇÃO DA PÁGINA (sempre no topo) ---
-    st.set_page_config(page_title="Mary", page_icon="🌹")
-# --- TÍTULO E RESUMO NA ÁREA PRINCIPAL ---
-st.title("🌹 Mary ")
-st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
-
-# --- Inicializa com o resumo apenas uma vez ---
-if "mensagens" not in st.session_state:
-    resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
-    st.session_state.mensagens = [{
-        "role": "assistant",
-        "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
-    }]
-
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🧠 Configurações")
@@ -374,7 +358,7 @@ with st.sidebar:
     opcoes_gatilhos = ["Nenhum"] + list(gatilhos_disponiveis.keys())
     st.selectbox("🎯 Gatilho narrativo (ativa objetivos)", opcoes_gatilhos, key="gatilho_mary", index=0)
 
-    # Última troca de mensagens
+    # Visualizar última troca de mensagens
     if "mensagens" not in st.session_state or not st.session_state.mensagens:
         try:
             aba = planilha.worksheet("interacoes_mary")
@@ -387,7 +371,7 @@ with st.sidebar:
         except Exception:
             st.warning("Não foi possível recuperar a última interação.")
 
-    # Ver vídeo atual
+    # Ver vídeo dinâmico
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
@@ -432,7 +416,6 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
 
-    # Adicionar memória fixa
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
 
@@ -453,10 +436,14 @@ with st.sidebar:
         else:
             st.warning("Digite o conteúdo da memória antes de salvar.")
 
-    # Atualizar app para exibir novo resumo
+    # Botão de atualização do resumo
     if st.button("🔁 Atualizar resumo colado"):
         st.session_state["forcar_rerun"] = True
 
+# --- FORÇA RERUN SE SOLICITADO ---
+if st.session_state.get("forcar_rerun"):
+    st.session_state["forcar_rerun"] = False
+    st.rerun()
 
 # --- EXIBIR HISTÓRICO DE MENSAGENS ---
 if "mensagens" not in st.session_state:
@@ -472,7 +459,6 @@ entrada = st.chat_input("Digite sua mensagem para Mary...")
 if entrada:
     with st.chat_message("user"):
         st.markdown(entrada)
-
     salvar_interacao("user", entrada)
     st.session_state.mensagens.append({"role": "user", "content": entrada})
 
@@ -505,17 +491,11 @@ if entrada:
 
         if resposta.status_code == 200:
             conteudo = resposta.json()["choices"][0]["message"]["content"]
-
             with st.chat_message("assistant"):
                 st.markdown(conteudo)
-
             salvar_interacao("assistant", conteudo)
             st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
         else:
             st.error("Erro ao obter resposta da Mary.")
 
-# --- Executa o rerun se ativado ---
-if st.session_state.get("forcar_rerun"):
-    st.session_state["forcar_rerun"] = False
-    st.experimental_rerun()
 
