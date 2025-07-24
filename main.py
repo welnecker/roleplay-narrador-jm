@@ -324,56 +324,30 @@ Não explique novamente o contexto. Apenas continue a ação, a fala ou o pensam
 
 
 with st.sidebar:
-
-   # --- CONFIGURAÇÃO DA PÁGINA (sempre no topo) ---
-    st.set_page_config(page_title="Mary", page_icon="🌹")
-# --- TÍTULO E RESUMO NA ÁREA PRINCIPAL ---
-st.title("🌹 Mary ")
-st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
-
-# --- Inicializa com o resumo apenas uma vez ---
-if "mensagens" not in st.session_state:
-    resumo = carregar_perfil_mary().get("sinopse", "[Sem resumo disponível]")
-    st.session_state.mensagens = [{
-        "role": "assistant",
-        "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"
-    }]
-
-# --- SIDEBAR ---
-with st.sidebar:
     st.title("🧠 Configurações")
 
     # Modo narrativo
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio", "Livre"], key="modo_mary", index=4)
 
-# Modelos disponíveis
+    # Modelos disponíveis
     modelos_disponiveis = {
-    # --- FLUÊNCIA E NARRATIVA COERENTE ---
-    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
-    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-
-    # --- EMOÇÃO E PROFUNDIDADE ---
-    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-    "🦋 EVA Qwen2.5 32B ★★★★★ (RP Pro)": "eva-unit-01/qwen2.5-32b-eva",
-    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-
-    # --- EROTISMO E CRIATIVIDADE ---
-    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-
-    # --- ATMOSFÉRICO E ESTÉTICO ---
-    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
-}
-
-
+        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
+        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+        "🦋 EVA Qwen2.5 32B ★★★★★ (RP Pro)": "eva-unit-01/qwen2.5-32b-eva",
+        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
+    }
 
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=3)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
@@ -383,7 +357,11 @@ with st.sidebar:
     opcoes_gatilhos = ["Nenhum"] + list(gatilhos_disponiveis.keys())
     st.selectbox("🎯 Gatilho narrativo (ativa objetivos)", opcoes_gatilhos, key="gatilho_mary", index=0)
 
-    # Visualizar última troca de mensagens
+    # Ver vídeo dinâmico
+    if st.button("🎮 Ver vídeo atual"):
+        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+
+    # Última interação
     if "mensagens" not in st.session_state or not st.session_state.mensagens:
         try:
             aba = planilha.worksheet("interacoes_mary")
@@ -396,23 +374,8 @@ with st.sidebar:
         except Exception:
             st.warning("Não foi possível recuperar a última interação.")
 
-    # Ver vídeo dinâmico
-    if st.button("🎮 Ver vídeo atual"):
-        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-
-    # --- SIDEBAR ---
-with st.sidebar:
-    st.title("🧠 Configurações")
-
-    # Modo narrativo
-    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio"], key="modo_mary", index=1)
-
-    # Ver vídeo dinâmico
-    if st.button("🎮 Ver vídeo atual"):
-        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-
     st.markdown("---")
-    
+
     # Gerar resumo do capítulo
     if st.button("📝 Gerar resumo do capítulo"):
         try:
@@ -424,7 +387,8 @@ with st.sidebar:
                 "Hot": 0.9,
                 "Flerte": 0.8,
                 "Racional": 0.7,
-                "Janio": 1.0
+                "Janio": 1.0,
+                "Livre": 0.95
             }
             modo_atual = st.session_state.get("modo_mary", "Racional")
             temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
@@ -448,14 +412,13 @@ with st.sidebar:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
                 salvar_resumo(resumo_gerado)
                 st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-                st.session_state["resumo_foi_gerado"] = True  # Ativa botão de atualização
+                st.session_state["resumo_foi_gerado"] = True
             else:
                 st.error("Erro ao gerar resumo automaticamente.")
-
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
 
-    # Botão de atualização após gerar resumo
+    # Botão de atualizar resumo
     if st.session_state.get("resumo_foi_gerado"):
         if st.button("🔁 Atualizar resumo"):
             st.experimental_rerun()
