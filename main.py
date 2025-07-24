@@ -326,10 +326,10 @@ Não explique novamente o contexto. Apenas continue a ação, a fala ou o pensam
 with st.sidebar:
     st.title("🧠 Configurações")
 
-    # Modo narrativo
+    # --- Modo narrativo ---
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio", "Livre"], key="modo_mary", index=4)
 
-    # Modelos disponíveis
+    # --- Modelos disponíveis ---
     modelos_disponiveis = {
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
@@ -352,22 +352,23 @@ with st.sidebar:
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=3)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    # Gatilhos narrativos
+    # --- Gatilhos narrativos ---
     gatilhos_disponiveis = carregar_objetivos_por_status()
     opcoes_gatilhos = ["Nenhum"] + list(gatilhos_disponiveis.keys())
     st.selectbox("🎯 Gatilho narrativo (ativa objetivos)", opcoes_gatilhos, key="gatilho_mary", index=0)
 
-    # Ver vídeo dinâmico
+    # --- Ver vídeo atual ---
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
-    # Última interação
+    st.markdown("---")
+
+    # --- Última interação antes da troca ---
     if "mensagens" not in st.session_state or not st.session_state.mensagens:
         try:
             aba = planilha.worksheet("interacoes_mary")
             dados = aba.get_all_records()
             if len(dados) >= 2:
-                st.markdown("---")
                 st.markdown("🔁 Última interação antes da troca de modelo:")
                 st.chat_message(dados[-2]["role"]).markdown(dados[-2]["content"])
                 st.chat_message(dados[-1]["role"]).markdown(dados[-1]["content"])
@@ -376,7 +377,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Gerar resumo do capítulo
+    # --- Geração do resumo ---
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             ultimas = carregar_ultimas_interacoes(n=3)
@@ -418,14 +419,15 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
 
-    # Botão de atualizar resumo
+    # --- Botão de atualizar o app (rerun) ---
     if st.session_state.get("resumo_foi_gerado"):
         if st.button("🔁 Atualizar resumo"):
-            st.session_state["forcar_rerun"] = True
+            st.rerun()
 
     st.markdown("---")
-    st.subheader("➕ Adicionar memória fixa")
 
+    # --- Adicionar memória fixa ---
+    st.subheader("➕ Adicionar memória fixa")
     nova_memoria = st.text_area(
         "🧠 Conteúdo da nova memória",
         height=80,
@@ -442,7 +444,6 @@ with st.sidebar:
                 st.error(f"Erro ao salvar memória: {e}")
         else:
             st.warning("Digite o conteúdo da memória antes de salvar.")
-
 
 
 # --- EXIBIR HISTÓRICO DE MENSAGENS ---
