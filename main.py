@@ -450,7 +450,7 @@ with st.sidebar:
         placeholder="ex: Mary nunca tolera grosserias vindas de homens desconhecidos..."
     )
 
-        if st.button("💾 Salvar memória"):
+    if st.button("💾 Salvar memória"):
         if nova_memoria.strip():
             try:
                 aba = planilha.worksheet("memorias")
