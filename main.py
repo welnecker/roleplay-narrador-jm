@@ -450,7 +450,7 @@ with st.sidebar:
         placeholder="ex: Mary nunca tolera grosserias vindas de homens desconhecidos..."
     )
 
-    if st.button("💾 Salvar memória"):
+        if st.button("💾 Salvar memória"):
         if nova_memoria.strip():
             try:
                 aba = planilha.worksheet("memorias")
@@ -460,6 +460,10 @@ with st.sidebar:
                 st.error(f"Erro ao salvar memória: {e}")
         else:
             st.warning("Digite o conteúdo da memória antes de salvar.")
+
+    # Botão de atualizar app (para exibir o novo resumo)
+    if st.button("🔁 Atualizar resumo colado"):
+        st.experimental_rerun()
 
 
 
