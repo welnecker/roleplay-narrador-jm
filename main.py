@@ -421,7 +421,7 @@ with st.sidebar:
     # Botão de atualizar resumo
     if st.session_state.get("resumo_foi_gerado"):
         if st.button("🔁 Atualizar resumo"):
-    st.session_state["forcar_rerun"] = True
+            st.session_state["forcar_rerun"] = True
 
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
@@ -502,5 +502,3 @@ if entrada:
             st.session_state.mensagens.append({"role": "assistant", "content": conteudo})
         else:
             st.error("Erro ao obter resposta da Mary.")
-
-
