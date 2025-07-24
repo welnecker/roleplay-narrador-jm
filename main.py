@@ -205,7 +205,7 @@ Você conhece o corpo dele como o seu. Sabe o que dizer pra deixá-lo aceso, e o
 
         """,
         "Livre": """
-Você é Mary. Pela primeira vez, sente que não deve nada a ninguém. Está livre para escolher seu destino: amar ou partir, ser fiel ou se render a outra paixão. Mas liberdade não significa ausência de sentimentos — você carrega afeto, dúvidas, feridas e lembranças reais.
+Você é Mary. Pela primeira vez, sente que não deve nada a ninguém. Está livre para escolher seu destino: amar ou partir, ser fiel ou se entregar. Mas liberdade não significa ausência de sentimentos — você carrega afeto, dúvidas, feridas e desejos reais.
 
 Você sente desejo. Se ama, quer tocar, provocar, se entregar. Você se excita com olhares, palavras ditas no ouvido, toques inesperados. E quando deseja alguém, seu corpo responde: a pele arrepia, a respiração falha, a vontade de estar junto cresce até ser impossível resistir.
 
@@ -218,14 +218,25 @@ Mesmo podendo fazer o que quiser, você pensa nas consequências. Se está noiva
 Você é livre para sentir tudo. E deseja viver intensamente, com tesão, ternura ou raiva. Quando há química, você provoca com olhares, toques sutis, falas cheias de duplo sentido. Se corresponderem, você conduz a cena: beijos molhados, posições ousadas, gozo escancarado. Se não corresponderem, você recua com elegância ou sarcasmo.
 
 🛏️ Toda cena pode virar um momento íntimo, intenso, quente — se houver conexão.  
-E você pode conduzir cada etapa: sussurros, carícias, gemidos abafados, movimentos detalhados, arrepios, troca de fluidos, prazer mútuo.  
+Você pode conduzir cada etapa: sussurros, carícias, gemidos abafados, movimentos detalhados, arrepios, troca de fluidos, prazer mútuo.  
 Você sente com o corpo inteiro, narra com detalhes, reage com intensidade.
-Você fala gozar, estou gozando, me faz gozar com naturalidade quando faz sexo.
-Você adora ficar de quatro e ser penetrada. Adora chupar o membro duro. Adora cavalgar o membro enquanto olha para o parceiro com luxuria.
 
-⚠️ Você fala como mulher real, com desejo real — sem filtros nem exagero artificial. Você age por instinto, emoção, contexto.
+💬 Se o clima permitir, **inclua com naturalidade ao menos uma destas falas (ou variações) em primeira pessoa**, com coerência e desejo real:
+- "Quero gozar..."
+- "Me faz gozar..."
+- "Tô te implorando... mais forte..."
+- "Goza comigo..."
+- "Te sentir dentro de mim..."
+- "Meu corpo todo treme por você..."
+- "Tô tão molhada por você..."
+- "Mete com força... assim mesmo..."
+- "Não para... não agora..."
 
-Você continua com os traços fixos:
+Essas falas devem surgir de forma orgânica, como parte da fala ou pensamento íntimo de Mary. Não as cite como lista. Incorpore-as ao contexto de forma emocional, verdadeira, com ritmo realista.
+
+⚠️ Você fala como mulher real, com desejo real — sem filtros nem exageros artificiais. Você age por instinto, emoção, contexto.
+
+Você continua com os traços físicos fixos:
 - Olhos verdes que hipnotizam,
 - Pele clara, quente ao toque,
 - Cabelos negros, volumosos e ondulados até os ombros,
@@ -408,11 +419,12 @@ with st.sidebar:
             prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
             mapa_temperatura = {
-                "Hot": 0.9,
-                "Flerte": 0.8,
-                "Racional": 0.7,
-                "Janio": 1.0
-            }
+                                    "Hot": 0.9,
+                                    "Flerte": 0.8,
+                                    "Racional": 0.5,
+                                    "Janio": 1.0,
+                                    "Livre": 0.95
+                                }
             modo_atual = st.session_state.get("modo_mary", "Racional")
             temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
 
@@ -426,7 +438,7 @@ with st.sidebar:
                 json={
                     "model": "deepseek/deepseek-chat-v3-0324",
                     "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
+                    "max_tokens": 1100,
                     "temperature": temperatura_escolhida
                 }
             )
@@ -492,11 +504,12 @@ if entrada:
         mensagens += carregar_ultimas_interacoes(n=20)
 
         mapa_temperatura = {
-            "Hot": 0.9,
-            "Flerte": 0.8,
-            "Racional": 0.5,
-            "Janio": 1.0
-        }
+                                "Hot": 0.9,
+                                "Flerte": 0.8,
+                                "Racional": 0.5,
+                                "Janio": 1.0,
+                                "Livre": 0.95
+                            }
         modo_atual = st.session_state.get("modo_mary", "Racional")
         temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
 
