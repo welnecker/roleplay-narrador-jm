@@ -355,7 +355,7 @@ with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio", "Livre"], key="modo_mary", index=4)
 
 # Modelos disponíveis
-modelos_disponiveis = {
+    modelos_disponiveis = {
     # --- FLUÊNCIA E NARRATIVA COERENTE ---
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
