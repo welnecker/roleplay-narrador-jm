@@ -213,10 +213,13 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     try:
         with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload, stream=True, timeout=300) as r:
             r.raise_for_status()
-            for raw_line in r.iter_lines(decode_unicode=True):
-                if not raw_line or not raw_line.startswith("data:"):
+            for raw_line in r.iter_lines(decode_unicode=False):
+                if not raw_line:
                     continue
-                data = raw_line[len("data:"):].strip()
+                line = raw_line.decode("utf-8", errors="ignore")
+                if not line.startswith("data:"):
+                    continue
+                data = line[len("data:"):].strip()
                 if data == "[DONE]":
                     break
                 try:
