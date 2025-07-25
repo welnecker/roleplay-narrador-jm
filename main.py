@@ -171,7 +171,7 @@ def construir_prompt_mary():
     return prompt.strip()
 
 # --------------------------- #
-# OpenRouter - Streaming
+# OpenRouter - Streaming (UTF-8 safe)
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
@@ -186,7 +186,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
         "messages": mensagens,
         "max_tokens": 1600,
         "temperature": temperatura,
-        "stream": True
+        "stream": True,
     }
 
     headers = {
@@ -197,15 +197,29 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     assistant_box = st.chat_message("assistant")
     placeholder = assistant_box.empty()
     full_text = ""
+
     try:
-        with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload, stream=True, timeout=300) as r:
+        # decode_unicode=False para tratarmos manualmente como UTF-8
+        with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload,
+                           stream=True, timeout=300) as r:
             r.raise_for_status()
-            for line in r.iter_lines(decode_unicode=True):
-                if not line or not line.startswith("data:"):
+            for raw_line in r.iter_lines(decode_unicode=False):
+                if not raw_line:
                     continue
+
+                # força UTF-8; se falhar, tenta latin1 -> utf8
+                try:
+                    line = raw_line.decode("utf-8")
+                except UnicodeDecodeError:
+                    line = raw_line.decode("latin1").encode("utf-8", "ignore").decode("utf-8", "ignore")
+
+                if not line.startswith("data:"):
+                    continue
+
                 data = line[len("data:"):].strip()
                 if data == "[DONE]":
                     break
+
                 try:
                     j = json.loads(data)
                     delta = j["choices"][0]["delta"].get("content", "")
@@ -213,10 +227,13 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
                         full_text += delta
                         placeholder.markdown(full_text)
                 except Exception:
+                    # ignora keepalives / pings ou chunks malformados
                     continue
+
     except Exception as e:
         st.error(f"Erro no streaming: {e}")
         return "[ERRO STREAM]"
+
     return full_text.strip()
 
 # --------------------------- #
