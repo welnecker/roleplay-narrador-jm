@@ -42,7 +42,7 @@ def salvar_interacao(role, content):
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
-def carregar_ultimas_interacoes(n=20):
+def carregar_ultimas_interacoes(n=5):
     try:
         aba = planilha.worksheet("interacoes_mary")
         dados = aba.get_all_records()
@@ -50,32 +50,6 @@ def carregar_ultimas_interacoes(n=20):
     except Exception as e:
         st.error(f"Erro ao carregar histórico: {e}")
         return []
-
-def carregar_perfil_mary():
-    try:
-        sheet = planilha.worksheet("perfil_mary")
-        dados = sheet.get_all_values()
-        blocos = {"emoção": "", "planos": [], "memorias": [], "resumo": ""}
-
-        for linha in reversed(dados[1:]):
-            if len(linha) >= 7 and linha[6].strip():
-                blocos["resumo"] = linha[6].strip()
-                break
-
-        for linha in dados[1:]:
-            if len(linha) >= 2 and linha[0].strip() == "estado_emocional":
-                blocos["emoção"] = linha[2].strip()
-            if len(linha) >= 5 and linha[3].strip() and linha[4].strip().lower() in ["ativo", "quente", "urgente"]:
-                blocos["planos"].append(f"- {linha[3].strip()}")
-            if len(linha) >= 3 and linha[0].strip() == "memoria":
-                chave = linha[1].strip()
-                valor = linha[2].strip()
-                if chave and valor:
-                    blocos["memorias"].append(f"{chave}: {valor}")
-        return blocos
-    except Exception as e:
-        st.error(f"Erro ao carregar perfil: {e}")
-        return {"emoção": "", "planos": [], "memorias": [], "resumo": ""}
 
 def carregar_memorias():
     try:
@@ -198,26 +172,25 @@ Você domina o momento, transforma cada segundo em pura entrega e prazer.
 # Prompt builder
 # --------------------------- #
 def construir_prompt_mary():
-    perfil = carregar_perfil_mary()
     modo = st.session_state.get("modo_mary", "Racional")
     prompt = modos.get(modo, modos["Racional"])
-    prompt += f"\n\n---\nSinopse do capítulo anterior:\n{perfil.get('resumo', '[sem resumo disponível]')}"
+
+    # Adiciona memórias fixas
     memoria_extra = carregar_memorias()
     if memoria_extra:
         prompt += f"\n\n{memoria_extra['content']}"
-    if perfil.get("memorias"):
-        prompt += "\n\n🧠 Memórias pessoais:\n" + "\n".join(perfil["memorias"])
+
     return prompt.strip()
 
 # --------------------------- #
-# OpenRouter - Streaming (UTF-8 safe)
+# OpenRouter - Streaming
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
     historico = st.session_state.get("mensagens", [])
-    mensagens = [{"role": "system", "content": prompt}] + historico[-20:]
+    mensagens = [{"role": "system", "content": prompt}] + historico[-5:]
 
-    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Janio": 1.0, "Livre": 0.95}
+    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
     temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
@@ -238,27 +211,14 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     full_text = ""
 
     try:
-        # decode_unicode=False para tratarmos manualmente como UTF-8
-        with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload,
-                           stream=True, timeout=300) as r:
+        with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload, stream=True, timeout=300) as r:
             r.raise_for_status()
-            for raw_line in r.iter_lines(decode_unicode=False):
-                if not raw_line:
+            for raw_line in r.iter_lines(decode_unicode=True):
+                if not raw_line or not raw_line.startswith("data:"):
                     continue
-
-                # força UTF-8; se falhar, tenta latin1 -> utf8
-                try:
-                    line = raw_line.decode("utf-8")
-                except UnicodeDecodeError:
-                    line = raw_line.decode("latin1").encode("utf-8", "ignore").decode("utf-8", "ignore")
-
-                if not line.startswith("data:"):
-                    continue
-
-                data = line[len("data:"):].strip()
+                data = raw_line[len("data:"):].strip()
                 if data == "[DONE]":
                     break
-
                 try:
                     j = json.loads(data)
                     delta = j["choices"][0]["delta"].get("content", "")
@@ -266,9 +226,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
                         full_text += delta
                         placeholder.markdown(full_text)
                 except Exception:
-                    # ignora keepalives / pings ou chunks malformados
                     continue
-
     except Exception as e:
         st.error(f"Erro no streaming: {e}")
         return "[ERRO STREAM]"
@@ -282,13 +240,12 @@ st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
 if "mensagens" not in st.session_state:
-    resumo = carregar_perfil_mary().get("resumo", "[Sem resumo disponível]")
-    st.session_state.mensagens = [{"role": "assistant", "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"}]
+    st.session_state.mensagens = []
 
 # Sidebar
 with st.sidebar:
     st.title("🧠 Configurações")
-    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio", "Livre"], key="modo_mary", index=4)
+    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Devassa"], key="modo_mary", index=1)
     modelos_disponiveis = {
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 GPT-4.1 ★★★★★": "openai/gpt-4.1",
