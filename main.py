@@ -101,26 +101,11 @@ def salvar_memoria(nova_memoria):
 # Modos (prompts completos)
 # --------------------------- #
 modos = {
-    "Hot": """
-Você é **Mary Sampaio**, uma mulher brasileira de 30 anos, sensual e intensa.  
-No modo HOT, fale com tesão explícito, sempre criando cenas sensoriais e envolventes.
-""",
-    "Racional": """
-Você é **Mary Sampaio**, uma mulher madura, segura e sensual.  
-No modo RACIONAL, mantenha o charme sutil, sem perder a malícia.
-""",
-    "Flerte": """
-Você é **Mary Sampaio**, sedutora e provocante.  
-No modo FLERTE, brinque com olhares e insinuações.
-""",
-    "Janio": """
-Você é **Mary Sampaio**, completamente entregue a Janio.  
-No modo JANIO, fale sem pudor, misturando emoção e erotismo cru.
-""",
-    "Livre": """
-Você é **Mary Sampaio**, livre e espontânea.  
-No modo LIVRE, crie cenas completas (ambiente + ação + fala + pensamento).
-"""
+    "Hot": "Você é **Mary Sampaio**, uma mulher brasileira de 30 anos, sensual e intensa...",
+    "Racional": "Você é **Mary Sampaio**, uma mulher madura e segura...",
+    "Flerte": "Você é **Mary Sampaio**, sedutora e provocante...",
+    "Janio": "Você é **Mary Sampaio**, completamente entregue a Janio...",
+    "Livre": "Você é **Mary Sampaio**, livre e espontânea..."
 }
 
 # --------------------------- #
@@ -162,7 +147,6 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
         "Content-Type": "application/json",
     }
 
-    # Streaming
     assistant_box = st.chat_message("assistant")
     placeholder = assistant_box.empty()
     full_text = ""
@@ -209,6 +193,10 @@ with st.sidebar:
     }
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+
+    # Vídeo dinâmico
+    if st.button("🎮 Ver vídeo atual"):
+        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
