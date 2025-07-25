@@ -296,6 +296,41 @@ with st.sidebar:
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
+    # Botão para gerar resumo do capítulo
+    if st.button("📝 Gerar resumo do capítulo"):
+        try:
+            ultimas = carregar_ultimas_interacoes(n=3)
+            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
+
+            modo_atual = st.session_state.get("modo_mary", "Racional")
+            mapa_temperatura = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
+            temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
+
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "deepseek/deepseek-chat-v3-0324",
+                    "messages": [{"role": "user", "content": prompt_resumo}],
+                    "max_tokens": 800,
+                    "temperature": temperatura_escolhida
+                }
+            )
+
+            if response.status_code == 200:
+                resumo_gerado = response.json()["choices"][0]["message"]["content"]
+                salvar_resumo(resumo_gerado)
+                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+            else:
+                st.error("Erro ao gerar resumo automaticamente.")
+
+        except Exception as e:
+            st.error(f"Erro durante a geração do resumo: {e}")
+
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
     nova_memoria = st.text_area("🧠 Nova memória", height=80, placeholder="Ex: Mary odeia ficar sozinha à noite...")
