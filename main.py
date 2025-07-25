@@ -239,8 +239,24 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
+# Exibe o último resumo ao iniciar o app
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = []
+    try:
+        aba_resumo = planilha.worksheet("perfil_mary")
+        dados = aba_resumo.get_all_values()
+        ultimo_resumo = "[Sem resumo disponível]"
+        for linha in reversed(dados[1:]):  # ignora o cabeçalho
+            if len(linha) >= 7 and linha[6].strip():
+                ultimo_resumo = linha[6].strip()
+                break
+        st.session_state.mensagens = [{
+            "role": "assistant",
+            "content": f"🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}"
+        }]
+        st.markdown(f"### 🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}")
+    except Exception as e:
+        st.session_state.mensagens = []
+        st.warning(f"Não foi possível carregar o resumo: {e}")
 
 # Sidebar
 with st.sidebar:
