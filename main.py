@@ -249,14 +249,12 @@ if "mensagens" not in st.session_state:
             if len(linha) >= 7 and linha[6].strip():
                 ultimo_resumo = linha[6].strip()
                 break
-        st.session_state.mensagens = [{
-            "role": "assistant",
-            "content": f"🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}"
-        }]
+        st.session_state.mensagens = []  # começa vazio
         st.markdown(f"### 🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}")
     except Exception as e:
         st.session_state.mensagens = []
         st.warning(f"Não foi possível carregar o resumo: {e}")
+
 
 # Sidebar
 with st.sidebar:
