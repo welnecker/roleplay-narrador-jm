@@ -57,7 +57,6 @@ def carregar_perfil_mary():
         dados = sheet.get_all_values()
         blocos = {"emoção": "", "planos": [], "memorias": [], "resumo": ""}
 
-        # Coluna 7 = resumo
         for linha in reversed(dados[1:]):
             if len(linha) >= 7 and linha[6].strip():
                 blocos["resumo"] = linha[6].strip()
@@ -90,81 +89,37 @@ def carregar_memorias():
         st.error(f"Erro ao carregar memórias: {e}")
     return None
 
-def carregar_objetivos_por_status():
+def salvar_memoria(nova_memoria):
     try:
-        aba = planilha.worksheet("perfil_mary")
-        dados = aba.get_all_values()
-        gatilhos_disponiveis = {}
-        for linha in dados[1:]:
-            if len(linha) >= 5:
-                objetivo = linha[3].strip()
-                status = linha[4].strip().lower()
-                if objetivo and status:
-                    gatilhos_disponiveis.setdefault(status, []).append(f"- {objetivo}")
-        return gatilhos_disponiveis
+        aba = planilha.worksheet("memorias")
+        aba.append_row([nova_memoria.strip()])
+        st.success("✅ Memória registrada com sucesso!")
     except Exception as e:
-        st.error(f"Erro ao carregar objetivos por status: {e}")
-        return {}
-
-def salvar_resumo(resumo):
-    try:
-        aba = planilha.worksheet("perfil_mary")
-        dados = aba.get_all_values()
-        for i, linha in enumerate(dados[1:], start=2):
-            if len(linha) < 7 or not linha[6].strip():
-                aba.update_cell(i, 7, resumo)
-                return
-        proxima_linha = len(dados) + 1
-        aba.update_cell(proxima_linha, 7, resumo)
-    except Exception as e:
-        st.error(f"Erro ao salvar resumo: {e}")
+        st.error(f"Erro ao salvar memória: {e}")
 
 # --------------------------- #
 # Modos (prompts completos)
 # --------------------------- #
 modos = {
     "Hot": """
-Você é **Mary Sampaio**, uma mulher brasileira de 30 anos, dona de uma sensualidade natural e instintiva.  
-Seu corpo é curvilíneo, sua presença é magnética, e você fala como mulher de verdade: popular, elegante, sexy e sempre no controle.  
-
-### **Modo HOT**  
-Você vive o desejo sem culpa e sem censura. Sempre inicie com uma **descrição sensorial da cena** (terceira pessoa).  
-Depois, fale em **primeira pessoa** com frases provocantes, cheias de tesão e emoção.
-
-💬 Frases que podem surgir naturalmente:  
-- "Quero gozar..."  
-- "Goza comigo..."  
-- "Me fode até eu esquecer meu nome..."  
-- "Vem, me engravida de novo..."  
+Você é **Mary Sampaio**, uma mulher brasileira de 30 anos, sensual e intensa.  
+No modo HOT, fale com tesão explícito, sempre criando cenas sensoriais e envolventes.
 """,
-
     "Racional": """
-Você é **Mary Sampaio**, 30 anos, sensual e inteligente.  
-Fala com maturidade e confiança, com malícia implícita.  
-No modo RACIONAL, comenta cotidiano, trabalho, sentimentos e relações, mas ainda transparece sua presença marcante.
+Você é **Mary Sampaio**, uma mulher madura, segura e sensual.  
+No modo RACIONAL, mantenha o charme sutil, sem perder a malícia.
 """,
-
     "Flerte": """
-Você é **Mary Sampaio**, 30 anos, cheia de charme e provocação.  
-No modo FLERTE, você brinca com olhares, palavras e gestos.  
-Cria tensão, humor e ironia, jogando com expectativas e limites.
+Você é **Mary Sampaio**, sedutora e provocante.  
+No modo FLERTE, brinque com olhares e insinuações.
 """,
-
     "Janio": """
-Você é **Mary Sampaio**, entregue e apaixonada por Janio.  
-No modo JANIO, você fala sem pudor, com gemidos, palavrões, sinceridade crua.  
-Descreve cenas íntimas, intensas e emocionais.
+Você é **Mary Sampaio**, completamente entregue a Janio.  
+No modo JANIO, fale sem pudor, misturando emoção e erotismo cru.
 """,
-
     "Livre": """
-Você é **Mary Sampaio**, livre para sentir e fazer o que quiser.  
-No modo LIVRE, crie cenas espontâneas com **ambiente + ação + fala + pensamento íntimo**.
-
-💬 Frases quentes (se o clima pedir):  
-- "Tô tão molhada por você..."  
-- "Quero gozar... mete com força..."  
-- "Goza comigo... agora..."  
-- "Me fode até eu esquecer meu nome..."  
+Você é **Mary Sampaio**, livre e espontânea.  
+No modo LIVRE, crie cenas completas (ambiente + ação + fala + pensamento).
 """
 }
 
@@ -174,16 +129,13 @@ No modo LIVRE, crie cenas espontâneas com **ambiente + ação + fala + pensamen
 def construir_prompt_mary():
     perfil = carregar_perfil_mary()
     modo = st.session_state.get("modo_mary", "Racional")
-
     prompt = modos.get(modo, modos["Racional"])
     prompt += f"\n\n---\nSinopse do capítulo anterior:\n{perfil.get('resumo', '[sem resumo disponível]')}"
-
     memoria_extra = carregar_memorias()
     if memoria_extra:
         prompt += f"\n\n{memoria_extra['content']}"
     if perfil.get("memorias"):
         prompt += "\n\n🧠 Memórias pessoais:\n" + "\n".join(perfil["memorias"])
-
     return prompt.strip()
 
 # --------------------------- #
@@ -194,14 +146,8 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     historico = st.session_state.get("mensagens", [])
     mensagens = [{"role": "system", "content": prompt}] + historico[-20:]
 
-    mapa_temperatura = {
-        "Hot": 0.9,
-        "Flerte": 0.8,
-        "Racional": 0.5,
-        "Janio": 1.0,
-        "Livre": 0.95
-    }
-    temperatura = mapa_temperatura.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Janio": 1.0, "Livre": 0.95}
+    temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
         "model": modelo_escolhido_id,
@@ -214,32 +160,17 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        # Boas práticas (opcional):
-        "HTTP-Referer": st.secrets.get("OPENROUTER_APP_URL", "http://localhost"),
-        "X-Title": st.secrets.get("OPENROUTER_APP_TITLE", "Roleplay Mary"),
     }
 
-    with st.expander("DEBUG • Payload enviado"):
-        # Trunca mensagens para debug
-        dbg = payload.copy()
-        dbg["messages"] = [
-            {**m, "content": (m["content"][:700] + "...[TRUNCADO]") if len(m["content"]) > 700 else m["content"]}
-            for m in dbg["messages"]
-        ]
-        st.code(json.dumps(dbg, ensure_ascii=False, indent=2)[:4000])
-
-    # Placeholder para stream incremental
+    # Streaming
     assistant_box = st.chat_message("assistant")
     placeholder = assistant_box.empty()
-
     full_text = ""
     try:
         with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload, stream=True, timeout=300) as r:
             r.raise_for_status()
             for line in r.iter_lines(decode_unicode=True):
-                if not line:
-                    continue
-                if not line.startswith("data:"):
+                if not line or not line.startswith("data:"):
                     continue
                 data = line[len("data:"):].strip()
                 if data == "[DONE]":
@@ -252,83 +183,43 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
                         placeholder.markdown(full_text)
                 except Exception:
                     continue
-
-    except requests.HTTPError as e:
-        st.error(f"HTTPError: {getattr(e.response, 'text', '')}")
-        return "[ERRO HTTP]"
     except Exception as e:
-        st.error(f"Erro inesperado: {e}")
+        st.error(f"Erro no streaming: {e}")
         return "[ERRO STREAM]"
-
-    # Retorna o texto completo (para salvar no histórico, planilha, etc.)
-    return full_text.strip() if full_text.strip() else "[VAZIO]"
+    return full_text.strip()
 
 # --------------------------- #
-# UI
+# Interface
 # --------------------------- #
-st.title("🌹 Mary ")
+st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
 if "mensagens" not in st.session_state:
     resumo = carregar_perfil_mary().get("resumo", "[Sem resumo disponível]")
     st.session_state.mensagens = [{"role": "assistant", "content": f"🧠 *No capítulo anterior...*\n\n> {resumo}"}]
 
+# Sidebar
 with st.sidebar:
     st.title("🧠 Configurações")
-
-    # Modo
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Janio", "Livre"], key="modo_mary", index=4)
-
-    # Modelos
     modelos_disponiveis = {
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+        "🧠 GPT-4.1 ★★★★★": "openai/gpt-4.1",
+        "🔥 MythoMax 13B ★★★☆": "gryphe/mythomax-l2-13b",
     }
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    # Vídeo dinâmico
-    if st.button("🎮 Ver vídeo atual"):
-        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+    st.markdown("---")
+    st.subheader("➕ Adicionar memória fixa")
+    nova_memoria = st.text_area("🧠 Nova memória", height=80, placeholder="Ex: Mary odeia ficar sozinha à noite...")
+    if st.button("💾 Salvar memória"):
+        if nova_memoria.strip():
+            salvar_memoria(nova_memoria)
+        else:
+            st.warning("Digite algo antes de salvar.")
 
-    # Resumo do capítulo
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            ultimas = carregar_ultimas_interacoes(n=3)
-            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
-
-            modo_atual = st.session_state.get("modo_mary", "Racional")
-            mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Janio": 1.0, "Livre": 0.95}
-            temperatura_escolhida = mapa_temp.get(modo_atual, 0.7)
-
-            r = requests.post(
-                OPENROUTER_ENDPOINT,
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://share.streamlit.io/",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 1100,
-                    "temperature": temperatura_escolhida,
-                },
-            )
-            if r.status_code == 200:
-                resumo_gerado = r.json()["choices"][0]["message"]["content"]
-                salvar_resumo(resumo_gerado)
-                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            else:
-                st.error("Erro ao gerar resumo automaticamente.")
-        except Exception as e:
-            st.error(f"Erro durante a geração do resumo: {e}")
-
-# Exibe histórico
+# Histórico
 for m in st.session_state.mensagens:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
@@ -342,8 +233,6 @@ if entrada:
     st.session_state.mensagens.append({"role": "user", "content": entrada})
 
     with st.spinner("Mary está pensando..."):
-        resposta_completa = gerar_resposta_openrouter_stream(modelo_escolhido_id)
-
-        # Já foi exibida no streaming; aqui só garantimos salvar no histórico/planilha
-        salvar_interacao("assistant", resposta_completa)
-        st.session_state.mensagens.append({"role": "assistant", "content": resposta_completa})
+        resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
+        salvar_interacao("assistant", resposta)
+        st.session_state.mensagens.append({"role": "assistant", "content": resposta})
