@@ -241,7 +241,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 1600,
+        "max_tokens": 1100,
         "temperature": temperatura,
         "stream": True,
     }
