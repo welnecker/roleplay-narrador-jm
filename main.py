@@ -79,19 +79,16 @@ def salvar_resumo(resumo):
         aba = planilha.worksheet("perfil_mary")
         dados = aba.get_all_values()
 
-        # Procura a primeira linha vazia na coluna 7 (coluna G)
-        for i, linha in enumerate(dados[1:], start=2):  # ignora cabeçalho
+        for i, linha in enumerate(dados[1:], start=2):
             if len(linha) < 7 or not linha[6].strip():
                 aba.update_cell(i, 7, resumo)
                 return
 
-        # Caso não encontre linha vazia, adiciona ao final
         proxima_linha = len(dados) + 1
         aba.update_cell(proxima_linha, 7, resumo)
 
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
-
 
 # --------------------------- #
 # Modos (prompts completos)
@@ -284,66 +281,65 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     return full_text.strip()
 
 # --------------------------- #
+# --------------------------- #
 # Interface
 # --------------------------- #
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
-# Exibe o último resumo ao iniciar o app
 if "mensagens" not in st.session_state:
     try:
+        st.session_state.mensagens = carregar_ultimas_interacoes(n=10)
+
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
         ultimo_resumo = "[Sem resumo disponível]"
-        for linha in reversed(dados[1:]):  # ignora o cabeçalho
+        for linha in reversed(dados[1:]):
             if len(linha) >= 7 and linha[6].strip():
                 ultimo_resumo = linha[6].strip()
                 break
-        st.session_state.mensagens = []  # começa vazio
         st.markdown(f"### 🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}")
+
     except Exception as e:
         st.session_state.mensagens = []
-        st.warning(f"Não foi possível carregar o resumo: {e}")
+        st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
 
-
+# --------------------------- #
 # Sidebar
+# --------------------------- #
 with st.sidebar:
     st.title("🧠 Configurações")
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Devassa"], key="modo_mary", index=1)
+
     modelos_disponiveis = {
-    # --- FLUÊNCIA E NARRATIVA COERENTE ---
-    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
-    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-
-    # --- EMOÇÃO E PROFUNDIDADE ---
-    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-
-    # --- EROTISMO E CRIATIVIDADE ---
-    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-
-    # --- ATMOSFÉRICO E ESTÉTICO ---
-    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
+        # --- FLUÊNCIA E NARRATIVA COERENTE ---
+        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
+        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+        # --- EMOÇÃO E PROFUNDIDADE ---
+        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+        "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+        "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+        # --- EROTISMO E CRIATIVIDADE ---
+        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+        # --- ATMOSFÉRICO E ESTÉTICO ---
+        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
     }
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    # Vídeo dinâmico
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
-    # Botão para gerar resumo do capítulo
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             ultimas = carregar_ultimas_interacoes(n=3)
@@ -351,8 +347,7 @@ with st.sidebar:
             prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
             modo_atual = st.session_state.get("modo_mary", "Racional")
-            mapa_temperatura = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
-            temperatura_escolhida = mapa_temperatura.get(modo_atual, 0.7)
+            temperatura_escolhida = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}.get(modo_atual, 0.7)
 
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -387,12 +382,16 @@ with st.sidebar:
         else:
             st.warning("Digite algo antes de salvar.")
 
+# --------------------------- #
 # Histórico
+# --------------------------- #
 for m in st.session_state.mensagens:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
+# --------------------------- #
 # Entrada do usuário
+# --------------------------- #
 entrada = st.chat_input("Digite sua mensagem para Mary...")
 if entrada:
     with st.chat_message("user"):
