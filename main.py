@@ -72,6 +72,28 @@ def salvar_memoria(nova_memoria):
         st.error(f"Erro ao salvar memória: {e}")
 
 # --------------------------- #
+# Salvar Resumo
+# --------------------------- #
+def salvar_resumo(resumo):
+    try:
+        aba = planilha.worksheet("perfil_mary")
+        dados = aba.get_all_values()
+
+        # Procura a primeira linha vazia na coluna 7 (coluna G)
+        for i, linha in enumerate(dados[1:], start=2):  # ignora cabeçalho
+            if len(linha) < 7 or not linha[6].strip():
+                aba.update_cell(i, 7, resumo)
+                return
+
+        # Caso não encontre linha vazia, adiciona ao final
+        proxima_linha = len(dados) + 1
+        aba.update_cell(proxima_linha, 7, resumo)
+
+    except Exception as e:
+        st.error(f"Erro ao salvar resumo: {e}")
+
+
+# --------------------------- #
 # Modos (prompts completos)
 # --------------------------- #
 modos = {
