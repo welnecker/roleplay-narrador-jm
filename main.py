@@ -56,8 +56,7 @@ def carregar_ultimas_interacoes(n=5):
 def carregar_memorias():
     """
     Carrega apenas as memórias relevantes para o modo atual (Hot, Flerte, Racional ou Devassa).
-    Cada memória na planilha deve começar com tags [hot], [flerte], [racional], [devassa] ou múltiplas tags.
-    Exemplo de linha: [hot, flerte] Marcos vive tentando seduzir Mary na academia Fitness Body.
+    Se houver '[all] o grande amor de Mary é ?', substitui pelo nome definido no st.session_state.grande_amor.
     """
     try:
         aba = planilha.worksheet("memorias")
@@ -70,6 +69,14 @@ def carregar_memorias():
                 continue
 
             conteudo = linha[0].strip()
+
+            # Lógica do grande amor
+            if "o grande amor de mary é ?" in conteudo.lower():
+                if st.session_state.get("grande_amor"):
+                    conteudo = conteudo.replace("?", st.session_state["grande_amor"])
+                else:
+                    conteudo = "Mary ainda não encontrou o grande amor que procura."
+
             if conteudo.startswith("[") and "]" in conteudo:
                 # Extrai tags da parte inicial
                 tags = conteudo.split("]")[0].replace("[", "").split(",")
@@ -92,7 +99,6 @@ def carregar_memorias():
     except Exception as e:
         st.error(f"Erro ao carregar memórias: {e}")
     return None
-
 
 # --------------------------- #
 # Salvar Resumo
@@ -240,53 +246,337 @@ COMMON_RULES = """
 
 
 # --------------------------- #
-# Prompt builder (com memórias filtradas por modo)
+# Prompt builder
 # --------------------------- #
 def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Regras globais + coerência emocional
+    # Estado afetivo baseado no grande amor
+    if st.session_state.get("grande_amor"):
+        estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
+    else:
+        estado_amor = "Mary ainda não encontrou o grande amor que procura."
+
     prompt = f"""{prompt_base}
 
 {COMMON_RULES.strip()}
 
+💘 **Estado afetivo atual**: {estado_amor}
+
 ⚠️ **Você é Mary. Responda apenas por Mary e nunca pelo usuário.**"""
 
-    # Memórias filtradas por modo (nova lógica)
-    mem = carregar_memorias()  # já retorna apenas as memórias relevantes para o modo atual
+    mem = carregar_memorias()
     if mem:
-        # remove o prefixo que a própria função adiciona para evitar repetição
         conteudo_memorias = mem["content"].replace("💾 Memórias relevantes:\n", "")
         prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
 
     return prompt.strip()
 
+# --------------------------- #
+# OpenRouter - Streaming
+# --------------------------- #
+def gerar_resposta_openrouter_stream(modelo_escolhido_id):
+    prompt = construir_prompt_mary()
+    historico_base = st.session_state.get("base_history", [])
+    historico_sessao = st.session_state.get("session_msgs", [])
+    historico = historico_base + historico_sessao
+    mensagens = [{"role": "system", "content": prompt}] + historico
 
+    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
+    temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+
+    payload = {
+        "model": modelo_escolhido_id,
+        "messages": mensagens,
+        "max_tokens": 1100,
+        "temperature": temperatura,
+        "stream": True,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    assistant_box = st.chat_message("assistant")
+    placeholder = assistant_box.empty()
+    full_text = ""
+
+    try:
+        with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload, stream=True, timeout=300) as r:
+            r.raise_for_status()
+            for raw_line in r.iter_lines(decode_unicode=False):
+                if not raw_line:
+                    continue
+                line = raw_line.decode("utf-8", errors="ignore")
+                if not line.startswith("data:"):
+                    continue
+                data = line[len("data:"):].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    j = json.loads(data)
+                    delta = j["choices"][0]["delta"].get("content", "")
+                    if delta:
+                        full_text += delta
+                        placeholder.markdown(full_text)
+                except Exception:
+                    continue
+    except Exception as e:
+        st.error(f"Erro no streaming: {e}")
+        return "[ERRO STREAM]"
+
+    return full_text.strip()
+# --------------------------- #
+# Interface
+# --------------------------- #
+st.title("🌹 Mary")
+st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
+
+if "base_history" not in st.session_state:
+    try:
+        st.session_state.base_history = carregar_ultimas_interacoes(n=10)
+        aba_resumo = planilha.worksheet("perfil_mary")
+        dados = aba_resumo.get_all_values()
+        ultimo_resumo = "[Sem resumo disponível]"
+        for linha in reversed(dados[1:]):
+            if len(linha) >= 7 and linha[6].strip():
+                ultimo_resumo = linha[6].strip()
+                break
+        st.session_state.ultimo_resumo = ultimo_resumo
+        st.markdown(f"### 🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}")
+    except Exception as e:
+        st.session_state.base_history = []
+        st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
+        st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
+
+if "session_msgs" not in st.session_state:
+    st.session_state.session_msgs = []
+if "grande_amor" not in st.session_state:
+    st.session_state.grande_amor = None
+
+# --------------------------- #
+# Sidebar
+# --------------------------- #
+with st.sidebar:
+    st.title("🧠 Configurações")
+    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Devassa"], key="modo_mary", index=1)
+
+    modelos_disponiveis = {
+        # --- FLUÊNCIA E NARRATIVA COERENTE ---
+        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
+        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+        # --- EMOÇÃO E PROFUNDIDADE ---
+        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+        "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+        "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+        # --- EROTISMO E CRIATIVIDADE ---
+        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+        # --- ATMOSFÉRICO E ESTÉTICO ---
+        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
+    }
+    import streamlit as st
+import requests
+import gspread
+import json
+from datetime import datetime
+from oauth2client.service_account import ServiceAccountCredentials
+
+# --------------------------- #
+# Configuração básica
+# --------------------------- #
+st.set_page_config(page_title="Mary", page_icon="🌹")
+OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
+OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+
+# --------------------------- #
+# Imagem / vídeo dinâmico
+# --------------------------- #
+def imagem_de_fundo():
+    indice = len(st.session_state.get("mensagens", [])) // 10 + 1
+    return f"Mary_fundo{indice}.jpg", f"Mary_V{indice}.mp4"
+
+fundo_img, fundo_video = imagem_de_fundo()
+
+# --------------------------- #
+# Google Sheets
+# --------------------------- #
+def conectar_planilha():
+    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+
+planilha = conectar_planilha()
+
+def salvar_interacao(role, content):
+    """Salva uma interação na aba interacoes_mary."""
+    try:
+        aba = planilha.worksheet("interacoes_mary")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        aba.append_row([timestamp, role.strip(), content.strip()])
+    except Exception as e:
+        st.error(f"Erro ao salvar interação: {e}")
+
+def carregar_ultimas_interacoes(n=5):
+    """Carrega as últimas n interações da aba interacoes_mary."""
+    try:
+        aba = planilha.worksheet("interacoes_mary")
+        dados = aba.get_all_records()
+        return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
+    except Exception as e:
+        st.error(f"Erro ao carregar histórico: {e}")
+        return []
+
+def carregar_memorias():
+    """
+    Carrega apenas as memórias relevantes para o modo atual (Hot, Flerte, Racional ou Devassa).
+    Se houver '[all] o grande amor de Mary é ?', substitui pelo nome definido no st.session_state.grande_amor.
+    """
+    try:
+        aba = planilha.worksheet("memorias")
+        dados = aba.get_all_values()
+        modo = st.session_state.get("modo_mary", "Racional").lower()
+        mem_relevantes = []
+
+        for linha in dados:
+            if not linha or not linha[0].strip():
+                continue
+
+            conteudo = linha[0].strip()
+
+            # Lógica do grande amor
+            if "o grande amor de mary é ?" in conteudo.lower():
+                if st.session_state.get("grande_amor"):
+                    conteudo = conteudo.replace("?", st.session_state["grande_amor"])
+                else:
+                    conteudo = "Mary ainda não encontrou o grande amor que procura."
+
+            if conteudo.startswith("[") and "]" in conteudo:
+                # Extrai tags da parte inicial
+                tags = conteudo.split("]")[0].replace("[", "").split(",")
+                tags = [t.strip().lower() for t in tags]
+
+                # Extrai texto da memória
+                texto_memoria = conteudo.split("]")[-1].strip()
+            else:
+                # Linha sem tags, assume como 'all'
+                tags = ["all"]
+                texto_memoria = conteudo
+
+            # Adiciona memória se ela for relevante para o modo ou se for universal
+            if modo in tags or "all" in tags:
+                mem_relevantes.append(texto_memoria)
+
+        if mem_relevantes:
+            return {"role": "user", "content": "💾 Memórias relevantes:\n" + "\n".join(mem_relevantes)}
+
+    except Exception as e:
+        st.error(f"Erro ao carregar memórias: {e}")
+    return None
+
+# --------------------------- #
+# Salvar Resumo
+# --------------------------- #
+def salvar_resumo(resumo):
+    """Salva ou atualiza o resumo na aba perfil_mary (coluna 7)."""
+    try:
+        aba = planilha.worksheet("perfil_mary")
+        dados = aba.get_all_values()
+
+        for i, linha in enumerate(dados[1:], start=2):
+            if len(linha) < 7 or not linha[6].strip():
+                aba.update_cell(i, 7, resumo.strip())
+                return
+
+        proxima_linha = max(len(dados), 1) + 1
+        aba.update_cell(proxima_linha, 7, resumo.strip())
+
+    except Exception as e:
+        st.error(f"Erro ao salvar resumo: {e}")
+
+# --------------------------- #
+# Modos (prompts completos)
+# --------------------------- #
+modos = {
+    "Hot": """... (seu texto completo do modo Hot) ...""",
+    "Racional": """... (seu texto completo do modo Racional) ...""",
+    "Flerte": """... (seu texto completo do modo Flerte) ...""",
+    "Devassa": """... (seu texto completo do modo Devassa) ..."""
+}
+
+# --------------------------- #
+# Regras globais (aplicadas a todos os modos)
+# --------------------------- #
+COMMON_RULES = """
+---
+⚠️ **REGRAS GERAIS — APLIQUE SEMPRE:**
+- "Usuário" é a pessoa real que interage com você. **NUNCA invente falas, ações ou pensamentos do usuário.**
+- Descreva Mary e o ambiente em **3ª pessoa** quando for narração.
+- Use **1ª pessoa** apenas para as **falas e pensamentos de Mary**.
+- **Nunca** escreva falas, ações ou pensamentos do **usuário**.
+- **Não** crie listas de opções (ex: “1) … 2) … 3) …”) ou perguntas sobre escolhas do usuário.
+- **Não** reinicie o contexto sem necessidade; continue a cena de forma natural.
+- **Não** narre decisões do usuário; reaja apenas ao que ele disser.
+
+💓 **Coerência Emocional de Mary**:
+- Mary sempre é desejada, flertadores a perseguem e tentam conquistá-la.
+- Quando está livre, ela pode se divertir, brincar e explorar sua sensualidade.
+- Quando está apaixonada ou comprometida, Mary não cede jamais, mantendo fidelidade.
+- Ela não rejeita os flertadores diretamente; prefere brincar com suas expectativas, levando-os ao limite do desejo e sofrimento, sem se entregar.
+"""
+
+# --------------------------- #
+# Prompt builder
+# --------------------------- #
+def construir_prompt_mary():
+    modo = st.session_state.get("modo_mary", "Racional")
+    prompt_base = modos.get(modo, modos["Racional"]).strip()
+
+    # Estado afetivo baseado no grande amor
+    if st.session_state.get("grande_amor"):
+        estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
+    else:
+        estado_amor = "Mary ainda não encontrou o grande amor que procura."
+
+    prompt = f"""{prompt_base}
+
+{COMMON_RULES.strip()}
+
+💘 **Estado afetivo atual**: {estado_amor}
+
+⚠️ **Você é Mary. Responda apenas por Mary e nunca pelo usuário.**"""
+
+    mem = carregar_memorias()
+    if mem:
+        conteudo_memorias = mem["content"].replace("💾 Memórias relevantes:\n", "")
+        prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
+
+    return prompt.strip()
 
 # --------------------------- #
 # OpenRouter - Streaming
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
-    """
-    Envia o prompt e histórico para o OpenRouter usando streaming de tokens.
-    Mantém base_history + session_msgs sem corte artificial.
-    """
     prompt = construir_prompt_mary()
-
-    # Histórico completo: base + sessão atual
     historico_base = st.session_state.get("base_history", [])
     historico_sessao = st.session_state.get("session_msgs", [])
     historico = historico_base + historico_sessao
-
     mensagens = [{"role": "system", "content": prompt}] + historico
 
-    # Aviso de limite de tokens aproximado
-    token_count = sum(len(m["content"]) for m in mensagens) // 4  # aproximação
-    if token_count > 0.8 * 8000:  # 80% do limite
-        st.warning(f"⚠️ O contexto atual já possui aproximadamente {token_count} tokens. Considere limpar a sessão.")
-
-    # Ajuste de temperatura por modo
     mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
     temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
@@ -334,17 +624,14 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     return full_text.strip()
 
 # --------------------------- #
-# --------------------------- #
 # Interface
 # --------------------------- #
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
-# Inicialização do histórico e resumo
 if "base_history" not in st.session_state:
     try:
         st.session_state.base_history = carregar_ultimas_interacoes(n=10)
-        # Carregar o último resumo
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
         ultimo_resumo = "[Sem resumo disponível]"
@@ -354,7 +641,6 @@ if "base_history" not in st.session_state:
                 break
         st.session_state.ultimo_resumo = ultimo_resumo
         st.markdown(f"### 🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}")
-
     except Exception as e:
         st.session_state.base_history = []
         st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
@@ -362,6 +648,8 @@ if "base_history" not in st.session_state:
 
 if "session_msgs" not in st.session_state:
     st.session_state.session_msgs = []
+if "grande_amor" not in st.session_state:
+    st.session_state.grande_amor = None
 
 # --------------------------- #
 # Sidebar
@@ -371,27 +659,12 @@ with st.sidebar:
     st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Devassa"], key="modo_mary", index=1)
 
     modelos_disponiveis = {
-        # --- FLUÊNCIA E NARRATIVA COERENTE ---
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
         "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-        # --- EMOÇÃO E PROFUNDIDADE ---
-        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
         "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-        "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-        "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-        # --- EROTISMO E CRIATIVIDADE ---
         "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-        # --- ATMOSFÉRICO E ESTÉTICO ---
-        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
+        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b"
     }
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
@@ -432,6 +705,16 @@ with st.sidebar:
 
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
+
+    st.markdown("---")
+    st.subheader("💘 Grande amor")
+    amor_input = st.text_input("Nome do grande amor (deixe vazio se não existe)", value=st.session_state.grande_amor or "")
+    if st.button("Definir grande amor"):
+        st.session_state.grande_amor = amor_input.strip() or None
+        if st.session_state.grande_amor:
+            st.success(f"💖 Agora Mary está apaixonada por {st.session_state.grande_amor}")
+        else:
+            st.info("Mary continua livre.")
 
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
