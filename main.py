@@ -396,7 +396,7 @@ with st.sidebar:
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    if st.button("🎮 Ver vídeo atual"):
+ if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
     if st.button("📝 Gerar resumo do capítulo"):
@@ -425,6 +425,7 @@ with st.sidebar:
             if response.status_code == 200:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
                 salvar_resumo(resumo_gerado)
+                st.session_state.ultimo_resumo = resumo_gerado
                 st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
             else:
                 st.error("Erro ao gerar resumo automaticamente.")
@@ -440,6 +441,7 @@ with st.sidebar:
             salvar_memoria(nova_memoria)
         else:
             st.warning("Digite algo antes de salvar.")
+
 
 # --------------------------- #
 # Histórico
