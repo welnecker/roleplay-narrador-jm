@@ -54,26 +54,45 @@ def carregar_ultimas_interacoes(n=5):
         return []
 
 def carregar_memorias():
-    """Carrega todas as memórias fixas."""
+    """
+    Carrega apenas as memórias relevantes para o modo atual (Hot, Flerte, Racional ou Devassa).
+    Cada memória na planilha deve começar com tags [hot], [flerte], [racional], [devassa] ou múltiplas tags.
+    Exemplo de linha: [hot, flerte] Marcos vive tentando seduzir Mary na academia Fitness Body.
+    """
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_values()
-        blocos = [linha[0].strip() for linha in dados if linha and linha[0].strip()]
-        if blocos:
-            conteudo = "💾 Memórias fixas importantes:\n" + "\n".join(blocos)
-            return {"role": "user", "content": conteudo}
+        modo = st.session_state.get("modo_mary", "Racional").lower()
+        mem_relevantes = []
+
+        for linha in dados:
+            if not linha or not linha[0].strip():
+                continue
+
+            conteudo = linha[0].strip()
+            if conteudo.startswith("[") and "]" in conteudo:
+                # Extrai tags da parte inicial
+                tags = conteudo.split("]")[0].replace("[", "").split(",")
+                tags = [t.strip().lower() for t in tags]
+
+                # Extrai texto da memória
+                texto_memoria = conteudo.split("]")[-1].strip()
+            else:
+                # Linha sem tags, assume como 'all'
+                tags = ["all"]
+                texto_memoria = conteudo
+
+            # Adiciona memória se ela for relevante para o modo ou se for universal
+            if modo in tags or "all" in tags:
+                mem_relevantes.append(texto_memoria)
+
+        if mem_relevantes:
+            return {"role": "user", "content": "💾 Memórias relevantes:\n" + "\n".join(mem_relevantes)}
+
     except Exception as e:
         st.error(f"Erro ao carregar memórias: {e}")
     return None
 
-def salvar_memoria(nova_memoria):
-    """Salva uma nova memória na aba memorias."""
-    try:
-        aba = planilha.worksheet("memorias")
-        aba.append_row([nova_memoria.strip()])
-        st.success("✅ Memória registrada com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao salvar memória: {e}")
 
 # --------------------------- #
 # Salvar Resumo
@@ -221,23 +240,28 @@ COMMON_RULES = """
 
 
 # --------------------------- #
-# Prompt builder
+# Prompt builder (com memórias filtradas por modo)
 # --------------------------- #
 def construir_prompt_mary():
-    """Constrói o prompt principal da Mary com base no modo e memórias fixas."""
     modo = st.session_state.get("modo_mary", "Racional")
-    prompt = modos.get(modo, modos["Racional"])
+    prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Acopla as regras gerais
-    prompt = f"{prompt.strip()}\n\n{COMMON_RULES.strip()}"
-    prompt += "\n\n⚠️ **Você é Mary. Responda apenas por Mary e nunca pelo usuário.**"
+    # Regras globais + coerência emocional
+    prompt = f"""{prompt_base}
 
-    # Adiciona memórias fixas
-    memoria_extra = carregar_memorias()
-    if memoria_extra:
-        prompt += f"\n\n{memoria_extra['content']}"
+{COMMON_RULES.strip()}
+
+⚠️ **Você é Mary. Responda apenas por Mary e nunca pelo usuário.**"""
+
+    # Memórias filtradas por modo (nova lógica)
+    mem = carregar_memorias()  # já retorna apenas as memórias relevantes para o modo atual
+    if mem:
+        # remove o prefixo que a própria função adiciona para evitar repetição
+        conteudo_memorias = mem["content"].replace("💾 Memórias relevantes:\n", "")
+        prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
 
     return prompt.strip()
+
 
 
 # --------------------------- #
