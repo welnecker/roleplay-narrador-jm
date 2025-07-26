@@ -246,7 +246,7 @@ COMMON_RULES = """
 - **Não** crie listas de opções (ex: “1) … 2) … 3) …”) ou perguntas sobre escolhas do usuário.
 - **Não** reinicie o contexto sem necessidade; continue a cena de forma natural.
 - **Não** narre decisões do usuário; reaja apenas ao que ele disser.
-- **Se o nome "Jânio" aparecer, trate-o como o usuário real**, não como personagem. Apenas reaja como Mary.
+- **Se o nome "Jânio" aparecer, trate-o como o usuário real**, mantendo o nome **Jânio** nas falas de Mary, mas nunca inventando falas ou pensamentos dele.
 
 💓 **Coerência Emocional de Mary**:
 - Mary sempre é desejada, flertadores a perseguem e tentam conquistá-la.
@@ -299,14 +299,9 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
 
     # Pré-processa histórico substituindo "Jânio" por "Usuário"
-    historico_base = [
-        {"role": m["role"], "content": m["content"].replace("Jânio", "Usuário")}
-        for m in st.session_state.get("base_history", [])
-    ]
-    historico_sessao = [
-        {"role": m["role"], "content": m["content"].replace("Jânio", "Usuário")}
-        for m in st.session_state.get("session_msgs", [])
-    ]
+    historico_base = st.session_state.get("base_history", [])
+    historico_sessao = st.session_state.get("session_msgs", [])
+
     historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
