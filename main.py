@@ -396,79 +396,76 @@ with st.sidebar:
     modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
- if st.button("🎮 Ver vídeo atual"):
-        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+    if st.button("🎮 Ver vídeo atual"):
+            st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
     if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            ultimas = carregar_ultimas_interacoes(n=3)
-            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
+            try:
+                ultimas = carregar_ultimas_interacoes(n=3)
+                texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+                prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
-            modo_atual = st.session_state.get("modo_mary", "Racional")
-            temperatura_escolhida = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}.get(modo_atual, 0.7)
+                modo_atual = st.session_state.get("modo_mary", "Racional")
+                temperatura_escolhida = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}.get(modo_atual, 0.7)
 
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": temperatura_escolhida
-                }
-            )
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "deepseek/deepseek-chat-v3-0324",
+                        "messages": [{"role": "user", "content": prompt_resumo}],
+                        "max_tokens": 800,
+                        "temperature": temperatura_escolhida
+                    }
+                )
 
-            if response.status_code == 200:
-                resumo_gerado = response.json()["choices"][0]["message"]["content"]
-                salvar_resumo(resumo_gerado)
-                st.session_state.ultimo_resumo = resumo_gerado
-                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            else:
-                st.error("Erro ao gerar resumo automaticamente.")
+                if response.status_code == 200:
+                    resumo_gerado = response.json()["choices"][0]["message"]["content"]
+                    salvar_resumo(resumo_gerado)
+                    st.session_state.ultimo_resumo = resumo_gerado
+                    st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+                else:
+                    st.error("Erro ao gerar resumo automaticamente.")
 
-        except Exception as e:
-            st.error(f"Erro durante a geração do resumo: {e}")
+            except Exception as e:
+                st.error(f"Erro durante a geração do resumo: {e}")
 
-    st.markdown("---")
-    st.subheader("➕ Adicionar memória fixa")
-    nova_memoria = st.text_area("🧠 Nova memória", height=80, placeholder="Ex: Mary odeia ficar sozinha à noite...")
-    if st.button("💾 Salvar memória"):
-        if nova_memoria.strip():
-            salvar_memoria(nova_memoria)
-        else:
-            st.warning("Digite algo antes de salvar.")
+            st.markdown("---")
+            st.subheader("➕ Adicionar memória fixa")
+            nova_memoria = st.text_area("🧠 Nova memória", height=80, placeholder="Ex: Mary odeia ficar sozinha à noite...")
+            if st.button("💾 Salvar memória"):
+                if nova_memoria.strip():
+                    salvar_memoria(nova_memoria)
+                else:
+                    st.warning("Digite algo antes de salvar.")
 
+    # --------------------------- #
+    # Histórico
+    # --------------------------- #
+    historico_total = st.session_state.base_history + st.session_state.session_msgs
+    for m in historico_total:
+        with st.chat_message(m["role"]):
+            st.markdown(m["content"])
 
-# --------------------------- #
-# Histórico
-# --------------------------- #
-# Mensagens + resumo no final
-historico_total = st.session_state.base_history + st.session_state.session_msgs
-for m in historico_total:
-    with st.chat_message(m["role"]):
-        st.markdown(m["content"])
+    # Exibe o resumo no final
+    if st.session_state.get("ultimo_resumo"):
+        with st.chat_message("assistant"):
+            st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
 
-# Adiciona o resumo como última "fala" da Mary
-if "ultimo_resumo" in st.session_state:
-    with st.chat_message("assistant"):
-        st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
+    # --------------------------- #
+    # Entrada do usuário
+    # --------------------------- #
+    entrada = st.chat_input("Digite sua mensagem para Mary...")
+    if entrada:
+        with st.chat_message("user"):
+            st.markdown(entrada)
+        salvar_interacao("user", entrada)
+        st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-
-# --------------------------- #
-# Entrada do usuário
-# --------------------------- #
-entrada = st.chat_input("Digite sua mensagem para Mary...")
-if entrada:
-    with st.chat_message("user"):
-        st.markdown(entrada)
-    salvar_interacao("user", entrada)
-    st.session_state.session_msgs.append({"role": "user", "content": entrada})
-
-    with st.spinner("Mary está pensando..."):
-        resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
-        salvar_interacao("assistant", resposta)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
+        with st.spinner("Mary está pensando..."):
+            resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
+            salvar_interacao("assistant", resposta)
+            st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
