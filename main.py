@@ -35,14 +35,16 @@ def conectar_planilha():
 planilha = conectar_planilha()
 
 def salvar_interacao(role, content):
+    """Salva uma interação na aba interacoes_mary."""
     try:
         aba = planilha.worksheet("interacoes_mary")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        aba.append_row([timestamp, role, content])
+        aba.append_row([timestamp, role.strip(), content.strip()])
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
 def carregar_ultimas_interacoes(n=5):
+    """Carrega as últimas n interações da aba interacoes_mary."""
     try:
         aba = planilha.worksheet("interacoes_mary")
         dados = aba.get_all_records()
@@ -52,6 +54,7 @@ def carregar_ultimas_interacoes(n=5):
         return []
 
 def carregar_memorias():
+    """Carrega todas as memórias fixas."""
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_values()
@@ -64,6 +67,7 @@ def carregar_memorias():
     return None
 
 def salvar_memoria(nova_memoria):
+    """Salva uma nova memória na aba memorias."""
     try:
         aba = planilha.worksheet("memorias")
         aba.append_row([nova_memoria.strip()])
@@ -75,20 +79,22 @@ def salvar_memoria(nova_memoria):
 # Salvar Resumo
 # --------------------------- #
 def salvar_resumo(resumo):
+    """Salva ou atualiza o resumo na aba perfil_mary (coluna 7)."""
     try:
         aba = planilha.worksheet("perfil_mary")
         dados = aba.get_all_values()
 
         for i, linha in enumerate(dados[1:], start=2):
             if len(linha) < 7 or not linha[6].strip():
-                aba.update_cell(i, 7, resumo)
+                aba.update_cell(i, 7, resumo.strip())
                 return
 
-        proxima_linha = len(dados) + 1
-        aba.update_cell(proxima_linha, 7, resumo)
+        proxima_linha = max(len(dados), 1) + 1
+        aba.update_cell(proxima_linha, 7, resumo.strip())
 
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
+
 
 # --------------------------- #
 # Modos (prompts completos)
@@ -211,6 +217,7 @@ COMMON_RULES = """
 # Prompt builder
 # --------------------------- #
 def construir_prompt_mary():
+    """Constrói o prompt principal da Mary com base no modo e memórias fixas."""
     modo = st.session_state.get("modo_mary", "Racional")
     prompt = modos.get(modo, modos["Racional"])
 
@@ -230,10 +237,25 @@ def construir_prompt_mary():
 # OpenRouter - Streaming
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
+    """
+    Envia o prompt e histórico para o OpenRouter usando streaming de tokens.
+    Mantém base_history + session_msgs sem corte artificial.
+    """
     prompt = construir_prompt_mary()
-    historico = st.session_state.get("mensagens", [])
-    mensagens = [{"role": "system", "content": prompt}] + historico[-5:]
 
+    # Histórico completo: base + sessão atual
+    historico_base = st.session_state.get("base_history", [])
+    historico_sessao = st.session_state.get("session_msgs", [])
+    historico = historico_base + historico_sessao
+
+    mensagens = [{"role": "system", "content": prompt}] + historico
+
+    # Aviso de limite de tokens aproximado
+    token_count = sum(len(m["content"]) for m in mensagens) // 4  # aproximação
+    if token_count > 0.8 * 8000:  # 80% do limite
+        st.warning(f"⚠️ O contexto atual já possui aproximadamente {token_count} tokens. Considere limpar a sessão.")
+
+    # Ajuste de temperatura por modo
     mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
     temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
@@ -287,10 +309,11 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
-if "mensagens" not in st.session_state:
+# Inicialização do histórico e resumo
+if "base_history" not in st.session_state:
     try:
-        st.session_state.mensagens = carregar_ultimas_interacoes(n=10)
-
+        st.session_state.base_history = carregar_ultimas_interacoes(n=10)
+        # Carregar o último resumo
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
         ultimo_resumo = "[Sem resumo disponível]"
@@ -298,11 +321,16 @@ if "mensagens" not in st.session_state:
             if len(linha) >= 7 and linha[6].strip():
                 ultimo_resumo = linha[6].strip()
                 break
+        st.session_state.ultimo_resumo = ultimo_resumo
         st.markdown(f"### 🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}")
 
     except Exception as e:
-        st.session_state.mensagens = []
+        st.session_state.base_history = []
+        st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
         st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
+
+if "session_msgs" not in st.session_state:
+    st.session_state.session_msgs = []
 
 # --------------------------- #
 # Sidebar
@@ -385,7 +413,7 @@ with st.sidebar:
 # --------------------------- #
 # Histórico
 # --------------------------- #
-for m in st.session_state.mensagens:
+for m in (st.session_state.base_history + st.session_state.session_msgs):
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
@@ -397,9 +425,9 @@ if entrada:
     with st.chat_message("user"):
         st.markdown(entrada)
     salvar_interacao("user", entrada)
-    st.session_state.mensagens.append({"role": "user", "content": entrada})
+    st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
     with st.spinner("Mary está pensando..."):
         resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
         salvar_interacao("assistant", resposta)
-        st.session_state.mensagens.append({"role": "assistant", "content": resposta})
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
