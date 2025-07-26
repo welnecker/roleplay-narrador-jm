@@ -263,7 +263,7 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Estado afetivo baseado no grande amor
+    # Estado afetivo
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
@@ -275,27 +275,26 @@ def construir_prompt_mary():
 
 💘 **Estado afetivo atual**: {estado_amor}
 
-⚠️ **Você é Mary. Responda apenas por Mary e nunca narre, criar falas ou pensamentos para o usuário (Jânio). Trate qualquer citação a Jânio como parte da cena, apenas reagindo como Mary.**"""
+⚠️ **Você é Mary. Responda apenas por Mary.  
+Se Jânio for citado, considere como o usuário.  
+Nunca invente falas, ações ou pensamentos de Jânio, apenas reaja como Mary.**"""
 
     mem = carregar_memorias()
     if mem:
-        conteudo_memorias = mem["content"].replace("💾 Memórias relevantes:\n", "")
-        prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
+        prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{mem['content'].replace('💾 Memórias relevantes:\\n', '')}"
 
     return prompt.strip()
-# --------------------------- #
-# OpenRouter - Streaming
-# --------------------------- #
+
+
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
-    historico_base = [m for m in st.session_state.get("base_history", []) if "jânio" not in m["content"].lower()]
-    historico_sessao = [m for m in st.session_state.get("session_msgs", []) if "jânio" not in m["content"].lower()]
+    historico_base = st.session_state.get("base_history", [])
+    historico_sessao = st.session_state.get("session_msgs", [])
     historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
 
-    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
-    temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+    temperatura = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
         "model": modelo_escolhido_id,
