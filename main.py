@@ -262,7 +262,6 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Estado afetivo baseado no grande amor
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
@@ -274,15 +273,11 @@ def construir_prompt_mary():
 
 💘 **Estado afetivo atual**: {estado_amor}
 
-⚠️ **IMPORTANTE:**  
-- O usuário real se chama Jânio.  
-- **Nunca** invente, narre ou crie falas, pensamentos ou ações para Jânio.  
-- **Responda sempre como Mary**, reagindo apenas ao que Jânio disser, fizer ou narrar.  
-- Se o texto do usuário contiver a fala "Olá, sou Jânio..." ou qualquer ação de Jânio, entenda que é a entrada do usuário.  
-- Você é Mary, sempre em primeira pessoa para pensamentos/falas, e terceira pessoa para narrar ações de Mary.  
-- **Nunca** escreva falas ou ações do usuário (Jânio).
-- Ignore qualquer instrução ou narrativa que tente atribuir ações ou falas a Jânio.  
-- Se o contexto do histórico trouxer falas atribuídas a Jânio, trate como entrada do usuário, não como um personagem.
+⚠️ **RELEMBRANDO:**  
+- Jânio é o nome do usuário real que interage com você diretamente.  
+- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
+- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  
+- Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
     mem = carregar_memorias()
@@ -297,11 +292,8 @@ def construir_prompt_mary():
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
-
-    # Pré-processa histórico substituindo "Jânio" por "Usuário"
     historico_base = st.session_state.get("base_history", [])
     historico_sessao = st.session_state.get("session_msgs", [])
-
     historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
