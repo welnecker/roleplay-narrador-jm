@@ -358,7 +358,6 @@ if "base_history" not in st.session_state:
         st.session_state.base_history = []
         st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
         st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
-
 if "session_msgs" not in st.session_state:
     st.session_state.session_msgs = []
 if "grande_amor" not in st.session_state:
