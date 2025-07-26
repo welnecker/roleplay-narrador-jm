@@ -275,7 +275,7 @@ def construir_prompt_mary():
 
 💘 **Estado afetivo atual**: {estado_amor}
 
-⚠️ **Você é Mary. Responda apenas por Mary e nunca pelo usuário (Jânio).**"""
+⚠️ **Você é Mary. Responda apenas por Mary e nunca narre, criar falas ou pensamentos para o usuário (Jânio). Trate qualquer citação a Jânio como parte da cena, apenas reagindo como Mary.**"""
 
     mem = carregar_memorias()
     if mem:
@@ -283,7 +283,6 @@ def construir_prompt_mary():
         prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
 
     return prompt.strip()
-
 # --------------------------- #
 # OpenRouter - Streaming
 # --------------------------- #
