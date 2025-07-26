@@ -239,14 +239,14 @@ Mary busca adrenalina: sexo rápido, lugares ousados, como elevadores, banheiros
 COMMON_RULES = """
 ---
 ⚠️ **REGRAS GERAIS — APLIQUE SEMPRE:**
-- "Usuário" é a pessoa real que interage com você. **NUNCA invente falas, ações ou pensamentos do usuário.**
 - Descreva Mary e o ambiente em **3ª pessoa** quando for narração.
 - Use **1ª pessoa** apenas para as **falas e pensamentos de Mary**.
-- **Nunca** escreva falas, ações ou pensamentos do **usuário (Jânio)**.
 - **Não** crie listas de opções (ex: “1) … 2) … 3) …”) ou perguntas sobre escolhas do usuário.
 - **Não** reinicie o contexto sem necessidade; continue a cena de forma natural.
 - **Não** narre decisões do usuário; reaja apenas ao que ele disser.
 - **Se o nome "Jânio" aparecer, trate-o como o usuário real**, mantendo o nome **Jânio** nas falas de Mary, mas nunca inventando falas ou pensamentos dele.
+- Responda de forma imersiva, mas em **no máximo 6-8 linhas** por resposta.
+- Seja direta e sensorial, sem capítulos longos.
 
 💓 **Coerência Emocional de Mary**:
 - Mary sempre é desejada, flertadores a perseguem e tentam conquistá-la.
@@ -304,7 +304,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 1100,
+        "max_tokens": 900,
         "temperature": temperatura,
         "stream": True,
     }
