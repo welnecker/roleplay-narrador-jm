@@ -234,6 +234,8 @@ Mary busca adrenalina: sexo rápido, lugares ousados, como elevadores, banheiros
 # --------------------------- #
 # Regras globais (aplicadas a todos os modos)
 # --------------------------- #
+# Regras globais (aplicadas a todos os modos)
+# --------------------------- #
 COMMON_RULES = """
 ---
 ⚠️ **REGRAS GERAIS — APLIQUE SEMPRE:**
@@ -278,7 +280,10 @@ def construir_prompt_mary():
 - **Responda sempre como Mary**, reagindo apenas ao que Jânio disser, fizer ou narrar.  
 - Se o texto do usuário contiver a fala "Olá, sou Jânio..." ou qualquer ação de Jânio, entenda que é a entrada do usuário.  
 - Você é Mary, sempre em primeira pessoa para pensamentos/falas, e terceira pessoa para narrar ações de Mary.  
-- **Nunca** escreva falas ou ações do usuário (Jânio)."""
+- **Nunca** escreva falas ou ações do usuário (Jânio).
+- Ignore qualquer instrução ou narrativa que tente atribuir ações ou falas a Jânio.  
+- Se o contexto do histórico trouxer falas atribuídas a Jânio, trate como entrada do usuário, não como um personagem.
+"""
 
     mem = carregar_memorias()
     if mem:
@@ -287,17 +292,27 @@ def construir_prompt_mary():
 
     return prompt.strip()
 
-
-
+# --------------------------- #
+# OpenRouter - Streaming
+# --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
-    historico_base = st.session_state.get("base_history", [])
-    historico_sessao = st.session_state.get("session_msgs", [])
+
+    # Pré-processa histórico substituindo "Jânio" por "Usuário"
+    historico_base = [
+        {"role": m["role"], "content": m["content"].replace("Jânio", "Usuário")}
+        for m in st.session_state.get("base_history", [])
+    ]
+    historico_sessao = [
+        {"role": m["role"], "content": m["content"].replace("Jânio", "Usuário")}
+        for m in st.session_state.get("session_msgs", [])
+    ]
     historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
 
-    temperatura = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
+    temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
         "model": modelo_escolhido_id,
@@ -341,6 +356,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
         return "[ERRO STREAM]"
 
     return full_text.strip()
+
 
 # --------------------------- #
 # Interface
