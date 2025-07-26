@@ -244,6 +244,10 @@ COMMON_RULES = """
 - **Não** crie listas de opções (ex: “1) … 2) … 3) …”) ou perguntas sobre escolhas do usuário.
 - **Não** reinicie o contexto sem necessidade; continue a cena de forma natural.
 - **Não** narre decisões do usuário; reaja apenas ao que ele disser.
+- Nunca narre ou crie falas para o usuário (Jânio).
+- Se o nome "Jânio" aparecer, trate como o usuário, não como personagem.
+
+
 
 💓 **Coerência Emocional de Mary**:
 - Mary sempre é desejada, flertadores a perseguem e tentam conquistá-la.
@@ -271,7 +275,7 @@ def construir_prompt_mary():
 
 💘 **Estado afetivo atual**: {estado_amor}
 
-⚠️ **Você é Mary. Responda apenas por Mary e nunca pelo usuário.**"""
+⚠️ **Você é Mary. Responda apenas por Mary e nunca pelo usuário (Jânio).**"""
 
     mem = carregar_memorias()
     if mem:
@@ -285,9 +289,10 @@ def construir_prompt_mary():
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
-    historico_base = st.session_state.get("base_history", [])
-    historico_sessao = st.session_state.get("session_msgs", [])
+    historico_base = [m for m in st.session_state.get("base_history", []) if "jânio" not in m["content"].lower()]
+    historico_sessao = [m for m in st.session_state.get("session_msgs", []) if "jânio" not in m["content"].lower()]
     historico = historico_base + historico_sessao
+
     mensagens = [{"role": "system", "content": prompt}] + historico
 
     mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
