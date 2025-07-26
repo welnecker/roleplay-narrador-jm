@@ -100,6 +100,14 @@ def carregar_memorias():
         st.error(f"Erro ao carregar memórias: {e}")
     return None
 
+def salvar_memoria(nova_memoria):
+    try:
+        aba = planilha.worksheet("memorias")
+        aba.append_row([nova_memoria.strip()])
+        st.success("✅ Memória registrada com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao salvar memória: {e}")
+
 # --------------------------- #
 # Salvar Resumo
 # --------------------------- #
@@ -122,7 +130,7 @@ def salvar_resumo(resumo):
 
 
 # --------------------------- #
-# Modos (prompts completos)
+# Modos (prompts completos, INTACTOS)
 # --------------------------- #
 modos = {
     "Hot": """
@@ -334,6 +342,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
+# Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
 if "base_history" not in st.session_state:
     try:
         st.session_state.base_history = carregar_ultimas_interacoes(n=10)
@@ -345,7 +354,6 @@ if "base_history" not in st.session_state:
                 ultimo_resumo = linha[6].strip()
                 break
         st.session_state.ultimo_resumo = ultimo_resumo
-        st.markdown(f"### 🧠 *No capítulo anterior...*\n\n> {ultimo_resumo}")
     except Exception as e:
         st.session_state.base_history = []
         st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
@@ -453,12 +461,7 @@ for m in historico_total:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-# 🔎 DEBUG: modo ativo + preview do prompt que está indo pro modelo
-st.caption(f"🧭 Modo ativo: **{st.session_state.get('modo_mary', 'Racional')}**")
-with st.expander("🛠️ Debug do prompt (primeiros 800 chars)"):
-    st.code(construir_prompt_mary()[:800])
-
-# Exibe o resumo no final
+# Exibe o resumo **uma única vez**, no final
 if st.session_state.get("ultimo_resumo"):
     with st.chat_message("assistant"):
         st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
