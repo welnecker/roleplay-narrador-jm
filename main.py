@@ -413,9 +413,17 @@ with st.sidebar:
 # --------------------------- #
 # Histórico
 # --------------------------- #
-for m in (st.session_state.base_history + st.session_state.session_msgs):
+# Mensagens + resumo no final
+historico_total = st.session_state.base_history + st.session_state.session_msgs
+for m in historico_total:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
+
+# Adiciona o resumo como última "fala" da Mary
+if "ultimo_resumo" in st.session_state:
+    with st.chat_message("assistant"):
+        st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
+
 
 # --------------------------- #
 # Entrada do usuário
