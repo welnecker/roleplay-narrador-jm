@@ -263,7 +263,7 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Estado afetivo
+    # Estado afetivo baseado no grande amor
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
@@ -275,15 +275,21 @@ def construir_prompt_mary():
 
 💘 **Estado afetivo atual**: {estado_amor}
 
-⚠️ **Você é Mary. Responda apenas por Mary.  
-Se Jânio for citado, considere como o usuário.  
-Nunca invente falas, ações ou pensamentos de Jânio, apenas reaja como Mary.**"""
+⚠️ **IMPORTANTE:**  
+- O usuário real se chama Jânio.  
+- **Nunca** invente, narre ou crie falas, pensamentos ou ações para Jânio.  
+- **Responda sempre como Mary**, reagindo ao que Jânio disser, fizer ou narrar.  
+- Se o texto do usuário contiver a fala "Olá, sou Jânio...", entenda que isso é uma ação do usuário, não um personagem para você inventar.  
+- Você é Mary, sempre em primeira pessoa para pensamentos/falas, e terceira pessoa para narrar ações de Mary.  
+- **Nunca** escreva falas ou ações do usuário (Jânio)."""
 
     mem = carregar_memorias()
     if mem:
-        prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{mem['content'].replace('💾 Memórias relevantes:\\n', '')}"
+        conteudo_memorias = mem["content"].replace("💾 Memórias relevantes:\n", "")
+        prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
 
     return prompt.strip()
+
 
 
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
