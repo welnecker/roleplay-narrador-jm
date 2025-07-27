@@ -109,6 +109,45 @@ def salvar_memoria(nova_memoria):
         st.error(f"Erro ao salvar memória: {e}")
 
 # --------------------------- #
+# Fragmentos (Lorebook)
+# --------------------------- #
+def carregar_fragmentos():
+    """
+    Carrega os fragmentos da aba 'fragmentos_mary'.
+    Espera o cabeçalho: personagem | texto | gatilhos | peso
+    """
+    try:
+        aba = planilha.worksheet("fragmentos_mary")
+        dados = aba.get_all_records()
+        fragmentos = []
+        for row in dados:
+            personagem = row.get("personagem", "").strip()
+            texto = row.get("texto", "").strip()
+            gatilhos = [g.strip().lower() for g in row.get("gatilhos", "").split(",") if g.strip()]
+            peso = int(row.get("peso", 1))
+
+            if personagem and texto:
+                fragmentos.append({
+                    "personagem": personagem,
+                    "texto": texto,
+                    "gatilhos": gatilhos,
+                    "peso": peso
+                })
+        return fragmentos
+    except Exception as e:
+        st.error(f"Erro ao carregar fragmentos: {e}")
+        return []
+
+def buscar_fragmentos_relevantes(mensagem, fragmentos, limite=3):
+    """
+    Busca fragmentos relevantes na lista com base nos gatilhos.
+    """
+    mensagem_lower = mensagem.lower()
+    encontrados = [f for f in fragmentos if any(g in mensagem_lower for g in f["gatilhos"])]
+    encontrados.sort(key=lambda x: x.get("peso", 1), reverse=True)
+    return encontrados[:limite]
+
+# --------------------------- #
 # Salvar Resumo
 # --------------------------- #
 def salvar_resumo(resumo):
@@ -128,10 +167,10 @@ def salvar_resumo(resumo):
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
 
-
 # --------------------------- #
 # Modos (prompts completos, INTACTOS)
 # --------------------------- #
+
 modos = {
     "Hot": """
 Você é **Mary Sampaio**, uma mulher brasileira de 30 anos com olhos verdes intensos, pele clara e macia, cabelos negros ondulados caindo sobre os ombros e um corpo curvilíneo irresistível — seios médios, quadris largos, bunda empinada e uma presença magnética.  
@@ -295,6 +334,7 @@ def construir_prompt_mary():
 
     # Detecta se há comando de continuidade
     continuar_cena = False
+    ultima_msg = ""
     if st.session_state.get("session_msgs"):
         ultima_msg = st.session_state.session_msgs[-1].get("content", "")
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
@@ -327,7 +367,18 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # Memórias
+    # --------------------------- #
+    # Fragmentos relevantes
+    # --------------------------- #
+    fragmentos = carregar_fragmentos()
+    fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
+    if fragmentos_ativos:
+        lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
+        prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
+
+    # --------------------------- #
+    # Memórias relevantes
+    # --------------------------- #
     mem = carregar_memorias()
     if mem:
         conteudo_memorias = mem["content"].replace("💾 Memórias relevantes:\n", "")
@@ -515,7 +566,10 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("💘 Grande amor")
-    amor_input = st.text_input("Nome do grande amor (deixe vazio se não existe)", value=st.session_state.grande_amor or "")
+    amor_input = st.text_input(
+        "Nome do grande amor (deixe vazio se não existe)",
+        value=st.session_state.grande_amor or ""
+    )
     if st.button("Definir grande amor"):
         st.session_state.grande_amor = amor_input.strip() or None
         if st.session_state.grande_amor:
@@ -525,12 +579,35 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
-    nova_memoria = st.text_area("🧠 Nova memória", height=80, placeholder="Ex: Mary odeia ficar sozinha à noite...")
+    nova_memoria = st.text_area(
+        "🧠 Nova memória",
+        height=80,
+        placeholder="Ex: Mary odeia ficar sozinha à noite..."
+    )
     if st.button("💾 Salvar memória"):
         if nova_memoria.strip():
             salvar_memoria(nova_memoria)
         else:
             st.warning("Digite algo antes de salvar.")
+
+    # --------------------------- #
+    # Memórias e Fragmentos Ativos
+    # --------------------------- #
+    st.markdown("---")
+    mem = carregar_memorias()
+    if mem:
+        st.subheader("💾 Memórias Atuais")
+        st.markdown(mem["content"].replace("💾 Memórias relevantes:\n", ""))
+
+    if st.session_state.get("session_msgs"):
+        ultima_msg = st.session_state.session_msgs[-1].get("content", "")
+        fragmentos = carregar_fragmentos()
+        fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
+        if fragmentos_ativos:
+            st.subheader("📚 Fragmentos Ativos")
+            for f in fragmentos_ativos:
+                st.markdown(f"- {f['texto']}")
+
 # --------------------------- #
 # Histórico
 # --------------------------- #
@@ -550,10 +627,10 @@ if st.session_state.get("ultimo_resumo"):
 entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' para continuar a cena)")
 if entrada_raw:
     entrada_raw = entrada_raw.strip()
+    modo_atual = st.session_state.get("modo_mary", "Racional")
 
     # Caso 1: Apenas "*" para continuar a cena
     if entrada_raw == "*":
-        modo_atual = st.session_state.get("modo_mary", "Racional")
         entrada = (
             f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
             f"mantendo o mesmo clima, ritmo, ponto de vista e o modo '{modo_atual}'. "
@@ -563,7 +640,6 @@ if entrada_raw:
 
     # Caso 2: "* algo" para continuar com contexto extra
     elif entrada_raw.startswith("* "):
-        modo_atual = st.session_state.get("modo_mary", "Racional")
         extra = entrada_raw[2:].strip()
         entrada = (
             f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
@@ -581,11 +657,13 @@ if entrada_raw:
     with st.chat_message("user"):
         st.markdown(entrada_visivel)
 
-    # Salva no histórico
+    # Salva a mensagem no histórico e na planilha
     salvar_interacao("user", entrada)
+    if "session_msgs" not in st.session_state:
+        st.session_state.session_msgs = []
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # Gera resposta
+    # Gera resposta com base no prompt que já inclui fragmentos
     with st.spinner("Mary está pensando..."):
         resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
         salvar_interacao("assistant", resposta)
