@@ -617,50 +617,16 @@ with st.sidebar:
             for f in fragmentos_ativos:
                 st.markdown(f"- {f['texto']}")
 
+
 # --------------------------- #
-# Entrada do usuário
+# Histórico
 # --------------------------- #
-entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' para continuar a cena)")
-if entrada_raw:
-    entrada_raw = entrada_raw.strip()
-    modo_atual = st.session_state.get("modo_mary", "Racional")
+historico_total = st.session_state.base_history + st.session_state.session_msgs
+for m in historico_total:
+    with st.chat_message(m["role"]):
+        st.markdown(m["content"])
 
-    # Caso 1: Apenas "*" para continuar a cena
-    if entrada_raw == "*":
-        entrada = (
-            f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
-            f"mantendo o mesmo clima, ritmo, ponto de vista e o modo '{modo_atual}'. "
-            "Não reinicie a cena, apenas prossiga naturalmente."
-        )
-        entrada_visivel = "*"
-
-    # Caso 2: "* algo" para continuar com contexto extra
-    elif entrada_raw.startswith("* "):
-        extra = entrada_raw[2:].strip()
-        entrada = (
-            f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
-            f"mantendo o mesmo clima, ritmo, ponto de vista e o modo '{modo_atual}'. "
-            f"Incorpore o seguinte elemento na continuidade: {extra}"
-        )
-        entrada_visivel = entrada_raw
-
-    # Caso 3: Mensagem normal
-    else:
-        entrada = entrada_raw
-        entrada_visivel = entrada_raw
-
-    # Exibe na tela
-    with st.chat_message("user"):
-        st.markdown(entrada_visivel)
-
-    # Salva a mensagem no histórico e na planilha
-    salvar_interacao("user", entrada)
-    if "session_msgs" not in st.session_state:
-        st.session_state.session_msgs = []
-    st.session_state.session_msgs.append({"role": "user", "content": entrada})
-
-    # Gera resposta com base no prompt que já inclui fragmentos
-    with st.spinner("Mary está pensando..."):
-        resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
-        salvar_interacao("assistant", resposta)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
+# Exibe o resumo **uma única vez**, no final
+if st.session_state.get("ultimo_resumo"):
+    with st.chat_message("assistant"):
+        st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
