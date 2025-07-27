@@ -287,12 +287,34 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
+    # Estado afetivo
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    prompt = f"""{prompt_base}
+    # Detecta se há comando de continuidade
+    continuar_cena = False
+    if st.session_state.get("session_msgs"):
+        ultima_msg = st.session_state.session_msgs[-1].get("content", "")
+        if ultima_msg.startswith("[CONTINUAR_CENA]"):
+            continuar_cena = True
+
+    # Montagem do prompt
+    if continuar_cena:
+        prompt = f"""{prompt_base}
+
+{COMMON_RULES.strip()}
+
+💘 **Estado afetivo atual**: {estado_amor}
+
+⚠️ **INSTRUÇÃO:**  
+Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
+- Nunca invente falas ou ações de Jânio.  
+- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
+"""
+    else:
+        prompt = f"""{prompt_base}
 
 {COMMON_RULES.strip()}
 
@@ -305,12 +327,14 @@ def construir_prompt_mary():
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
+    # Memórias
     mem = carregar_memorias()
     if mem:
         conteudo_memorias = mem["content"].replace("💾 Memórias relevantes:\n", "")
         prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
 
     return prompt.strip()
+
 
 # --------------------------- #
 # OpenRouter - Streaming
@@ -523,13 +547,45 @@ if st.session_state.get("ultimo_resumo"):
 # --------------------------- #
 # Entrada do usuário
 # --------------------------- #
-entrada = st.chat_input("Digite sua mensagem para Mary...")
-if entrada:
+entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' para continuar a cena)")
+if entrada_raw:
+    entrada_raw = entrada_raw.strip()
+
+    # Caso 1: Apenas "*" para continuar a cena
+    if entrada_raw == "*":
+        modo_atual = st.session_state.get("modo_mary", "Racional")
+        entrada = (
+            f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
+            f"mantendo o mesmo clima, ritmo, ponto de vista e o modo '{modo_atual}'. "
+            "Não reinicie a cena, apenas prossiga naturalmente."
+        )
+        entrada_visivel = "*"
+
+    # Caso 2: "* algo" para continuar com contexto extra
+    elif entrada_raw.startswith("* "):
+        modo_atual = st.session_state.get("modo_mary", "Racional")
+        extra = entrada_raw[2:].strip()
+        entrada = (
+            f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
+            f"mantendo o mesmo clima, ritmo, ponto de vista e o modo '{modo_atual}'. "
+            f"Incorpore o seguinte elemento na continuidade: {extra}"
+        )
+        entrada_visivel = entrada_raw
+
+    # Caso 3: Mensagem normal
+    else:
+        entrada = entrada_raw
+        entrada_visivel = entrada_raw
+
+    # Exibe na tela
     with st.chat_message("user"):
-        st.markdown(entrada)
+        st.markdown(entrada_visivel)
+
+    # Salva no histórico
     salvar_interacao("user", entrada)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
+    # Gera resposta
     with st.spinner("Mary está pensando..."):
         resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
         salvar_interacao("assistant", resposta)
