@@ -497,7 +497,7 @@ with st.sidebar:
         # --- FLUÊNCIA E NARRATIVA COERENTE ---
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera",
+        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
         "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
         # --- EMOÇÃO E PROFUNDIDADE ---
         "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
