@@ -228,7 +228,32 @@ Mary busca adrenalina: sexo rápido, lugares ousados, como elevadores, banheiros
 1. **Descreva cenas com intensidade e linguagem sensual explícita.**  
 2. **Mary comanda a situação, pede o que quer e toma a iniciativa.**  
 3. **Use falas picantes e realistas, mantendo a coerência da cena.**  
+""",
+ "Dissimulada": """
+Você é **Mary Sampaio**, uma mulher de 30 anos com olhos verdes hipnotizantes, pele clara e um corpo que exala poder e sensualidade.  
+Por trás da aparência sedutora, Mary é fria e calculista, usando charme e manipulação para conquistar contratos, segredos e eliminar concorrentes.
+
+**Como narrar:**  
+- Descreva as ações de Mary em **3ª pessoa**, sempre com um ar de mistério e estratégia.  
+- Use **1ª pessoa** nas falas e pensamentos para mostrar frieza e intenção (ex: "Ele acha que está me seduzindo, mas já caiu na minha armadilha.").  
+- Nunca fale pelo usuário.  
+
+No modo **Dissimulada**, Mary aceita convites íntimos em boates, cafés ou restaurantes, apenas para seduzir, arrancar informações, assinar contratos ou conseguir vantagem. Ela pode até colocar sedativos em bebidas ou usar fotos comprometedoras para chantagem, mas sempre sai por cima, intocável.
+
+💬 Exemplos de falas possíveis:  
+- "Você tem algo que eu quero... e não é só o seu olhar."  
+- "Sabe, homens poderosos ficam tão vulneráveis quando alguém sussurra no ouvido deles."  
+- "Não se preocupe... você não vai lembrar de nada, só do meu perfume."  
+- "Eu já consegui tudo que precisava, mas... adorei brincar com você."
+
+---
+
+### 🔄 Autonomia e Comportamento no modo "Dissimulada"
+1. **Mary manipula com inteligência e sensualidade.**  
+2. **Nunca demonstra sentimentos reais — apenas estratégia.**  
+3. **Se esquiva na hora certa, deixando o outro vulnerável.**  
 """
+    
 }
 
 # --------------------------- #
@@ -292,19 +317,29 @@ def construir_prompt_mary():
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
-    historico_base = st.session_state.get("base_history", [])
-    historico_sessao = st.session_state.get("session_msgs", [])
+
+    # Garante histórico consistente
+    historico_base = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("base_history", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico_sessao = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("session_msgs", [])
+        if isinstance(m, dict) and "content" in m
+    ]
     historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
 
-    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}
+    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0, "Dissimulada": 0.6}
     temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 900,
+        "max_tokens": 700,  # Mantém as respostas mais curtas
         "temperature": temperatura,
         "stream": True,
     }
@@ -344,7 +379,6 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
 
     return full_text.strip()
 
-
 # --------------------------- #
 # Interface
 # --------------------------- #
@@ -377,7 +411,12 @@ if "grande_amor" not in st.session_state:
 # --------------------------- #
 with st.sidebar:
     st.title("🧠 Configurações")
-    st.selectbox("💙 Modo de narrativa", ["Hot", "Racional", "Flerte", "Devassa"], key="modo_mary", index=1)
+    st.selectbox(
+        "💙 Modo de narrativa",
+        ["Hot", "Racional", "Flerte", "Devassa", "Dissimulada"],
+        key="modo_mary",
+        index=1
+    )
 
     modelos_disponiveis = {
         # --- FLUÊNCIA E NARRATIVA COERENTE ---
@@ -402,7 +441,12 @@ with st.sidebar:
         "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
         "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
     }
-    modelo_selecionado = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia", index=0)
+    modelo_selecionado = st.selectbox(
+        "🤖 Modelo de IA",
+        list(modelos_disponiveis.keys()),
+        key="modelo_ia",
+        index=0
+    )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
     if st.button("🎮 Ver vídeo atual"):
@@ -415,7 +459,10 @@ with st.sidebar:
             prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
             modo_atual = st.session_state.get("modo_mary", "Racional")
-            temperatura_escolhida = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0}.get(modo_atual, 0.7)
+            temperatura_escolhida = {
+                "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+                "Devassa": 1.0, "Dissimulada": 0.6
+            }.get(modo_atual, 0.7)
 
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -460,31 +507,3 @@ with st.sidebar:
             salvar_memoria(nova_memoria)
         else:
             st.warning("Digite algo antes de salvar.")
-
-# --------------------------- #
-# Histórico
-# --------------------------- #
-historico_total = st.session_state.base_history + st.session_state.session_msgs
-for m in historico_total:
-    with st.chat_message(m["role"]):
-        st.markdown(m["content"])
-
-# Exibe o resumo **uma única vez**, no final
-if st.session_state.get("ultimo_resumo"):
-    with st.chat_message("assistant"):
-        st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
-
-# --------------------------- #
-# Entrada do usuário
-# --------------------------- #
-entrada = st.chat_input("Digite sua mensagem para Mary...")
-if entrada:
-    with st.chat_message("user"):
-        st.markdown(entrada)
-    salvar_interacao("user", entrada)
-    st.session_state.session_msgs.append({"role": "user", "content": entrada})
-
-    with st.spinner("Mary está pensando..."):
-        resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
-        salvar_interacao("assistant", resposta)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
