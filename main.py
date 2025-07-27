@@ -283,8 +283,6 @@ COMMON_RULES = """
 # --------------------------- #
 # Prompt builder
 # --------------------------- #
-from lorebook import carregar_lorebook, buscar_fragmentos, montar_fragmentos_texto
-
 def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
@@ -302,7 +300,7 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # Montagem inicial do prompt
+    # Montagem do prompt
     if continuar_cena:
         prompt = f"""{prompt_base}
 
@@ -329,14 +327,6 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # Adiciona fragmentos relevantes do Lorebook
-    mensagem_atual = ultima_msg if st.session_state.get("session_msgs") else ""
-    fragmentos = carregar_lorebook("lorebook_mary_completo.json")
-    fragmentos_ativos = buscar_fragmentos(mensagem_atual, fragmentos)
-
-    if fragmentos_ativos:
-        prompt += f"\n\n### 📚 Fragmentos do Lorebook\n{montar_fragmentos_texto(fragmentos_ativos)}"
-
     # Memórias
     mem = carregar_memorias()
     if mem:
@@ -344,7 +334,6 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
         prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
 
     return prompt.strip()
-
 
 
 # --------------------------- #
