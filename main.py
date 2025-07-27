@@ -596,11 +596,11 @@ with st.sidebar:
     st.markdown("---")
     mem = carregar_memorias()
     if mem:
-    st.subheader("💾 Memórias Atuais")
-    # Adiciona '*' no início de cada linha de memória
-    mem_texto = mem["content"].replace("💾 Memórias relevantes:\n", "")
-    mem_linhas = [f"* {linha}" for linha in mem_texto.split("\n") if linha.strip()]
-    st.markdown("\n".join(mem_linhas))
+        st.subheader("💾 Memórias Atuais")
+        # Adiciona '*' no início de cada linha de memória
+        mem_texto = mem["content"].replace("💾 Memórias relevantes:\n", "")
+        mem_linhas = [f"* {linha}" for linha in mem_texto.split("\n") if linha.strip()]
+        st.markdown("\n".join(mem_linhas))
 
 
     if st.session_state.get("session_msgs"):
