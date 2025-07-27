@@ -591,18 +591,23 @@ with st.sidebar:
             st.warning("Digite algo antes de salvar.")
 
     # --------------------------- #
-    # Memórias e Fragmentos Ativos
+    # Memórias com filtro de busca
     # --------------------------- #
     st.markdown("---")
-    mem = carregar_memorias()
-    if mem:
-        st.subheader("💾 Memórias Atuais")
-        # Adiciona '*' no início de cada linha de memória
-        mem_texto = mem["content"].replace("💾 Memórias relevantes:\n", "")
-        mem_linhas = [f"* {linha}" for linha in mem_texto.split("\n") if linha.strip()]
-        st.markdown("\n".join(mem_linhas))
+    st.subheader("💾 Memórias (busca)")
+    try:
+        aba_memorias = planilha.worksheet("memorias")
+        dados_mem = aba_memorias.col_values(1)
+        busca = st.text_input("🔍 Buscar memória...", key="filtro_memoria").strip().lower()
+        filtradas = [m for m in dados_mem if busca in m.lower()] if busca else dados_mem
+        st.caption(f"{len(filtradas)} memórias encontradas")
+        st.markdown("\n".join(f"* {m}" for m in filtradas if m.strip()))
+    except Exception as e:
+        st.error(f"Erro ao carregar memórias: {e}")
 
-
+    # --------------------------- #
+    # Fragmentos Ativos
+    # --------------------------- #
     if st.session_state.get("session_msgs"):
         ultima_msg = st.session_state.session_msgs[-1].get("content", "")
         fragmentos = carregar_fragmentos()
@@ -611,19 +616,6 @@ with st.sidebar:
             st.subheader("📚 Fragmentos Ativos")
             for f in fragmentos_ativos:
                 st.markdown(f"- {f['texto']}")
-
-# --------------------------- #
-# Histórico
-# --------------------------- #
-historico_total = st.session_state.base_history + st.session_state.session_msgs
-for m in historico_total:
-    with st.chat_message(m["role"]):
-        st.markdown(m["content"])
-
-# Exibe o resumo **uma única vez**, no final
-if st.session_state.get("ultimo_resumo"):
-    with st.chat_message("assistant"):
-        st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
 
 # --------------------------- #
 # Entrada do usuário
