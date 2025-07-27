@@ -507,3 +507,30 @@ with st.sidebar:
             salvar_memoria(nova_memoria)
         else:
             st.warning("Digite algo antes de salvar.")
+# --------------------------- #
+# Histórico
+# --------------------------- #
+historico_total = st.session_state.base_history + st.session_state.session_msgs
+for m in historico_total:
+    with st.chat_message(m["role"]):
+        st.markdown(m["content"])
+
+# Exibe o resumo **uma única vez**, no final
+if st.session_state.get("ultimo_resumo"):
+    with st.chat_message("assistant"):
+        st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
+
+# --------------------------- #
+# Entrada do usuário
+# --------------------------- #
+entrada = st.chat_input("Digite sua mensagem para Mary...")
+if entrada:
+    with st.chat_message("user"):
+        st.markdown(entrada)
+    salvar_interacao("user", entrada)
+    st.session_state.session_msgs.append({"role": "user", "content": entrada})
+
+    with st.spinner("Mary está pensando..."):
+        resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
+        salvar_interacao("assistant", resposta)
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
