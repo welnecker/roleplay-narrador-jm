@@ -482,6 +482,33 @@ if "grande_amor" not in st.session_state:
     st.session_state.grande_amor = None
 
 # --------------------------- #
+# Interface
+# --------------------------- #
+st.title("🌹 Mary")
+st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
+
+# Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
+if "base_history" not in st.session_state:
+    try:
+        st.session_state.base_history = carregar_ultimas_interacoes(n=10)
+        aba_resumo = planilha.worksheet("perfil_mary")
+        dados = aba_resumo.get_all_values()
+        ultimo_resumo = "[Sem resumo disponível]"
+        for linha in reversed(dados[1:]):
+            if len(linha) >= 7 and linha[6].strip():
+                ultimo_resumo = linha[6].strip()
+                break
+        st.session_state.ultimo_resumo = ultimo_resumo
+    except Exception as e:
+        st.session_state.base_history = []
+        st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
+        st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
+if "session_msgs" not in st.session_state:
+    st.session_state.session_msgs = []
+if "grande_amor" not in st.session_state:
+    st.session_state.grande_amor = None
+
+# --------------------------- #
 # Sidebar
 # --------------------------- #
 with st.sidebar:
@@ -526,9 +553,37 @@ with st.sidebar:
         index=0
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+    st.session_state.modelo_escolhido_id = modelo_escolhido_id
+    st.session_state.provedor_ia = st.session_state.get("provedor_ia", "openrouter")
 
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+
+# --------------------------- #
+# Função auxiliar para Together.ai
+# --------------------------- #
+def gerar_resposta_together(model_id, mensagens, api_key):
+    import requests
+    url = "https://api.together.xyz/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    response = requests.post(
+        url,
+        headers=headers,
+        json={
+            "model": model_id,
+            "messages": mensagens,
+            "temperature": 0.8,
+            "max_tokens": 1000
+        }
+    )
+    if response.status_code == 200:
+        return response.json()["choices"][0]["message"]["content"]
+    else:
+        raise Exception(f"Erro da Together API: {response.status_code} - {response.text}")
+
 
     if st.button("📝 Gerar resumo do capítulo"):
         try:
@@ -676,48 +731,27 @@ if entrada_raw:
         st.session_state.session_msgs = []
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # Escolhe o endpoint e header com base no provedor
+    # Gera resposta com base no modelo e provedor selecionado
     provedor = st.session_state.get("provedor_ia", "openrouter")
-    modelo = st.session_state.modelo_escolhido_id
-    headers = {"Content-Type": "application/json"}
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
 
-    if provedor == "openrouter":
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers["Authorization"] = f"Bearer {st.secrets['OPENROUTER_API_KEY']}"
-    elif provedor == "together":
-        url = "https://api.together.xyz/v1/chat/completions"
-        headers["Authorization"] = f"Bearer {st.secrets['TOGETHER_API_KEY']}"
-    else:
-        st.error("Provedor de IA inválido.")
-        st.stop()
-
-    # Corpo da requisição
-    payload = {
-        "model": modelo,
-        "messages": st.session_state.base_history + st.session_state.session_msgs,
-        "max_tokens": 1024,
-        "temperature": {
-            "Hot": 0.9,
-            "Flerte": 0.8,
-            "Racional": 0.5,
-            "Devassa": 1.0,
-            "Dissimulada": 0.6
-        }.get(modo_atual, 0.7)
-    }
-
-    # Gera resposta
     with st.spinner("Mary está pensando..."):
         try:
-            response = requests.post(url, headers=headers, json=payload)
-            if response.status_code == 200:
-                resposta = response.json()["choices"][0]["message"]["content"]
-                salvar_interacao("assistant", resposta)
-                st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
-                with st.chat_message("assistant"):
-                    st.markdown(resposta)
+            if provedor == "together":
+                resposta = gerar_resposta_together(
+                    modelo,
+                    st.session_state.session_msgs,
+                    st.secrets["TOGETHER_API_KEY"]
+                )
             else:
-                st.error(f"Erro do modelo: {response.status_code} - {response.text}")
+                resposta = gerar_resposta_openrouter_stream(
+                    modelo,
+                    st.session_state.session_msgs
+                )
+
+            salvar_interacao("assistant", resposta)
+            st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
         except Exception as e:
-            st.error(f"Erro ao conectar com o modelo: {e}")
+            st.error(f"Erro ao gerar resposta com o modelo {modelo}: {e}")
 
 
