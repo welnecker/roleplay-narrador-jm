@@ -520,14 +520,14 @@ with st.sidebar:
         "⚡ Mixtral 8x7B Instruct v0.1 ★★★★☆ (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
     }
     modelo_selecionado = st.selectbox(
-        "🤖 Modelo de IA",
-        list(modelos_disponiveis.keys()),
-        key="modelo_ia",
-        index=0
-    )
-    modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
-    st.session_state.modelo_escolhido_id = modelo_escolhido_id
-    st.session_state.provedor_ia = st.session_state.get("provedor_ia", "openrouter")
+    "🤖 Modelo de IA",
+            list(modelos_disponiveis.keys()),
+            key="modelo_ia",
+            index=0
+        )
+        modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+        st.session_state.modelo_escolhido_id = modelo_escolhido_id
+
 
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
