@@ -708,7 +708,7 @@ if st.session_state.get("ultimo_resumo"):
         st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
 
 # --------------------------- #
-# Função que escolhe provedor/modelo
+# Função de resposta (OpenRouter + Together)
 # --------------------------- #
 def responder_com_modelo_escolhido():
     modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
@@ -719,7 +719,6 @@ def responder_com_modelo_escolhido():
     else:
         return gerar_resposta_openrouter_stream(modelo)
 
-
 # --------------------------- #
 # Entrada do usuário
 # --------------------------- #
@@ -728,7 +727,7 @@ if entrada_raw:
     entrada_raw = entrada_raw.strip()
     modo_atual = st.session_state.get("modo_mary", "Racional")
 
-    # Caso 1: Apenas "*" para continuar a cena
+    # CASO 1: Apenas "*" = continuar cena
     if entrada_raw == "*":
         entrada = (
             f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
@@ -737,7 +736,7 @@ if entrada_raw:
         )
         entrada_visivel = "*"
 
-    # Caso 2: "* algo" para continuar com contexto extra
+    # CASO 2: "* algo" = continuar com elemento novo
     elif entrada_raw.startswith("* "):
         extra = entrada_raw[2:].strip()
         entrada = (
@@ -747,23 +746,35 @@ if entrada_raw:
         )
         entrada_visivel = entrada_raw
 
-    # Caso 3: Mensagem normal
+    # CASO 3: Mensagem normal
     else:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibe na tela
+    # Exibe mensagem do usuário
     with st.chat_message("user"):
         st.markdown(entrada_visivel)
 
-    # Salva a mensagem no histórico e na planilha
+    # Salva histórico
     salvar_interacao("user", entrada)
     if "session_msgs" not in st.session_state:
         st.session_state.session_msgs = []
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # Gera resposta com base no prompt que já inclui fragmentos
-    with st.spinner("Mary está pensando..."):
-        resposta = responder_com_modelo_escolhido()  # Chama a função que escolhe o provedor certo
-        salvar_interacao("assistant", resposta)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
+    # IA responde com streaming
+    with st.chat_message("assistant"):
+        resposta_final = ""
+        placeholder = st.empty()
+
+        with st.spinner("Mary está pensando..."):
+            try:
+                for token in responder_com_modelo_escolhido():
+                    resposta_final += token
+                    placeholder.markdown(resposta_final + "▌")
+            except Exception as e:
+                st.error(f"Erro: {e}")
+                resposta_final = "[Erro ao gerar resposta]"
+
+        placeholder.markdown(resposta_final)
+        salvar_interacao("assistant", resposta_final)
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
