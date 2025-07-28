@@ -482,33 +482,6 @@ if "grande_amor" not in st.session_state:
     st.session_state.grande_amor = None
 
 # --------------------------- #
-# Interface
-# --------------------------- #
-st.title("🌹 Mary")
-st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
-
-# Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
-if "base_history" not in st.session_state:
-    try:
-        st.session_state.base_history = carregar_ultimas_interacoes(n=10)
-        aba_resumo = planilha.worksheet("perfil_mary")
-        dados = aba_resumo.get_all_values()
-        ultimo_resumo = "[Sem resumo disponível]"
-        for linha in reversed(dados[1:]):
-            if len(linha) >= 7 and linha[6].strip():
-                ultimo_resumo = linha[6].strip()
-                break
-        st.session_state.ultimo_resumo = ultimo_resumo
-    except Exception as e:
-        st.session_state.base_history = []
-        st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
-        st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
-if "session_msgs" not in st.session_state:
-    st.session_state.session_msgs = []
-if "grande_amor" not in st.session_state:
-    st.session_state.grande_amor = None
-
-# --------------------------- #
 # Sidebar
 # --------------------------- #
 with st.sidebar:
@@ -583,6 +556,43 @@ def gerar_resposta_together(model_id, mensagens, api_key):
         return response.json()["choices"][0]["message"]["content"]
     else:
         raise Exception(f"Erro da Together API: {response.status_code} - {response.text}")
+
+# --------------------------- #
+# Função auxiliar para OpenRouter
+# --------------------------- #
+def gerar_resposta_openrouter_stream(model_id, mensagens):
+    import requests
+    headers = {
+        "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY']}",
+        "Content-Type": "application/json"
+    }
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=headers,
+        json={
+            "model": model_id,
+            "messages": mensagens,
+            "temperature": 0.8,
+            "max_tokens": 1000
+        }
+    )
+    if response.status_code == 200:
+        return response.json()["choices"][0]["message"]["content"]
+    else:
+        raise Exception(f"Erro da OpenRouter API: {response.status_code} - {response.text}")
+
+# --------------------------- #
+# Função central para escolher provedor e gerar resposta
+# --------------------------- #
+def responder_com_modelo_escolhido(mensagens):
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+    provedor = st.session_state.get("provedor_ia", "openrouter")
+
+    if provedor == "together":
+        return gerar_resposta_together(modelo, mensagens, st.secrets["TOGETHER_API_KEY"])
+    else:
+        return gerar_resposta_openrouter_stream(modelo, mensagens)
+
 
 
     if st.button("📝 Gerar resumo do capítulo"):
@@ -721,37 +731,27 @@ if entrada_raw:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibe na tela
+    # Exibe na tela a mensagem do usuário
     with st.chat_message("user"):
         st.markdown(entrada_visivel)
 
-    # Salva a mensagem no histórico e na planilha
+    # Salva no histórico da sessão e na planilha
     salvar_interacao("user", entrada)
     if "session_msgs" not in st.session_state:
         st.session_state.session_msgs = []
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # Gera resposta com base no modelo e provedor selecionado
-    provedor = st.session_state.get("provedor_ia", "openrouter")
-    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
-
+    # Gera resposta com base no provedor/modelo selecionado
     with st.spinner("Mary está pensando..."):
         try:
-            if provedor == "together":
-                resposta = gerar_resposta_together(
-                    modelo,
-                    st.session_state.session_msgs,
-                    st.secrets["TOGETHER_API_KEY"]
-                )
-            else:
-                resposta = gerar_resposta_openrouter_stream(
-                    modelo,
-                    st.session_state.session_msgs
-                )
-
+            resposta = responder_com_modelo_escolhido(st.session_state.session_msgs)
             salvar_interacao("assistant", resposta)
             st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
+
+            with st.chat_message("assistant"):
+                st.markdown(resposta)
         except Exception as e:
-            st.error(f"Erro ao gerar resposta com o modelo {modelo}: {e}")
+            st.error(f"Erro ao gerar resposta: {e}")
+
 
 
