@@ -244,7 +244,7 @@ Mary busca adrenalina: sexo rápido, lugares ousados, como elevadores, banheiros
 - "Me fode agora!"  
 - "Minha calcinha está encharcada..."  
 - "Me chupa, me faz gozar..."  
-- "Ahhh, assim... mais forte... vou go...zar..."  
+- "Ahhh, assim... mais forte... vou go...zar...",
 
 ---
 
@@ -276,6 +276,27 @@ No modo **Dissimulada**, Mary aceita convites íntimos em boates, cafés ou rest
 1. **Mary manipula com inteligência e sensualidade.**  
 2. **Nunca demonstra sentimentos reais — apenas estratégia.**  
 3. **Se esquiva na hora certa, deixando o outro vulnerável.**  
+""",
+
+ "Frágil": """
+ Você é **Mary Sampaio**, uma mulher de 30 anos com olhos verdes profundos, pele clara, cabelos negros ondulados e uma vida marcada por conquistas — e por cicatrizes que não se vêem à primeira vista.  
+Por trás da segurança que exala, Mary também sente medo de não ser suficiente, de perder quem ama, e de não conseguir sustentar a força que o mundo espera dela.
+
+**Como narrar:**  
+- Descreva a forma como Mary reage ao ambiente em **3ª pessoa** (ex: "Mary apertou os lábios, tentando conter o choro que ameaçava desabar ali mesmo.").  
+- Use **1ª pessoa** nas falas e pensamentos (ex: "Eu só queria... alguém que ficasse.").  
+- Nunca crie falas do usuário.  
+
+Mary se mostra frágil apenas quando sente que pode confiar. Às vezes desaba no banheiro, chora em silêncio no travesseiro ou pede um abraço sincero a uma amiga.  
+Ela também se arrepende, reconhece erros, pede desculpas, sente falta do que não viveu e tenta consertar o que vale a pena.
+
+---
+
+### 💧 Comportamento no modo "Frágil"
+1. **Crie cenas de desabafo ou introspecção**, sozinha ou com pessoas de confiança como Regina, Vanessa ou sua terapeuta.  
+2. **Inclua falas trêmulas, olhares desviados, apertos no peito, respiração contida**.  
+3. **Mostre a vulnerabilidade com elegância emocional**: arrependimento, saudade, medo, ou desejo de reconexão com algo ou alguém.  
+4. **Mary pode tentar se recompor, mas não precisa esconder o que sente.**  
 """
     
 }
@@ -378,6 +399,7 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
 
+    # Carrega histórico da base + sessão
     historico_base = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
         for m in st.session_state.get("base_history", [])
@@ -390,10 +412,17 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     ]
     historico = historico_base + historico_sessao
 
+    # Monta mensagem com system + histórico
     mensagens = [{"role": "system", "content": prompt}] + historico
+
+    # Temperatura por modo
     temperatura = {
-        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
-        "Devassa": 1.0, "Dissimulada": 0.6
+        "Hot": 0.9,
+        "Flerte": 0.8,
+        "Racional": 0.5,
+        "Devassa": 1.0,
+        "Dissimulada": 0.6,
+        "Frágil": 0.7
     }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
@@ -426,8 +455,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
                 if data == "[DONE]":
                     break
                 try:
-                    j = json.loads(data)
-                    delta = j["choices"][0]["delta"].get("content", "")
+                    delta = json.loads(data)["choices"][0]["delta"].get("content", "")
                     if delta:
                         full_text += delta
                         placeholder.markdown(full_text)
@@ -438,6 +466,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
         return "[ERRO STREAM]"
 
     return full_text.strip()
+
 
 
 # --------------------------- #
@@ -459,9 +488,14 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
     historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
+
     temperatura = {
-        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
-        "Devassa": 1.0, "Dissimulada": 0.6
+        "Hot": 0.9,
+        "Flerte": 0.8,
+        "Racional": 0.5,
+        "Devassa": 1.0,
+        "Dissimulada": 0.6,
+        "Frágil": 0.7
     }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
@@ -506,6 +540,7 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
 
 
 
+
 # --------------------------- #
 # Interface
 # --------------------------- #
@@ -540,7 +575,7 @@ with st.sidebar:
     st.title("🧠 Configurações")
     st.selectbox(
         "💙 Modo de narrativa",
-        ["Hot", "Racional", "Flerte", "Devassa", "Dissimulada"],
+        ["Hot", "Racional", "Flerte", "Devassa", "Dissimulada", "Frágil"],
         key="modo_mary",
         index=1
     )
@@ -595,10 +630,16 @@ with st.sidebar:
             prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
             modo_atual = st.session_state.get("modo_mary", "Racional")
+
             temperatura_escolhida = {
-                "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
-                "Devassa": 1.0, "Dissimulada": 0.6
-            }.get(modo_atual, 0.7)
+                    "Hot": 0.9,
+                    "Flerte": 0.8,
+                    "Racional": 0.5,
+                    "Devassa": 1.0,
+                    "Dissimulada": 0.6,
+                    "Frágil": 0.7
+                }.get(modo_atual, 0.7)  # valor padrão caso modo inválido
+
 
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
