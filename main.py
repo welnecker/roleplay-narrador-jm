@@ -82,14 +82,10 @@ def carregar_memorias():
                 tags = ["all"]
                 texto_memoria = conteudo
 
-            # Adiciona se o modo atual for compatível
             if modo in tags or "all" in tags:
                 mem_relevantes.append(texto_memoria)
 
-        # DEBUG: mostra memórias carregadas no app
         if mem_relevantes:
-            st.info("💾 Memórias carregadas no prompt:")
-            st.markdown("\n".join(f"- {m}" for m in mem_relevantes))
             return {"role": "user", "content": "💾 Memórias relevantes:\n" + "\n".join(mem_relevantes)}
 
     except Exception as e:
