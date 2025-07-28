@@ -525,8 +525,8 @@ with st.sidebar:
             key="modelo_ia",
             index=0
         )
-        modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
-        st.session_state.modelo_escolhido_id = modelo_escolhido_id
+    modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+    st.session_state.modelo_escolhido_id = modelo_escolhido_id
 
 
     if st.button("🎮 Ver vídeo atual"):
@@ -752,6 +752,3 @@ if entrada_raw:
                 st.markdown(resposta)
         except Exception as e:
             st.error(f"Erro ao gerar resposta: {e}")
-
-
-
