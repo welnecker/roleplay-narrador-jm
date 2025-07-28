@@ -746,19 +746,18 @@ if entrada_raw:
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
     # IA responde com streaming
-    with st.chat_message("assistant"):
-        resposta_final = ""
-        placeholder = st.empty()
+resposta_final = ""
+with st.chat_message("assistant"):
+    placeholder = st.empty()
 
-        with st.spinner("Mary está pensando..."):
-            try:
-                for token in responder_com_modelo_escolhido():
-                    resposta_final += token
-                    placeholder.markdown(resposta_final + "▌")
-            except Exception as e:
-                st.error(f"Erro: {e}")
-                resposta_final = "[Erro ao gerar resposta]"
+    with st.spinner("Mary está pensando..."):
+        try:
+            resposta_final = responder_com_modelo_escolhido()  # ← já faz streaming
+        except Exception as e:
+            st.error(f"Erro: {e}")
+            resposta_final = "[Erro ao gerar resposta]"
 
-        placeholder.markdown(resposta_final)
-        salvar_interacao("assistant", resposta_final)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+# Salva e atualiza histórico (fora do chat_message para não duplicar)
+salvar_interacao("assistant", resposta_final)
+st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+
