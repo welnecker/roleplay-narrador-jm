@@ -66,28 +66,35 @@ def carregar_memorias():
 
             conteudo = linha[0].strip()
 
+            # Substitui "?" por nome do grande amor
             if "o grande amor de mary é ?" in conteudo.lower():
                 if st.session_state.get("grande_amor"):
                     conteudo = conteudo.replace("?", st.session_state["grande_amor"])
                 else:
                     conteudo = "Mary ainda não encontrou o grande amor que procura."
 
+            # Lê as tags e converte tudo para lowercase
             if conteudo.startswith("[") and "]" in conteudo:
-                tags = conteudo.split("]")[0].replace("[", "").split(",")
-                tags = [t.strip().lower() for t in tags]
+                raw_tags = conteudo.split("]")[0].replace("[", "")
+                tags = [t.strip().lower() for t in raw_tags.split(",")]
                 texto_memoria = conteudo.split("]")[-1].strip()
             else:
                 tags = ["all"]
                 texto_memoria = conteudo
 
+            # Adiciona se o modo atual for compatível
             if modo in tags or "all" in tags:
                 mem_relevantes.append(texto_memoria)
 
+        # DEBUG: mostra memórias carregadas no app
         if mem_relevantes:
+            st.info("💾 Memórias carregadas no prompt:")
+            st.markdown("\n".join(f"- {m}" for m in mem_relevantes))
             return {"role": "user", "content": "💾 Memórias relevantes:\n" + "\n".join(mem_relevantes)}
 
     except Exception as e:
         st.error(f"Erro ao carregar memórias: {e}")
+
     return None
 
 def salvar_memoria(nova_memoria):
@@ -107,12 +114,13 @@ def carregar_fragmentos():
         dados = aba.get_all_records()
         fragmentos = []
         for row in dados:
-            personagem = row.get("personagem", "").strip()
+            personagem = row.get("personagem", "").strip().lower()
             texto = row.get("texto", "").strip()
             gatilhos = [g.strip().lower() for g in row.get("gatilhos", "").split(",") if g.strip()]
             peso = int(row.get("peso", 1))
 
-            if personagem and texto:
+            # Somente fragmentos da Mary são carregados
+            if personagem == "mary" and texto:
                 fragmentos.append({
                     "personagem": personagem,
                     "texto": texto,
