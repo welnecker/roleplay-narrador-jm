@@ -393,7 +393,6 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
 
-    # Garante histórico consistente
     historico_base = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
         for m in st.session_state.get("base_history", [])
@@ -407,14 +406,15 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
-
-    mapa_temp = {"Hot": 0.9, "Flerte": 0.8, "Racional": 0.5, "Devassa": 1.0, "Dissimulada": 0.6}
-    temperatura = mapa_temp.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+    temperatura = {
+        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+        "Devassa": 1.0, "Dissimulada": 0.6
+    }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 700,  # Mantém as respostas mais curtas
+        "max_tokens": 700,
         "temperature": temperatura,
         "stream": True,
     }
@@ -449,10 +449,77 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
                 except Exception:
                     continue
     except Exception as e:
-        st.error(f"Erro no streaming: {e}")
+        st.error(f"Erro no streaming com OpenRouter: {e}")
         return "[ERRO STREAM]"
 
     return full_text.strip()
+
+
+# --------------------------- #
+# Together - Streaming
+# --------------------------- #
+def gerar_resposta_together_stream(modelo_escolhido_id):
+    prompt = construir_prompt_mary()
+
+    historico_base = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("base_history", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico_sessao = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("session_msgs", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico = historico_base + historico_sessao
+
+    mensagens = [{"role": "system", "content": prompt}] + historico
+    temperatura = {
+        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+        "Devassa": 1.0, "Dissimulada": 0.6
+    }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+
+    payload = {
+        "model": modelo_escolhido_id,
+        "messages": mensagens,
+        "max_tokens": 700,
+        "temperature": temperatura,
+        "stream": True,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {TOGETHER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    assistant_box = st.chat_message("assistant")
+    placeholder = assistant_box.empty()
+    full_text = ""
+
+    try:
+        with requests.post("https://api.together.xyz/v1/chat/completions", headers=headers, json=payload, stream=True, timeout=300) as r:
+            r.raise_for_status()
+            for line in r.iter_lines():
+                if line:
+                    line = line.decode("utf-8").strip()
+                    if line.startswith("data:"):
+                        data = line[len("data:"):].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            content = json.loads(data)["choices"][0]["delta"].get("content", "")
+                            if content:
+                                full_text += content
+                                placeholder.markdown(full_text)
+                        except Exception:
+                            continue
+    except Exception as e:
+        st.error(f"Erro no streaming com Together: {e}")
+        return "[ERRO STREAM]"
+
+    return full_text.strip()
+
+
 
 # --------------------------- #
 # Interface
@@ -493,107 +560,39 @@ with st.sidebar:
         index=1
     )
 
-    provedores = ["openrouter", "together"]
-    st.selectbox("🌐 Provedor de IA", provedores, key="provedor_ia", index=0)
-
     modelos_disponiveis = {
-        # OpenRouter models
+        # --- FLUÊNCIA E NARRATIVA COERENTE ---
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
         "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
         "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+        # --- EMOÇÃO E PROFUNDIDADE ---
         "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
         "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
         "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
         "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
         "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+        # --- EROTISMO E CRIATIVIDADE ---
         "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
         "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
         "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
         "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
         "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+        # --- ATMOSFÉRICO E ESTÉTICO ---
         "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
         "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-        # Together.ai models
-        "⚡ Qwen3 Coder 480B A35B ★★★★★ (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-        "⚡ Mixtral 8x7B Instruct v0.1 ★★★★☆ (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
+        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
     }
     modelo_selecionado = st.selectbox(
-    "🤖 Modelo de IA",
-            list(modelos_disponiveis.keys()),
-            key="modelo_ia",
-            index=0
-        )
+        "🤖 Modelo de IA",
+        list(modelos_disponiveis.keys()),
+        key="modelo_ia",
+        index=0
+    )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
-    st.session_state.modelo_escolhido_id = modelo_escolhido_id
-
 
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-
-# --------------------------- #
-# Função auxiliar para Together.ai
-# --------------------------- #
-def gerar_resposta_together(model_id, mensagens, api_key):
-    import requests
-    url = "https://api.together.xyz/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    response = requests.post(
-        url,
-        headers=headers,
-        json={
-            "model": model_id,
-            "messages": mensagens,
-            "temperature": 0.8,
-            "max_tokens": 1000
-        }
-    )
-    if response.status_code == 200:
-        return response.json()["choices"][0]["message"]["content"]
-    else:
-        raise Exception(f"Erro da Together API: {response.status_code} - {response.text}")
-
-# --------------------------- #
-# Função auxiliar para OpenRouter
-# --------------------------- #
-def gerar_resposta_openrouter_stream(model_id, mensagens):
-    import requests
-    headers = {
-        "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY']}",
-        "Content-Type": "application/json"
-    }
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers=headers,
-        json={
-            "model": model_id,
-            "messages": mensagens,
-            "temperature": 0.8,
-            "max_tokens": 1000
-        }
-    )
-    if response.status_code == 200:
-        return response.json()["choices"][0]["message"]["content"]
-    else:
-        raise Exception(f"Erro da OpenRouter API: {response.status_code} - {response.text}")
-
-# --------------------------- #
-# Função central para escolher provedor e gerar resposta
-# --------------------------- #
-def responder_com_modelo_escolhido(mensagens):
-    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
-    provedor = st.session_state.get("provedor_ia", "openrouter")
-
-    if provedor == "together":
-        return gerar_resposta_together(modelo, mensagens, st.secrets["TOGETHER_API_KEY"])
-    else:
-        return gerar_resposta_openrouter_stream(modelo, mensagens)
-
-
 
     if st.button("📝 Gerar resumo do capítulo"):
         try:
@@ -731,24 +730,18 @@ if entrada_raw:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibe na tela a mensagem do usuário
+    # Exibe na tela
     with st.chat_message("user"):
         st.markdown(entrada_visivel)
 
-    # Salva no histórico da sessão e na planilha
+    # Salva a mensagem no histórico e na planilha
     salvar_interacao("user", entrada)
     if "session_msgs" not in st.session_state:
         st.session_state.session_msgs = []
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # Gera resposta com base no provedor/modelo selecionado
+    # Gera resposta com base no prompt que já inclui fragmentos
     with st.spinner("Mary está pensando..."):
-        try:
-            resposta = responder_com_modelo_escolhido(st.session_state.session_msgs)
-            salvar_interacao("assistant", resposta)
-            st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
-
-            with st.chat_message("assistant"):
-                st.markdown(resposta)
-        except Exception as e:
-            st.error(f"Erro ao gerar resposta: {e}")
+        resposta = responder_com_modelo_escolhido()  # Chama a função que escolhe o provedor certo
+        salvar_interacao("assistant", resposta)
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
