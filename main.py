@@ -711,7 +711,7 @@ if entrada_raw:
     entrada_raw = entrada_raw.strip()
     modo_atual = st.session_state.get("modo_mary", "Racional")
 
-    # CASO 1: Apenas "*" = continuar cena
+    # CASO 1: Apenas "*"
     if entrada_raw == "*":
         entrada = (
             f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
@@ -720,7 +720,7 @@ if entrada_raw:
         )
         entrada_visivel = "*"
 
-    # CASO 2: "* algo" = continuar com elemento novo
+    # CASO 2: "* algo"
     elif entrada_raw.startswith("* "):
         extra = entrada_raw[2:].strip()
         entrada = (
@@ -730,34 +730,31 @@ if entrada_raw:
         )
         entrada_visivel = entrada_raw
 
-    # CASO 3: Mensagem normal
+    # CASO 3: Mensagem comum
     else:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibe mensagem do usuário
+    # Exibe a entrada do usuário no chat
     with st.chat_message("user"):
         st.markdown(entrada_visivel)
 
-    # Salva histórico
+    # Salva a entrada no histórico
     salvar_interacao("user", entrada)
-    if "session_msgs" not in st.session_state:
-        st.session_state.session_msgs = []
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
     # IA responde com streaming
-resposta_final = ""
-with st.chat_message("assistant"):
-    placeholder = st.empty()
+    resposta_final = ""
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        with st.spinner("Mary está pensando..."):
+            try:
+                resposta_final = responder_com_modelo_escolhido()
+            except Exception as e:
+                st.error(f"Erro: {e}")
+                resposta_final = "[Erro ao gerar resposta]"
 
-    with st.spinner("Mary está pensando..."):
-        try:
-            resposta_final = responder_com_modelo_escolhido()  # ← já faz streaming
-        except Exception as e:
-            st.error(f"Erro: {e}")
-            resposta_final = "[Erro ao gerar resposta]"
-
-# Salva e atualiza histórico (fora do chat_message para não duplicar)
-salvar_interacao("assistant", resposta_final)
-st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+    # Salva resposta
+    salvar_interacao("assistant", resposta_final)
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
