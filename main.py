@@ -493,28 +493,31 @@ with st.sidebar:
         index=1
     )
 
+    provedores = ["openrouter", "together"]
+    st.selectbox("🌐 Provedor de IA", provedores, key="provedor_ia", index=0)
+
     modelos_disponiveis = {
-        # --- FLUÊNCIA E NARRATIVA COERENTE ---
+        # OpenRouter models
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
         "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
         "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-        # --- EMOÇÃO E PROFUNDIDADE ---
         "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
         "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
         "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
         "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
         "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-        # --- EROTISMO E CRIATIVIDADE ---
         "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
         "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
         "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
         "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
         "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-        # --- ATMOSFÉRICO E ESTÉTICO ---
         "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
         "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b"
+        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+        # Together.ai models
+        "⚡ Qwen3 Coder 480B A35B ★★★★★ (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
+        "⚡ Mixtral 8x7B Instruct v0.1 ★★★★☆ (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
     }
     modelo_selecionado = st.selectbox(
         "🤖 Modelo de IA",
@@ -673,9 +676,48 @@ if entrada_raw:
         st.session_state.session_msgs = []
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # Gera resposta com base no prompt que já inclui fragmentos
+    # Escolhe o endpoint e header com base no provedor
+    provedor = st.session_state.get("provedor_ia", "openrouter")
+    modelo = st.session_state.modelo_escolhido_id
+    headers = {"Content-Type": "application/json"}
+
+    if provedor == "openrouter":
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers["Authorization"] = f"Bearer {st.secrets['OPENROUTER_API_KEY']}"
+    elif provedor == "together":
+        url = "https://api.together.xyz/v1/chat/completions"
+        headers["Authorization"] = f"Bearer {st.secrets['TOGETHER_API_KEY']}"
+    else:
+        st.error("Provedor de IA inválido.")
+        st.stop()
+
+    # Corpo da requisição
+    payload = {
+        "model": modelo,
+        "messages": st.session_state.base_history + st.session_state.session_msgs,
+        "max_tokens": 1024,
+        "temperature": {
+            "Hot": 0.9,
+            "Flerte": 0.8,
+            "Racional": 0.5,
+            "Devassa": 1.0,
+            "Dissimulada": 0.6
+        }.get(modo_atual, 0.7)
+    }
+
+    # Gera resposta
     with st.spinner("Mary está pensando..."):
-        resposta = gerar_resposta_openrouter_stream(modelo_escolhido_id)
-        salvar_interacao("assistant", resposta)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
+        try:
+            response = requests.post(url, headers=headers, json=payload)
+            if response.status_code == 200:
+                resposta = response.json()["choices"][0]["message"]["content"]
+                salvar_interacao("assistant", resposta)
+                st.session_state.session_msgs.append({"role": "assistant", "content": resposta})
+                with st.chat_message("assistant"):
+                    st.markdown(resposta)
+            else:
+                st.error(f"Erro do modelo: {response.status_code} - {response.text}")
+        except Exception as e:
+            st.error(f"Erro ao conectar com o modelo: {e}")
+
 
