@@ -708,6 +708,19 @@ if st.session_state.get("ultimo_resumo"):
         st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
 
 # --------------------------- #
+# Função que escolhe provedor/modelo
+# --------------------------- #
+def responder_com_modelo_escolhido():
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+    provedor = st.session_state.get("provedor_ia", "openrouter")
+
+    if provedor == "together":
+        return gerar_resposta_together_stream(modelo)
+    else:
+        return gerar_resposta_openrouter_stream(modelo)
+
+
+# --------------------------- #
 # Entrada do usuário
 # --------------------------- #
 entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' para continuar a cena)")
