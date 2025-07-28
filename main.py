@@ -11,6 +11,8 @@ from oauth2client.service_account import ServiceAccountCredentials
 st.set_page_config(page_title="Mary", page_icon="🌹")
 OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
+TOGETHER_API_KEY = st.secrets["TOGETHER_API_KEY"]
+TOGETHER_ENDPOINT = "https://api.together.xyz/v1/chat/completions"
 
 # --------------------------- #
 # Imagem / vídeo dinâmico
@@ -30,12 +32,11 @@ def conectar_planilha():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
 
 planilha = conectar_planilha()
 
 def salvar_interacao(role, content):
-    """Salva uma interação na aba interacoes_mary."""
     try:
         aba = planilha.worksheet("interacoes_mary")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -44,7 +45,6 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 def carregar_ultimas_interacoes(n=5):
-    """Carrega as últimas n interações da aba interacoes_mary."""
     try:
         aba = planilha.worksheet("interacoes_mary")
         dados = aba.get_all_records()
@@ -54,10 +54,6 @@ def carregar_ultimas_interacoes(n=5):
         return []
 
 def carregar_memorias():
-    """
-    Carrega apenas as memórias relevantes para o modo atual (Hot, Flerte, Racional ou Devassa).
-    Se houver '[all] o grande amor de Mary é ?', substitui pelo nome definido no st.session_state.grande_amor.
-    """
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_values()
@@ -70,7 +66,6 @@ def carregar_memorias():
 
             conteudo = linha[0].strip()
 
-            # Lógica do grande amor
             if "o grande amor de mary é ?" in conteudo.lower():
                 if st.session_state.get("grande_amor"):
                     conteudo = conteudo.replace("?", st.session_state["grande_amor"])
@@ -78,18 +73,13 @@ def carregar_memorias():
                     conteudo = "Mary ainda não encontrou o grande amor que procura."
 
             if conteudo.startswith("[") and "]" in conteudo:
-                # Extrai tags da parte inicial
                 tags = conteudo.split("]")[0].replace("[", "").split(",")
                 tags = [t.strip().lower() for t in tags]
-
-                # Extrai texto da memória
                 texto_memoria = conteudo.split("]")[-1].strip()
             else:
-                # Linha sem tags, assume como 'all'
                 tags = ["all"]
                 texto_memoria = conteudo
 
-            # Adiciona memória se ela for relevante para o modo ou se for universal
             if modo in tags or "all" in tags:
                 mem_relevantes.append(texto_memoria)
 
@@ -112,10 +102,6 @@ def salvar_memoria(nova_memoria):
 # Fragmentos (Lorebook)
 # --------------------------- #
 def carregar_fragmentos():
-    """
-    Carrega os fragmentos da aba 'fragmentos_mary'.
-    Espera o cabeçalho: personagem | texto | gatilhos | peso
-    """
     try:
         aba = planilha.worksheet("fragmentos_mary")
         dados = aba.get_all_records()
@@ -139,9 +125,6 @@ def carregar_fragmentos():
         return []
 
 def buscar_fragmentos_relevantes(mensagem, fragmentos, limite=3):
-    """
-    Busca fragmentos relevantes na lista com base nos gatilhos.
-    """
     mensagem_lower = mensagem.lower()
     encontrados = [f for f in fragmentos if any(g in mensagem_lower for g in f["gatilhos"])]
     encontrados.sort(key=lambda x: x.get("peso", 1), reverse=True)
@@ -151,7 +134,6 @@ def buscar_fragmentos_relevantes(mensagem, fragmentos, limite=3):
 # Salvar Resumo
 # --------------------------- #
 def salvar_resumo(resumo):
-    """Salva ou atualiza o resumo na aba perfil_mary (coluna 7)."""
     try:
         aba = planilha.worksheet("perfil_mary")
         dados = aba.get_all_values()
@@ -166,7 +148,6 @@ def salvar_resumo(resumo):
 
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
-
 # --------------------------- #
 # Modos (prompts completos, INTACTOS)
 # --------------------------- #
@@ -712,12 +693,15 @@ if st.session_state.get("ultimo_resumo"):
 # --------------------------- #
 def responder_com_modelo_escolhido():
     modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
-    provedor = st.session_state.get("provedor_ia", "openrouter")
 
-    if provedor == "together":
+    # Detecta provedor com base no ID do modelo
+    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+        st.session_state["provedor_ia"] = "together"
         return gerar_resposta_together_stream(modelo)
     else:
+        st.session_state["provedor_ia"] = "openrouter"
         return gerar_resposta_openrouter_stream(modelo)
+
 
 # --------------------------- #
 # Entrada do usuário
