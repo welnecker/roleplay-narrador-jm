@@ -900,6 +900,15 @@ if tipo in ["imagem", "video"]:
     url_vid = f"https://github.com/welnecker/roleplay_imagens/raw/refs/heads/main/Mary_V{indice}.mp4"
 
     if tipo == "imagem":
-        st.image(url_img, use_container_width=True)
+        st.image(url_img, width=400)  # ajuste aqui o tamanho desejado
     elif tipo == "video":
-        st.video(url_vid)
+        st.markdown(
+            f"""
+            <video width="400" controls>
+                <source src="{url_vid}" type="video/mp4">
+                Seu navegador não suporta a tag de vídeo.
+            </video>
+            """,
+            unsafe_allow_html=True
+        )
+
