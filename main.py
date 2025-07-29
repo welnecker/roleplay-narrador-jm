@@ -722,6 +722,32 @@ with st.sidebar:
             for f in fragmentos_ativos:
                 st.markdown(f"- {f['texto']}")
 
+# --------------------------- #
+# Botão para excluir última interação da planilha
+# --------------------------- #
+def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
+    try:
+        planilha = conectar_planilha()
+        aba = planilha.worksheet(aba_nome)
+        total_linhas = len(aba.get_all_values())
+
+        if total_linhas <= 1:
+            st.warning("Nenhuma interação para excluir.")
+            return
+
+        # Remove as duas últimas linhas (usuário e resposta)
+        aba.delete_rows(total_linhas - 1)
+        aba.delete_rows(total_linhas - 2)
+
+        st.success("🗑️ Última interação excluída da planilha com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao excluir interação: {e}")
+
+# Botão visível ao usuário
+if st.button("🗑️ Excluir última interação da planilha"):
+    excluir_ultimas_interacoes("interacoes_mary")
+
+
 
 # --------------------------- #
 # Histórico
