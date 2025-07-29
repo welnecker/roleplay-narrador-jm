@@ -682,7 +682,7 @@ with st.sidebar:
         else:
             st.info("Mary continua livre.")
 
-    st.markdown("---")
+        st.markdown("---")
     st.subheader("➕ Adicionar memória fixa")
     nova_memoria = st.text_area(
         "🧠 Nova memória",
@@ -694,6 +694,11 @@ with st.sidebar:
             salvar_memoria(nova_memoria)
         else:
             st.warning("Digite algo antes de salvar.")
+
+    # ✅ NOVO BOTÃO DE EXCLUSÃO AQUI
+    if st.button("🗑️ Excluir última interação da planilha"):
+        excluir_ultimas_interacoes("interacoes_mary")
+
 
             
     # --------------------------- #
