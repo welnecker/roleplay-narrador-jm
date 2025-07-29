@@ -550,21 +550,6 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
-# --------------------------- #
-# Botões manuais para imagem/vídeo
-# --------------------------- #
-col1, col2, col3 = st.columns(3)
-with col1:
-    if st.button("🖼️ Ver imagem sensual"):
-        st.session_state["surpresa_mary_tipo"] = "imagem"
-with col2:
-    if st.button("🎬 Ver vídeo sensual"):
-        st.session_state["surpresa_mary_tipo"] = "video"
-with col3:
-    if st.button("❌ Fechar mídia"):
-        st.session_state["surpresa_mary_tipo"] = None
-
-
 # Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
 if "base_history" not in st.session_state:
     try:
@@ -811,23 +796,6 @@ for m in historico_total:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-# --------------------------- #
-# Exibição da mídia de surpresa
-# --------------------------- #
-tipo = st.session_state.get("surpresa_mary_tipo")
-if tipo in ["imagem", "video"]:
-    st.chat_message("assistant").markdown("💌 **Pra você, amor...**")
-
-    indice = len(st.session_state.get("mensagens", [])) // 10 + 1
-    url_img = f"https://github.com/welnecker/roleplay_imagens/raw/refs/heads/main/Mary_fundo{indice}.jpg"
-    url_vid = f"https://github.com/welnecker/roleplay_imagens/raw/refs/heads/main/Mary_V{indice}.mp4"
-
-    if tipo == "imagem":
-        st.image(url_img, use_column_width=True)
-    elif tipo == "video":
-        st.video(url_vid)
-
-
 # Exibe o resumo **uma única vez**, no final
 if st.session_state.get("ultimo_resumo"):
     with st.chat_message("assistant"):
@@ -902,4 +870,36 @@ if entrada_raw:
     # Salva resposta
     salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+        # Salva resposta
+    salvar_interacao("assistant", resposta_final)
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
+# --------------------------- #
+# Botões de Surpresa (logo após o prompt)
+# --------------------------- #
+col1, col2, col3 = st.columns([1, 1, 2])
+with col1:
+    if st.button("📸 Surpreender com imagem"):
+        st.session_state.surpresa_mary_tipo = "imagem"
+with col2:
+    if st.button("🎥 Surpreender com vídeo"):
+        st.session_state.surpresa_mary_tipo = "video"
+with col3:
+    if st.button("❌ Fechar surpresa"):
+        st.session_state.surpresa_mary_tipo = None
+
+# --------------------------- #
+# Exibição da mídia de surpresa
+# --------------------------- #
+tipo = st.session_state.get("surpresa_mary_tipo")
+if tipo in ["imagem", "video"]:
+    st.chat_message("assistant").markdown("💌 **Pra você, amor...**")
+
+    indice = len(st.session_state.get("mensagens", [])) // 10 + 1
+    url_img = f"https://github.com/welnecker/roleplay_imagens/raw/refs/heads/main/Mary_fundo{indice}.jpg"
+    url_vid = f"https://github.com/welnecker/roleplay_imagens/raw/refs/heads/main/Mary_V{indice}.mp4"
+
+    if tipo == "imagem":
+        st.image(url_img, use_container_width=True)
+    elif tipo == "video":
+        st.video(url_vid)
