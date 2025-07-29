@@ -875,20 +875,6 @@ if entrada_raw:
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
 # --------------------------- #
-# Botões de Surpresa (logo após o prompt)
-# --------------------------- #
-col1, col2, col3 = st.columns([1, 1, 2])
-with col1:
-    if st.button("📸 Surpreender com imagem"):
-        st.session_state.surpresa_mary_tipo = "imagem"
-with col2:
-    if st.button("🎥 Surpreender com vídeo"):
-        st.session_state.surpresa_mary_tipo = "video"
-with col3:
-    if st.button("❌ Fechar surpresa"):
-        st.session_state.surpresa_mary_tipo = None
-
-# --------------------------- #
 # Botões abaixo do chat: Surpreender com vídeo ou imagem
 # --------------------------- #
 
