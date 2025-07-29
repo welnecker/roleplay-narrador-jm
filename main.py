@@ -889,26 +889,49 @@ with col3:
         st.session_state.surpresa_mary_tipo = None
 
 # --------------------------- #
-# Exibição da mídia de surpresa
+# Botões abaixo do chat: Surpreender com vídeo ou imagem
 # --------------------------- #
-tipo = st.session_state.get("surpresa_mary_tipo")
-if tipo in ["imagem", "video"]:
-    st.chat_message("assistant").markdown("💌 **Pra você, amor...**")
 
-    indice = len(st.session_state.get("mensagens", [])) // 10 + 1
-    url_img = f"https://github.com/welnecker/roleplay_imagens/raw/refs/heads/main/Mary_fundo{indice}.jpg"
-    url_vid = f"https://github.com/welnecker/roleplay_imagens/raw/refs/heads/main/Mary_V{indice}.mp4"
+st.divider()
+st.subheader("💡 Surpreender Mary")
 
-    if tipo == "imagem":
-        st.image(url_img, width=400)  # ajuste aqui o tamanho desejado
-    elif tipo == "video":
-        st.markdown(
-            f"""
-            <video width="400" controls>
-                <source src="{url_vid}" type="video/mp4">
-                Seu navegador não suporta a tag de vídeo.
-            </video>
-            """,
-            unsafe_allow_html=True
-        )
+col1, col2, col3 = st.columns([1, 1, 2])
+
+with col1:
+    if st.button("🎥 Vídeo Surpresa"):
+        # Exibe vídeo 1 a 5 conforme interação, mas não repete em cada rerun
+        if "video_idx" not in st.session_state:
+            st.session_state.video_idx = 1
+        else:
+            st.session_state.video_idx += 1
+            if st.session_state.video_idx > 5:
+                st.session_state.video_idx = 1
+        video_url = f"https://github.com/welnecker/roleplay_imagens/raw/main/Mary_V{st.session_state.video_idx}.mp4"
+        st.session_state.mostrar_video = video_url
+        st.session_state.mostrar_imagem = None  # Fecha imagem se aberta
+
+with col2:
+    if st.button("🖼️ Imagem Surpresa"):
+        if "img_idx" not in st.session_state:
+            st.session_state.img_idx = 1
+        else:
+            st.session_state.img_idx += 1
+            if st.session_state.img_idx > 5:
+                st.session_state.img_idx = 1
+        img_url = f"https://github.com/welnecker/roleplay_imagens/raw/main/Mary_fundo{st.session_state.img_idx}.jpg"
+        st.session_state.mostrar_imagem = img_url
+        st.session_state.mostrar_video = None  # Fecha vídeo se aberto
+
+with col3:
+    if st.button("❌ Fechar"):
+        st.session_state.mostrar_imagem = None
+        st.session_state.mostrar_video = None
+        st.success("Imagem ou vídeo fechado.")
+
+# Exibição segura do conteúdo escolhido
+if st.session_state.get("mostrar_video"):
+    st.video(st.session_state["mostrar_video"])
+
+if st.session_state.get("mostrar_imagem"):
+    st.image(st.session_state["mostrar_imagem"], use_container_width=True)
 
