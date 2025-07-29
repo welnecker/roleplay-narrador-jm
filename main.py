@@ -595,6 +595,9 @@ def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
 # --------------------------- #
 # Sidebar
 # --------------------------- #
+# --------------------------- #
+# Sidebar
+# --------------------------- #
 with st.sidebar:
     st.title("🧠 Configurações")
     st.selectbox(
@@ -625,13 +628,17 @@ with st.sidebar:
                 key="escolha_desejo_sexual"
             )
 
-            if desejo_escolhido:
+            if desejo_escolhido and desejo_escolhido in desejos_mary:
+                if "session_msgs" not in st.session_state:
+                    st.session_state.session_msgs = []
+
                 st.session_state.session_msgs.append({
                     "role": "user",
                     "content": desejos_mary[desejo_escolhido]
                 })
+
                 st.success("✨ Desejo adicionado ao chat.")
-                st.rerun()
+
 
 
     modelos_disponiveis = {
