@@ -914,10 +914,22 @@ with col3:
         st.session_state.mostrar_video = None
         st.success("Imagem ou vídeo fechado.")
 
-# Exibição segura do conteúdo escolhido
-if st.session_state.get("mostrar_video"):
-    st.video(st.session_state["mostrar_video"])
+# --------------------------- #
+# Exibição de mídia com controle de tamanho
+# --------------------------- #
+if st.session_state.get("mostrar_midia"):
+    st.markdown("---")
+    st.subheader("🎬 Mary quer te mostrar algo...")
 
-if st.session_state.get("mostrar_imagem"):
-    st.image(st.session_state["mostrar_imagem"], use_container_width=True)
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        fechar = st.button("❌ Fechar", key="fechar_midia")
+    with col2:
+        if st.session_state.get("midia_tipo") == "video":
+            st.video(st.session_state.midia_url, format="video/mp4", start_time=0)
+        else:
+            st.image(st.session_state.midia_url, use_container_width=True)
+
+    if fechar:
+        st.session_state.mostrar_midia = False
 
