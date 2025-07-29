@@ -695,10 +695,7 @@ with st.sidebar:
         else:
             st.warning("Digite algo antes de salvar.")
 
-            # Botão visível ao usuário
-if st.button("🗑️ Excluir última interação da planilha"):
-    excluir_ultimas_interacoes("interacoes_mary")
-
+            
     # --------------------------- #
     # Memórias com filtro de busca
     # --------------------------- #
