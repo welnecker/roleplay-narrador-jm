@@ -604,6 +604,36 @@ with st.sidebar:
         index=1
     )
 
+    # 👇 Só mostra os desejos se o modo for Devassa
+    if st.session_state.get("modo_mary") == "Devassa":
+        with st.expander("💋 Desejos de Mary (explícitos)", expanded=False):
+            st.caption("Escolha um desejo sensual para Mary expressar automaticamente.")
+
+            desejos_mary = {
+                "🫦 Chupar Jânio": "Mary se ajoelha lentamente, encarando Jânio com olhos famintos. — Deixa eu cuidar de você do meu jeito... com a boca.",
+                "🙈 De quatro": "Mary se vira e se apoia nos cotovelos, empinando os quadris com um sorriso provocante. — Assim… do jeitinho que você gosta.",
+                "🐎 Cavalgar": "Mary monta em Jânio com ousadia, os cabelos caindo sobre os ombros. — Agora você vai me sentir inteirinha…",
+                "🌪️ Contra a parede": "Ela é empurrada contra a parede, gemendo baixinho. — Me domina... aqui mesmo.",
+                "🛏️ Em cima da cama": "Mary se joga sobre os lençóis e abre espaço. — Vem… aqui é nosso palco agora.",
+                "🚿 No banho": "Com a água escorrendo pelo corpo, Mary se aproxima molhada e nua. — Quer brincar comigo aqui dentro?",
+                "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
+            }
+
+            desejo_escolhido = st.selectbox(
+                "Escolha um desejo de Mary",
+                [""] + list(desejos_mary.keys()),
+                key="escolha_desejo_sexual"
+            )
+
+            if desejo_escolhido:
+                st.session_state.session_msgs.append({
+                    "role": "user",
+                    "content": desejos_mary[desejo_escolhido]
+                })
+                st.success("✨ Desejo adicionado ao chat.")
+                st.rerun()
+
+
     modelos_disponiveis = {
     # === OPENROUTER ===
     # --- FLUÊNCIA E NARRATIVA COERENTE ---
