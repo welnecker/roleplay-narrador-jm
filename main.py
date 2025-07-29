@@ -3,6 +3,7 @@ import requests
 import gspread
 import json
 import re
+import streamlit.components.v1 as components
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -876,17 +877,17 @@ if entrada_raw:
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
 # --------------------------- #
-# Função para converter link do Drive
+# Conversão de link Google Drive para preview
 # --------------------------- #
 def converter_link_drive(link):
     match = re.search(r"/d/([a-zA-Z0-9_-]+)", link)
     if match:
         file_id = match.group(1)
-        return f"https://drive.google.com/uc?export=download&id={file_id}"
+        return f"https://drive.google.com/file/d/{file_id}/preview"
     return link
 
 # --------------------------- #
-# Carrega mídia da aba "video_imagem"
+# Carregar vídeos e imagens da aba "video_imagem"
 # --------------------------- #
 def carregar_midia_disponivel():
     try:
@@ -904,7 +905,7 @@ videos = [m for m in midia_disponivel if m["nome"].lower().endswith(".mp4")]
 imagens = [m for m in midia_disponivel if m["nome"].lower().endswith(".jpg")]
 
 # --------------------------- #
-# Botões para surpresa
+# Botões de controle
 # --------------------------- #
 st.divider()
 st.subheader("💡 Surpreender Mary")
@@ -934,12 +935,14 @@ with col3:
         st.success("Mídia fechada.")
 
 # --------------------------- #
-# Exibição da mídia
+# EXIBIÇÃO DE MÍDIA
 # --------------------------- #
 if st.session_state.get("mostrar_video"):
     st.markdown("### 🎬 Mary quer te mostrar um vídeo...")
-    st.video(st.session_state.mostrar_video)
+    components.iframe(st.session_state.mostrar_video, height=360, width=640)
+    st.markdown(f"[🔲 Tela cheia]({st.session_state.mostrar_video})", unsafe_allow_html=True)
 
 if st.session_state.get("mostrar_imagem"):
     st.markdown("### 📸 Mary quer te mostrar uma imagem...")
-    st.image(st.session_state.mostrar_imagem, use_container_width=True)
+    largura = st.slider("📐 Ajustar largura da imagem", 200, 1200, 640, step=50)
+    st.image(st.session_state.mostrar_imagem, width=largura)
