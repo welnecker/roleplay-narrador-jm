@@ -875,9 +875,36 @@ if entrada_raw:
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
 # --------------------------- #
-# Botões abaixo do chat: Surpreender com vídeo ou imagem
+# Função para converter link do Drive
 # --------------------------- #
+def converter_link_drive(link):
+    match = re.search(r"/d/([a-zA-Z0-9_-]+)", link)
+    if match:
+        file_id = match.group(1)
+        return f"https://drive.google.com/uc?export=download&id={file_id}"
+    return link
 
+# --------------------------- #
+# Carrega mídia da aba "video_imagem"
+# --------------------------- #
+def carregar_midia_disponivel():
+    try:
+        aba_midia = planilha.worksheet("video_imagem")
+        dados = aba_midia.get_all_records()
+        for item in dados:
+            item["link"] = converter_link_drive(item.get("link", ""))
+        return dados
+    except Exception as e:
+        st.error(f"Erro ao carregar mídia: {e}")
+        return []
+
+midia_disponivel = carregar_midia_disponivel()
+videos = [m for m in midia_disponivel if m["nome"].lower().endswith(".mp4")]
+imagens = [m for m in midia_disponivel if m["nome"].lower().endswith(".jpg")]
+
+# --------------------------- #
+# Botões para surpresa
+# --------------------------- #
 st.divider()
 st.subheader("💡 Surpreender Mary")
 
@@ -885,47 +912,33 @@ col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
     if st.button("🎥 Vídeo Surpresa"):
-        st.session_state.video_idx = st.session_state.get("video_idx", 0) + 1
-        if st.session_state.video_idx > 5:
-            st.session_state.video_idx = 1
-        video_url = f"https://github.com/welnecker/roleplay_imagens/raw/main/Mary_V{st.session_state.video_idx}.mp4"
-        st.session_state.mostrar_midia = True
-        st.session_state.midia_tipo = "video"
-        st.session_state.midia_url = video_url
+        if "video_idx" not in st.session_state:
+            st.session_state.video_idx = 0
+        st.session_state.video_idx = (st.session_state.video_idx + 1) % len(videos)
+        st.session_state.mostrar_video = videos[st.session_state.video_idx]["link"]
+        st.session_state.mostrar_imagem = None
 
 with col2:
     if st.button("🖼️ Imagem Surpresa"):
-        st.session_state.img_idx = st.session_state.get("img_idx", 0) + 1
-        if st.session_state.img_idx > 5:
-            st.session_state.img_idx = 1
-        img_url = f"https://github.com/welnecker/roleplay_imagens/raw/main/Mary_fundo{st.session_state.img_idx}.jpg"
-        st.session_state.mostrar_midia = True
-        st.session_state.midia_tipo = "image"
-        st.session_state.midia_url = img_url
+        if "img_idx" not in st.session_state:
+            st.session_state.img_idx = 0
+        st.session_state.img_idx = (st.session_state.img_idx + 1) % len(imagens)
+        st.session_state.mostrar_imagem = imagens[st.session_state.img_idx]["link"]
+        st.session_state.mostrar_video = None
 
 with col3:
     if st.button("❌ Fechar"):
-        st.session_state.mostrar_midia = False
-        st.session_state.midia_url = None
-        st.session_state.midia_tipo = None
+        st.session_state.mostrar_video = None
+        st.session_state.mostrar_imagem = None
+        st.success("Mídia fechada.")
 
 # --------------------------- #
-# Exibição de mídia com controle de tamanho
+# Exibição da mídia
 # --------------------------- #
-if st.session_state.get("mostrar_midia") and st.session_state.get("midia_url"):
-    st.markdown("---")
-    st.subheader("🎬 Mary quer te mostrar algo...")
+if st.session_state.get("mostrar_video"):
+    st.markdown("### 🎬 Mary quer te mostrar um vídeo...")
+    st.video(st.session_state.mostrar_video)
 
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        fechar = st.button("❌ Fechar", key="fechar_midia")
-    with col2:
-        if st.session_state.get("midia_tipo") == "video":
-            st.video(st.session_state.midia_url, format="video/mp4")
-        elif st.session_state.get("midia_tipo") == "image":
-            st.image(st.session_state.midia_url, use_container_width=True)
-
-    if fechar:
-        st.session_state.mostrar_midia = False
-        st.session_state.midia_url = None
-        st.session_state.midia_tipo = None
+if st.session_state.get("mostrar_imagem"):
+    st.markdown("### 📸 Mary quer te mostrar uma imagem...")
+    st.image(st.session_state.mostrar_imagem, use_container_width=True)
