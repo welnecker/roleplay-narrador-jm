@@ -885,39 +885,34 @@ col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
     if st.button("🎥 Vídeo Surpresa"):
-        # Exibe vídeo 1 a 5 conforme interação, mas não repete em cada rerun
-        if "video_idx" not in st.session_state:
+        st.session_state.video_idx = st.session_state.get("video_idx", 0) + 1
+        if st.session_state.video_idx > 5:
             st.session_state.video_idx = 1
-        else:
-            st.session_state.video_idx += 1
-            if st.session_state.video_idx > 5:
-                st.session_state.video_idx = 1
         video_url = f"https://github.com/welnecker/roleplay_imagens/raw/main/Mary_V{st.session_state.video_idx}.mp4"
-        st.session_state.mostrar_video = video_url
-        st.session_state.mostrar_imagem = None  # Fecha imagem se aberta
+        st.session_state.mostrar_midia = True
+        st.session_state.midia_tipo = "video"
+        st.session_state.midia_url = video_url
 
 with col2:
     if st.button("🖼️ Imagem Surpresa"):
-        if "img_idx" not in st.session_state:
+        st.session_state.img_idx = st.session_state.get("img_idx", 0) + 1
+        if st.session_state.img_idx > 5:
             st.session_state.img_idx = 1
-        else:
-            st.session_state.img_idx += 1
-            if st.session_state.img_idx > 5:
-                st.session_state.img_idx = 1
         img_url = f"https://github.com/welnecker/roleplay_imagens/raw/main/Mary_fundo{st.session_state.img_idx}.jpg"
-        st.session_state.mostrar_imagem = img_url
-        st.session_state.mostrar_video = None  # Fecha vídeo se aberto
+        st.session_state.mostrar_midia = True
+        st.session_state.midia_tipo = "image"
+        st.session_state.midia_url = img_url
 
 with col3:
     if st.button("❌ Fechar"):
-        st.session_state.mostrar_imagem = None
-        st.session_state.mostrar_video = None
-        st.success("Imagem ou vídeo fechado.")
+        st.session_state.mostrar_midia = False
+        st.session_state.midia_url = None
+        st.session_state.midia_tipo = None
 
 # --------------------------- #
 # Exibição de mídia com controle de tamanho
 # --------------------------- #
-if st.session_state.get("mostrar_midia"):
+if st.session_state.get("mostrar_midia") and st.session_state.get("midia_url"):
     st.markdown("---")
     st.subheader("🎬 Mary quer te mostrar algo...")
 
@@ -926,10 +921,11 @@ if st.session_state.get("mostrar_midia"):
         fechar = st.button("❌ Fechar", key="fechar_midia")
     with col2:
         if st.session_state.get("midia_tipo") == "video":
-            st.video(st.session_state.midia_url, format="video/mp4", start_time=0)
-        else:
+            st.video(st.session_state.midia_url, format="video/mp4")
+        elif st.session_state.get("midia_tipo") == "image":
             st.image(st.session_state.midia_url, use_container_width=True)
 
     if fechar:
         st.session_state.mostrar_midia = False
-
+        st.session_state.midia_url = None
+        st.session_state.midia_tipo = None
