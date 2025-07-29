@@ -695,6 +695,10 @@ with st.sidebar:
         else:
             st.warning("Digite algo antes de salvar.")
 
+            # Botão visível ao usuário
+if st.button("🗑️ Excluir última interação da planilha"):
+    excluir_ultimas_interacoes("interacoes_mary")
+
     # --------------------------- #
     # Memórias com filtro de busca
     # --------------------------- #
@@ -742,11 +746,6 @@ def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
         st.success("🗑️ Última interação excluída da planilha com sucesso!")
     except Exception as e:
         st.error(f"Erro ao excluir interação: {e}")
-
-# Botão visível ao usuário
-if st.button("🗑️ Excluir última interação da planilha"):
-    excluir_ultimas_interacoes("interacoes_mary")
-
 
 
 # --------------------------- #
