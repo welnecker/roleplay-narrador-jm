@@ -29,16 +29,25 @@ fundo_img, fundo_video = imagem_de_fundo()
 # Google Sheets
 # --------------------------- #
 def conectar_planilha():
-    creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+    try:
+        creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+    except Exception as e:
+        st.error(f"Erro ao conectar à planilha: {e}")
+        return None
 
 planilha = conectar_planilha()
 
 def salvar_interacao(role, content):
+    if not planilha:
+        return
     try:
         aba = planilha.worksheet("interacoes_mary")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -47,6 +56,8 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 def carregar_ultimas_interacoes(n=5):
+    if not planilha:
+        return []
     try:
         aba = planilha.worksheet("interacoes_mary")
         dados = aba.get_all_records()
@@ -56,6 +67,8 @@ def carregar_ultimas_interacoes(n=5):
         return []
 
 def carregar_memorias():
+    if not planilha:
+        return None
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_values()
@@ -68,14 +81,12 @@ def carregar_memorias():
 
             conteudo = linha[0].strip()
 
-            # Substitui "?" por nome do grande amor
+            # Substitui "?" pelo nome do grande amor (se houver)
             if "o grande amor de mary é ?" in conteudo.lower():
-                if st.session_state.get("grande_amor"):
-                    conteudo = conteudo.replace("?", st.session_state["grande_amor"])
-                else:
-                    conteudo = "Mary ainda não encontrou o grande amor que procura."
+                amor = st.session_state.get("grande_amor")
+                conteudo = conteudo.replace("?", amor if amor else "ninguém")
 
-            # Lê as tags e converte tudo para lowercase
+            # Lê as tags e separa memória
             if conteudo.startswith("[") and "]" in conteudo:
                 raw_tags = conteudo.split("]")[0].replace("[", "")
                 tags = [t.strip().lower() for t in raw_tags.split(",")]
@@ -88,7 +99,10 @@ def carregar_memorias():
                 mem_relevantes.append(texto_memoria)
 
         if mem_relevantes:
-            return {"role": "user", "content": "💾 Memórias relevantes:\n" + "\n".join(mem_relevantes)}
+            return {
+                "role": "user",
+                "content": "💾 Memórias relevantes:\n" + "\n".join(mem_relevantes)
+            }
 
     except Exception as e:
         st.error(f"Erro ao carregar memórias: {e}")
@@ -96,12 +110,15 @@ def carregar_memorias():
     return None
 
 def salvar_memoria(nova_memoria):
+    if not planilha:
+        return
     try:
         aba = planilha.worksheet("memorias")
         aba.append_row([nova_memoria.strip()])
         st.success("✅ Memória registrada com sucesso!")
     except Exception as e:
         st.error(f"Erro ao salvar memória: {e}")
+
 
 # --------------------------- #
 # Fragmentos (Lorebook)
@@ -933,19 +950,26 @@ if entrada_raw:
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
     # IA responde com streaming
-    resposta_final = ""
-    with st.chat_message("assistant"):
-        placeholder = st.empty()
-        with st.spinner("Mary está pensando..."):
-            try:
-                resposta_final = responder_com_modelo_escolhido()
-            except Exception as e:
-                st.error(f"Erro: {e}")
-                resposta_final = "[Erro ao gerar resposta]"
+resposta_final = ""
+with st.chat_message("assistant"):
+    placeholder = st.empty()
+    with st.spinner("Mary está pensando..."):
+        try:
+            resposta_final = responder_com_modelo_escolhido()
 
-    # Salva resposta
-    salvar_interacao("assistant", resposta_final)
-    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+            # Aplica corte anticlímax nos modos sensuais
+            modo = st.session_state.get("modo_mary", "")
+            if modo in ["Hot", "Devassa", "Livre"]:
+                resposta_final = cortar_antes_do_climax(resposta_final)
+
+        except Exception as e:
+            st.error(f"Erro: {e}")
+            resposta_final = "[Erro ao gerar resposta]"
+
+# Salva resposta
+salvar_interacao("assistant", resposta_final)
+st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+
        
 # --------------------------- #
 # Conversão de link Google Drive para preview
