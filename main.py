@@ -871,10 +871,7 @@ if entrada_raw:
     # Salva resposta
     salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
-        # Salva resposta
-    salvar_interacao("assistant", resposta_final)
-    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
-
+       
 # --------------------------- #
 # Conversão de link Google Drive para preview
 # --------------------------- #
