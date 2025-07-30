@@ -404,7 +404,6 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
 
-    # Carrega histórico da base + sessão
     historico_base = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
         for m in st.session_state.get("base_history", [])
@@ -417,17 +416,10 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     ]
     historico = historico_base + historico_sessao
 
-    # Monta mensagem com system + histórico
     mensagens = [{"role": "system", "content": prompt}] + historico
-
-    # Temperatura por modo
     temperatura = {
-        "Hot": 0.9,
-        "Flerte": 0.8,
-        "Racional": 0.5,
-        "Devassa": 1.0,
-        "Dissimulada": 0.6,
-        "Frágil": 0.7
+        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+        "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
     }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
@@ -460,8 +452,9 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
                 if data == "[DONE]":
                     break
                 try:
-                    delta = json.loads(data)["choices"][0]["delta"].get("content", "")
-                    if delta:
+                    j = json.loads(data)
+                    delta = j["choices"][0]["delta"].get("content", "")
+                    if delta and not full_text.endswith(delta):
                         full_text += delta
                         placeholder.markdown(full_text)
                 except Exception:
@@ -471,7 +464,6 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
         return "[ERRO STREAM]"
 
     return full_text.strip()
-
 
 
 # --------------------------- #
@@ -493,14 +485,9 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
     historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
-
     temperatura = {
-        "Hot": 0.9,
-        "Flerte": 0.8,
-        "Racional": 0.5,
-        "Devassa": 1.0,
-        "Dissimulada": 0.6,
-        "Frágil": 0.7
+        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+        "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
     }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
@@ -532,7 +519,7 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
                             break
                         try:
                             content = json.loads(data)["choices"][0]["delta"].get("content", "")
-                            if content:
+                            if content and not full_text.endswith(content):
                                 full_text += content
                                 placeholder.markdown(full_text)
                         except Exception:
@@ -542,6 +529,17 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
         return "[ERRO STREAM]"
 
     return full_text.strip()
+
+
+# --------------------------- #
+# Temperatura por modo
+# --------------------------- #
+modo_atual = st.session_state.get("modo_mary", "Racional")
+temperatura_escolhida = {
+    "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+    "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
+}.get(modo_atual, 0.7)
+
 
 
 
