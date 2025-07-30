@@ -1070,22 +1070,18 @@ st.subheader("💡 Surpreender Mary")
 col1, col2, col3 = st.columns([1, 1, 2])
 
 with col1:
-    if st.button("🎥 Vídeo Surpresa"):
-        if "video_idx" not in st.session_state:
-            st.session_state.video_idx = 0
+    if st.button("🎥 Vídeo Surpresa") and videos:
         st.session_state.video_idx = (st.session_state.video_idx + 1) % len(videos)
         st.session_state.mostrar_video = videos[st.session_state.video_idx]["link"]
         st.session_state.mostrar_imagem = None
-        st.session_state.ultima_entrada_recebida = None  # evita resposta automática
+        st.session_state.ultima_entrada_recebida = None
 
 with col2:
-    if st.button("🖼️ Imagem Surpresa"):
-        if "img_idx" not in st.session_state:
-            st.session_state.img_idx = 0
+    if st.button("🖼️ Imagem Surpresa") and imagens:
         st.session_state.img_idx = (st.session_state.img_idx + 1) % len(imagens)
         st.session_state.mostrar_imagem = imagens[st.session_state.img_idx]["link"]
         st.session_state.mostrar_video = None
-        st.session_state.ultima_entrada_recebida = None  # evita resposta automática
+        st.session_state.ultima_entrada_recebida = None
 
 with col3:
     if st.button("❌ Fechar"):
@@ -1098,8 +1094,7 @@ with col3:
 # --------------------------- #
 if st.session_state.get("mostrar_video"):
     st.markdown("### 🎬 Mary quer te mostrar um vídeo...")
-    components.iframe(st.session_state.mostrar_video, height=360, width=640)
-    st.markdown(f"[🔲 Tela cheia]({st.session_state.mostrar_video})", unsafe_allow_html=True)
+    st.video(st.session_state.mostrar_video)
 
 if st.session_state.get("mostrar_imagem"):
     st.markdown("### 📸 Mary quer te mostrar uma imagem...")
