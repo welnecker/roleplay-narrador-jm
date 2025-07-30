@@ -454,7 +454,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
                 try:
                     j = json.loads(data)
                     delta = j["choices"][0]["delta"].get("content", "")
-                    if delta and not full_text.endswith(delta):
+                    if delta:
                         full_text += delta
                         placeholder.markdown(full_text)
                 except Exception:
@@ -519,7 +519,7 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
                             break
                         try:
                             content = json.loads(data)["choices"][0]["delta"].get("content", "")
-                            if content and not full_text.endswith(content):
+                            if content:
                                 full_text += content
                                 placeholder.markdown(full_text)
                         except Exception:
@@ -539,6 +539,7 @@ temperatura_escolhida = {
     "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
     "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
 }.get(modo_atual, 0.7)
+
 
 
 
