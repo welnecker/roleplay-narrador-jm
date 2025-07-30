@@ -45,6 +45,29 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
+# --------------------------- #
+# Interrompe cenas antes do clímax explícito
+# --------------------------- #
+def cortar_antes_do_climax(texto: str) -> str:
+    """
+    Permite que Mary conduza com sensualidade e domínio,
+    mas interrompe a narrativa antes do clímax sexual explícito.
+    Preserva o envolvimento do usuário para que ele conduza o próximo passo.
+    """
+    padroes_climax = [
+        r"(ela|ele) (a|o)? ?(penetra|invade|toma com força|explode dentro|goza|atinge o clímax)",
+        r"(os|seus)? ?corpos (colapsam|tremem juntos|vibram)",
+        r"(orgasmo|explosão de prazer|clímax) (vem|chega|invade|toma conta)",
+        r"(ela|ele) (grita|geme alto) (ao gozar|com o clímax)",
+        r"(espasmos|contrações) (involuntárias|do corpo)",
+    ]
+
+    for padrao in padroes_climax:
+        match = re.search(padrao, texto, re.IGNORECASE)
+        if match:
+            return texto[:match.start()].rstrip(" .,;") + "."
+    return texto
+
 def salvar_interacao(role, content):
     if not planilha:
         return
