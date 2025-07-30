@@ -655,6 +655,37 @@ temperatura_escolhida = {
     "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
 }.get(modo_atual, 0.7)
 
+# --------------------------- #
+# Resposta da IA só se houver entrada
+# --------------------------- #
+if st.session_state.get("ultima_entrada_recebida"):
+    resposta_final = ""
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        with st.spinner("Mary está pensando..."):
+            try:
+                resposta_final = responder_com_modelo_escolhido()
+
+                modo = st.session_state.get("modo_mary", "")
+                if modo in ["Hot", "Devassa", "Livre"]:
+                    resposta_final = cortar_antes_do_climax(resposta_final)
+
+            except Exception as e:
+                st.error(f"Erro: {e}")
+                resposta_final = "[Erro ao gerar resposta]"
+
+    salvar_interacao("assistant", resposta_final)
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+    st.session_state.ultima_entrada_recebida = None
+# --------------------------- #
+# Reset de entrada ao clicar em imagem/vídeo
+# --------------------------- #
+def resetar_entrada():
+    st.session_state.ultima_entrada_recebida = None
+
+# Garantir chamada nos botões
+if st.session_state.get("mostrar_imagem") or st.session_state.get("mostrar_video"):
+    resetar_entrada()
 
 
 
