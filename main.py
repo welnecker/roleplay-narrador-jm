@@ -7,6 +7,15 @@ import streamlit.components.v1 as components
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 
+# 👇 Estado inicial das sessões vem aqui
+if 'mostrar_imagem' not in st.session_state:
+    st.session_state.mostrar_imagem = None
+if 'mostrar_video' not in st.session_state:
+    st.session_state.mostrar_video = None
+if 'ultima_entrada_recebida' not in st.session_state:
+    st.session_state.ultima_entrada_recebida = None
+
+
 # --------------------------- #
 # Configuração básica
 # --------------------------- #
@@ -1003,28 +1012,27 @@ if entrada_raw:
     salvar_interacao("user", entrada)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # IA responde com streaming
-resposta_final = ""
-with st.chat_message("assistant"):
-    placeholder = st.empty()
-    with st.spinner("Mary está pensando..."):
-        try:
-            resposta_final = responder_com_modelo_escolhido()
+    # IA responde com streaming apenas se houver entrada do usuário
+    resposta_final = ""
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        with st.spinner("Mary está pensando..."):
+            try:
+                resposta_final = responder_com_modelo_escolhido()
 
-            # Aplica corte anticlímax nos modos sensuais
-            modo = st.session_state.get("modo_mary", "")
-            if modo in ["Hot", "Devassa", "Livre"]:
-                resposta_final = cortar_antes_do_climax(resposta_final)
+                # Aplica corte anticlímax nos modos sensuais
+                modo = st.session_state.get("modo_mary", "")
+                if modo in ["Hot", "Devassa", "Livre"]:
+                    resposta_final = cortar_antes_do_climax(resposta_final)
 
-        except Exception as e:
-            st.error(f"Erro: {e}")
-            resposta_final = "[Erro ao gerar resposta]"
+            except Exception as e:
+                st.error(f"Erro: {e}")
+                resposta_final = "[Erro ao gerar resposta]"
 
-# Salva resposta
-salvar_interacao("assistant", resposta_final)
-st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+        # Salva resposta
+        salvar_interacao("assistant", resposta_final)
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
-       
 # --------------------------- #
 # Conversão de link Google Drive para preview
 # --------------------------- #
@@ -1068,6 +1076,7 @@ with col1:
         st.session_state.video_idx = (st.session_state.video_idx + 1) % len(videos)
         st.session_state.mostrar_video = videos[st.session_state.video_idx]["link"]
         st.session_state.mostrar_imagem = None
+        st.session_state.ultima_entrada_recebida = None  # evita resposta automática
 
 with col2:
     if st.button("🖼️ Imagem Surpresa"):
@@ -1076,6 +1085,7 @@ with col2:
         st.session_state.img_idx = (st.session_state.img_idx + 1) % len(imagens)
         st.session_state.mostrar_imagem = imagens[st.session_state.img_idx]["link"]
         st.session_state.mostrar_video = None
+        st.session_state.ultima_entrada_recebida = None  # evita resposta automática
 
 with col3:
     if st.button("❌ Fechar"):
