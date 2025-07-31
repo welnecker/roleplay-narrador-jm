@@ -1195,19 +1195,19 @@ if len(st.session_state.session_msgs) >= 2:
 
 def converter_link_drive(link, tipo="imagem"):
     """
-    Converte links do Google Drive:
+    Converte link do Google Drive em formato apropriado para imagem ou vídeo.
     - tipo="imagem": retorna link de download
-    - tipo="video": retorna link de pré-visualização (embed)
+    - tipo="video": retorna link de preview
     """
-    match = re.search(r'/d/([a-zA-Z0-9_-]+)', link)
+    match = re.search(r"/d/([a-zA-Z0-9_-]+)", link)
     if not match:
-        match = re.search(r'id=([a-zA-Z0-9_-]+)', link)
+        match = re.search(r"id=([a-zA-Z0-9_-]+)", link)
     if match:
         file_id = match.group(1)
-        if tipo == "imagem":
-            return f"https://drive.google.com/uc?export=download&id={file_id}"
-        elif tipo == "video":
+        if tipo == "video":
             return f"https://drive.google.com/file/d/{file_id}/preview"
+        else:  # imagem ou outro
+            return f"https://drive.google.com/uc?export=download&id={file_id}"
     return link
 
 
@@ -1225,6 +1225,7 @@ def carregar_midia_disponivel():
         for item in dados:
             video_link = converter_link_drive(item.get("video", "").strip(), tipo="video")
             imagem_link = converter_link_drive(item.get("imagem", "").strip(), tipo="imagem")
+
             if video_link or imagem_link:
                 midias.append({"video": video_link, "imagem": imagem_link})
 
