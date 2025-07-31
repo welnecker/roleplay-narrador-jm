@@ -6,6 +6,35 @@ import re
 import streamlit.components.v1 as components
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
+import openai
+import numpy as np
+
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+def gerar_embedding_openai(texto: str):
+    try:
+        resposta = openai.Embedding.create(
+            input=texto,
+            model="text-embedding-3-small"
+        )
+        return np.array(resposta['data'][0]['embedding'])
+    except Exception as e:
+        st.error(f"Erro ao gerar embedding: {e}")
+        return None
+
+def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+def verificar_quebra_semantica_openai(texto1: str, texto2: str, limite=0.6) -> str:
+    emb1 = gerar_embedding_openai(texto1)
+    emb2 = gerar_embedding_openai(texto2)
+    if emb1 is None or emb2 is None:
+        return ""
+    sim = cosine_similarity(emb1, emb2)
+    if sim < limite:
+        return f"⚠️ Baixa continuidade narrativa (similaridade: {sim:.2f}) — pode haver salto de cena sem transição."
+    return f"✅ Continuidade coerente (similaridade: {sim:.2f})."
+
 
 # 👇 Estado inicial das sessões vem aqui
 if 'mostrar_imagem' not in st.session_state:
@@ -1115,6 +1144,15 @@ if entrada_raw:
 
         salvar_interacao("assistant", resposta_final)
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+
+# Verificação semântica automática após cada resposta
+if len(st.session_state.session_msgs) >= 2:
+    texto_anterior = st.session_state.session_msgs[-2]["content"]
+    texto_atual = st.session_state.session_msgs[-1]["content"]
+    alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
+    if alerta_semantica:
+        st.info(alerta_semantica)
+
 
 def converter_link_drive(link):
     """
