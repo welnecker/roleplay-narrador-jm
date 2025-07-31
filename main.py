@@ -1193,19 +1193,23 @@ if len(st.session_state.session_msgs) >= 2:
         st.info(alerta_semantica)
 
 
-def converter_link_drive(link):
+def converter_link_drive(link, tipo="imagem"):
     """
-    Converte um link de compartilhamento do Google Drive em link direto para visualização/download.
-    Suporta links no formato 'https://drive.google.com/file/d/ID/view?usp=sharing'
-    ou 'https://drive.google.com/open?id=ID'
+    Converte links do Google Drive:
+    - tipo="imagem": retorna link de download
+    - tipo="video": retorna link de pré-visualização (embed)
     """
     match = re.search(r'/d/([a-zA-Z0-9_-]+)', link)
     if not match:
         match = re.search(r'id=([a-zA-Z0-9_-]+)', link)
     if match:
         file_id = match.group(1)
-        return f"https://drive.google.com/uc?export=download&id={file_id}"
-    return link  # Retorna o link original se não for um link do Drive conhecido
+        if tipo == "imagem":
+            return f"https://drive.google.com/uc?export=download&id={file_id}"
+        elif tipo == "video":
+            return f"https://drive.google.com/file/d/{file_id}/preview"
+    return link
+
 
 
 
@@ -1219,8 +1223,8 @@ def carregar_midia_disponivel():
         midias = []
 
         for item in dados:
-            video_link = converter_link_drive(item.get("video", "").strip())
-            imagem_link = converter_link_drive(item.get("imagem", "").strip())
+            video_link = converter_link_drive(item.get("video", "").strip(), tipo="video")
+            imagem_link = converter_link_drive(item.get("imagem", "").strip(), tipo="imagem")
             if video_link or imagem_link:
                 midias.append({"video": video_link, "imagem": imagem_link})
 
@@ -1228,6 +1232,7 @@ def carregar_midia_disponivel():
     except Exception as e:
         st.error(f"Erro ao carregar mídia: {e}")
         return []
+
 
 midia_disponivel = carregar_midia_disponivel()
 videos = [m["video"] for m in midia_disponivel if m["video"]]
