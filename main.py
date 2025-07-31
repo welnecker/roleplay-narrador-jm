@@ -1216,16 +1216,30 @@ def carregar_midia_disponivel():
     try:
         aba_midia = planilha.worksheet("video_imagem")
         dados = aba_midia.get_all_records()
+
+        midias = []
         for item in dados:
-            item["link"] = converter_link_drive(item.get("link", ""))
-        return dados
+            video = item.get("video", "").strip()
+            imagem = item.get("imagem", "").strip()
+            if video:
+                midias.append({"tipo": "video", "link": converter_link_drive(video)})
+            if imagem:
+                midias.append({"tipo": "imagem", "link": converter_link_drive(imagem)})
+        return midias
     except Exception as e:
         st.error(f"Erro ao carregar mídia: {e}")
         return []
 
 midia_disponivel = carregar_midia_disponivel()
-videos = [m for m in midia_disponivel if m["nome"].lower().endswith(".mp4")]
-imagens = [m for m in midia_disponivel if m["nome"].lower().endswith(".jpg")]
+videos = [m for m in midia_disponivel if m["tipo"] == "video"]
+imagens = [m for m in midia_disponivel if m["tipo"] == "imagem"]
+
+# Inicializar índices se ainda não existem
+if "video_idx" not in st.session_state:
+    st.session_state.video_idx = 0
+if "img_idx" not in st.session_state:
+    st.session_state.img_idx = 0
+
 
 # --------------------------- #
 # Botões de controle
@@ -1266,3 +1280,4 @@ if st.session_state.get("mostrar_imagem"):
     st.markdown("### 📸 Mary quer te mostrar uma imagem...")
     largura = st.slider("📐 Ajustar largura da imagem", 200, 1200, 640, step=50)
     st.image(st.session_state.mostrar_imagem, width=largura)
+
