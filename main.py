@@ -9,18 +9,21 @@ from oauth2client.service_account import ServiceAccountCredentials
 import openai
 import numpy as np
 
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+from openai import OpenAI
+
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def gerar_embedding_openai(texto: str):
     try:
-        resposta = openai.Embedding.create(
+        resposta = client.embeddings.create(
             input=texto,
             model="text-embedding-3-small"
         )
-        return np.array(resposta['data'][0]['embedding'])
+        return np.array(resposta.data[0].embedding)
     except Exception as e:
         st.error(f"Erro ao gerar embedding: {e}")
         return None
+
 
 def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
     return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
