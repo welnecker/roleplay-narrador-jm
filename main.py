@@ -1195,22 +1195,20 @@ if len(st.session_state.session_msgs) >= 2:
 
 def converter_link_drive(link, tipo="imagem"):
     """
-    Converte link do Google Drive em formato apropriado para imagem ou vídeo.
-    - tipo="imagem": retorna link de download
-    - tipo="video": retorna link de preview
+    Converte link do Google Drive para visualização no Streamlit.
+    - tipo="imagem": retorna uc?export=view&id=...
+    - tipo="video": retorna .../preview
     """
-    match = re.search(r"/d/([a-zA-Z0-9_-]+)", link)
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)', link)
     if not match:
-        match = re.search(r"id=([a-zA-Z0-9_-]+)", link)
+        match = re.search(r'id=([a-zA-Z0-9_-]+)', link)
     if match:
         file_id = match.group(1)
         if tipo == "video":
             return f"https://drive.google.com/file/d/{file_id}/preview"
-        else:  # imagem ou outro
-            return f"https://drive.google.com/uc?export=download&id={file_id}"
+        else:
+            return f"https://drive.google.com/uc?export=view&id={file_id}"
     return link
-
-
 
 
 # --------------------------- #
@@ -1225,8 +1223,8 @@ def carregar_midia_disponivel():
         for linha in dados:
             if not linha:
                 continue
-            video_link = converter_link_drive(linha[0].strip()) if len(linha) > 0 else ""
-            imagem_link = converter_link_drive(linha[1].strip()) if len(linha) > 1 else ""
+            video_link = converter_link_drive(linha[0].strip(), tipo="video") if len(linha) > 0 else ""
+            imagem_link = converter_link_drive(linha[1].strip(), tipo="imagem") if len(linha) > 1 else ""
             if video_link or imagem_link:
                 midias.append({"video": video_link, "imagem": imagem_link})
 
