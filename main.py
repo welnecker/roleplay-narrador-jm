@@ -708,6 +708,20 @@ temperatura_escolhida = {
 }.get(modo_atual, 0.7)
 
 # --------------------------- #
+# Função auxiliar: verificar se resposta é válida
+# --------------------------- #
+def resposta_valida(texto: str) -> bool:
+    padroes_invalidos = [
+        r"check if.*string", r"#\s?1(\.\d+)+", r"\d{10,}", r"the cmd package",
+        r"(111\s?)+", r"\d+\.\d+", r"#+\s*\d+", r"\bimport\s", r"\bdef\s", r"```", r"class\s"
+    ]
+    for padrao in padroes_invalidos:
+        if re.search(padrao, texto.lower()):
+            return False
+    return True
+
+
+# --------------------------- #
 # Resposta da IA só se houver entrada
 # --------------------------- #
 if st.session_state.get("ultima_entrada_recebida"):
@@ -718,6 +732,15 @@ if st.session_state.get("ultima_entrada_recebida"):
             try:
                 resposta_final = responder_com_modelo_escolhido()
 
+                # Validação semântica / sintática
+                if not resposta_valida(resposta_final):
+                    st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
+                    resposta_final = responder_com_modelo_escolhido()
+
+                    if not resposta_valida(resposta_final):
+                        resposta_final = "[⚠️ A resposta da IA veio corrompida. Tente reformular sua entrada ou reenviar.]"
+
+                # Interrompe antes do clímax se necessário
                 modo = st.session_state.get("modo_mary", "")
                 if modo in ["Hot", "Devassa", "Livre"]:
                     resposta_final = cortar_antes_do_climax(resposta_final)
@@ -729,6 +752,8 @@ if st.session_state.get("ultima_entrada_recebida"):
     salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
     st.session_state.ultima_entrada_recebida = None
+
+
 # --------------------------- #
 # Reset de entrada ao clicar em imagem/vídeo
 # --------------------------- #
