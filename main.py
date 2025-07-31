@@ -1218,20 +1218,19 @@ def carregar_midia_disponivel():
     try:
         aba_midia = planilha.worksheet("video_imagem")
         dados = aba_midia.get_all_values()
-
         midias = []
         for linha in dados:
             if not linha:
                 continue
-            video_link = converter_link_drive(linha[0].strip(), tipo="video") if len(linha) > 0 else ""
-            imagem_link = converter_link_drive(linha[1].strip(), tipo="imagem") if len(linha) > 1 else ""
+            video_link = linha[0].strip() if len(linha) > 0 else ""
+            imagem_link = linha[1].strip() if len(linha) > 1 else ""
             if video_link or imagem_link:
                 midias.append({"video": video_link, "imagem": imagem_link})
-
         return midias
     except Exception as e:
         st.error(f"Erro ao carregar mídia: {e}")
         return []
+
 
 
 midia_disponivel = carregar_midia_disponivel()
@@ -1277,11 +1276,26 @@ with col3:
 # --------------------------- #
 # Exibição da mídia
 # --------------------------- #
-if st.session_state.get("mostrar_video"):
-    st.markdown("### 🎬 Mary quer te mostrar um vídeo...")
-    st.video(st.session_state.mostrar_video)
 
+# Imagem
 if st.session_state.get("mostrar_imagem"):
-    st.markdown("### 📸 Mary quer te mostrar uma imagem...")
-    largura = st.slider("📐 Ajustar largura da imagem", 200, 1200, 640, step=50)
-    st.image(st.session_state.mostrar_imagem, width=largura)
+    imagem = st.session_state.mostrar_imagem
+    if imagem and isinstance(imagem, str) and imagem.strip():
+        largura = st.slider("📐 Ajustar largura da imagem", 200, 1200, 640, step=50)
+        try:
+            st.image(imagem, width=largura)
+        except Exception:
+            st.warning("Erro ao carregar a imagem selecionada.")
+    else:
+        st.warning("Não há mais imagens disponíveis para exibir.")
+
+# Vídeo
+if st.session_state.get("mostrar_video"):
+    video = st.session_state.mostrar_video
+    if video and isinstance(video, str) and video.strip():
+        try:
+            st.video(video)
+        except Exception:
+            st.warning("Erro ao carregar o vídeo selecionado.")
+    else:
+        st.warning("Não há mais vídeos disponíveis para exibir.")
