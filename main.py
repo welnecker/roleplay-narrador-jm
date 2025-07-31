@@ -195,39 +195,7 @@ def carregar_memorias():
 
     return None
 
-            # Lê tags
-            if conteudo.startswith("[") and "]" in conteudo:
-                raw_tags = conteudo.split("]")[0].replace("[", "")
-                tags = [t.strip().lower() for t in raw_tags.split(",")]
-                texto_memoria = conteudo.split("]")[-1].strip()
-            else:
-                tags = ["all"]
-                texto_memoria = conteudo
-
-            if "lembrança" in tags:
-                mem_lembrancas.append(texto_memoria)
-            elif modo in tags or "all" in tags:
-                mem_relevantes.append(texto_memoria)
-
-        # Monta o retorno com seções separadas
-        blocos = []
-        if mem_relevantes:
-            blocos.append("💾 Memórias relevantes:\n" + "\n".join(f"- {m}" for m in mem_relevantes))
-        if mem_lembrancas:
-            blocos.append("🧠 Lembranças importantes:\n" + "\n".join(f"- {m}" for m in mem_lembrancas))
-
-        if blocos:
-            return {
-                "role": "user",
-                "content": "\n\n".join(blocos)
-            }
-
-    except Exception as e:
-        st.error(f"Erro ao carregar memórias: {e}")
-
-    return None
-
-
+          
 # --------------------------- #
 # Fragmentos (Lorebook)
 # --------------------------- #
