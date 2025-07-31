@@ -509,7 +509,7 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # Montagem do prompt
+    # Bloco base do prompt
     if continuar_cena:
         prompt = f"""{prompt_base}
 
@@ -548,11 +548,11 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
     # --------------------------- #
     # Memórias relevantes
     # --------------------------- #
-   mem = carregar_memorias()
+    mem = carregar_memorias()
     if mem:
         prompt += f"\n\n{mem['content']}"
 
-        return prompt.strip()
+    return prompt.strip()
 
 
 # --------------------------- #
