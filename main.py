@@ -133,11 +133,14 @@ def carregar_ultimas_interacoes(n=5):
 def carregar_memorias():
     if not planilha:
         return None
+
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_values()
         modo = st.session_state.get("modo_mary", "Racional").lower()
+
         mem_relevantes = []
+        mem_lembrancas = []
 
         for linha in dados:
             if not linha or not linha[0].strip():
@@ -145,12 +148,12 @@ def carregar_memorias():
 
             conteudo = linha[0].strip()
 
-            # Substitui "?" pelo nome do grande amor (se houver)
+            # Substitui "?" pelo nome do grande amor
             if "o grande amor de mary é ?" in conteudo.lower():
                 amor = st.session_state.get("grande_amor")
                 conteudo = conteudo.replace("?", amor if amor else "ninguém")
 
-            # Lê as tags e separa memória
+            # Lê tags
             if conteudo.startswith("[") and "]" in conteudo:
                 raw_tags = conteudo.split("]")[0].replace("[", "")
                 tags = [t.strip().lower() for t in raw_tags.split(",")]
@@ -159,29 +162,28 @@ def carregar_memorias():
                 tags = ["all"]
                 texto_memoria = conteudo
 
-            if modo in tags or "all" in tags:
+            if "lembrança" in tags:
+                mem_lembrancas.append(texto_memoria)
+            elif modo in tags or "all" in tags:
                 mem_relevantes.append(texto_memoria)
 
+        # Monta o retorno com seções separadas
+        blocos = []
         if mem_relevantes:
+            blocos.append("💾 Memórias relevantes:\n" + "\n".join(f"- {m}" for m in mem_relevantes))
+        if mem_lembrancas:
+            blocos.append("🧠 Lembranças importantes:\n" + "\n".join(f"- {m}" for m in mem_lembrancas))
+
+        if blocos:
             return {
                 "role": "user",
-                "content": "💾 Memórias relevantes:\n" + "\n".join(mem_relevantes)
+                "content": "\n\n".join(blocos)
             }
 
     except Exception as e:
         st.error(f"Erro ao carregar memórias: {e}")
 
     return None
-
-def salvar_memoria(nova_memoria):
-    if not planilha:
-        return
-    try:
-        aba = planilha.worksheet("memorias")
-        aba.append_row([nova_memoria.strip()])
-        st.success("✅ Memória registrada com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao salvar memória: {e}")
 
 
 # --------------------------- #
@@ -546,12 +548,11 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
     # --------------------------- #
     # Memórias relevantes
     # --------------------------- #
-    mem = carregar_memorias()
+   mem = carregar_memorias()
     if mem:
-        conteudo_memorias = mem["content"].replace("💾 Memórias relevantes:\n", "")
-        prompt += f"\n\n### 💾 Memórias relevantes ({modo})\n{conteudo_memorias}"
+        prompt += f"\n\n{mem['content']}"
 
-    return prompt.strip()
+        return prompt.strip()
 
 
 # --------------------------- #
