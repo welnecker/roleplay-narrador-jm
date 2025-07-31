@@ -971,77 +971,151 @@ def responder_com_modelo_escolhido():
         st.session_state["provedor_ia"] = "openrouter"
         return gerar_resposta_openrouter_stream(modelo)
 
+# ---------------------------
+# 🎬 Efeitos Cinematográficos por Emoção Oculta
+# ---------------------------
+CINEMATIC_EFFECTS = {
+    "tristeza": [
+        "Câmera lenta nos gestos de Mary.",
+        "Som ambiente abafado, como se o mundo estivesse distante.",
+        "Luz azulada ou fria, sombras longas ao redor."
+    ],
+    "raiva": [
+        "Cortes rápidos, câmera tremida acompanhando os passos de Mary.",
+        "Batidas de coração fortes, respiração acelerada ao fundo.",
+        "Luz vermelha ou sombras projetadas nos olhos."
+    ],
+    "felicidade": [
+        "Câmera girando suavemente ao redor de Mary.",
+        "Som ambiente vívido: risadas, vento leve, música ao fundo.",
+        "Luz dourada atravessando janelas, atmosfera acolhedora."
+    ],
+    "tensão": [
+        "Close nos olhos ou lábios de Mary, em câmera lenta.",
+        "Som intermitente de respiração e silêncio tenso.",
+        "Contraste de luz e sombra destacando contornos do corpo."
+    ],
+    "nenhuma": [
+        "Plano médio neutro com iluminação ambiente comum.",
+        "Som ambiente sem efeitos especiais.",
+        "Cenário descritivo padrão, sem efeitos visuais."
+    ]
+}
 
-# --------------------------- #
-# Entrada do usuário
-# --------------------------- #
-entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' para continuar a cena)")
+
+# ---------------------------
+# Entrada do usuário (Roteirista Cinematográfico com efeitos)
+# ---------------------------
+entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' ou '@Mary:')")
 if entrada_raw:
     entrada_raw = entrada_raw.strip()
     modo_atual = st.session_state.get("modo_mary", "Racional")
+    estado_amor = st.session_state.get("grande_amor")
 
-    # CASO 1: Apenas "*"
-    if entrada_raw == "*":
+    if "emocao_oculta" not in st.session_state:
+        st.session_state.emocao_oculta = None
+
+    # Caso 1: Comando Roteirista
+    if entrada_raw.lower().startswith("@mary:"):
+        comando = entrada_raw[len("@mary:"):].strip()
+
+        # Emoção oculta
+        if any(x in comando.lower() for x in ["triste", "sozinha", "choro", "saudade"]):
+            st.session_state.emocao_oculta = "tristeza"
+        elif any(x in comando.lower() for x in ["raiva", "ciúme", "ódio", "furiosa"]):
+            st.session_state.emocao_oculta = "raiva"
+        elif any(x in comando.lower() for x in ["feliz", "alegre", "orgulhosa", "leve"]):
+            st.session_state.emocao_oculta = "felicidade"
+        elif any(x in comando.lower() for x in ["desejo", "provocação", "tensão", "calor"]):
+            st.session_state.emocao_oculta = "tensão"
+        else:
+            st.session_state.emocao_oculta = "nenhuma"
+
+        # Fragmentos e memórias
+        fragmentos = carregar_fragmentos()
+        mem = carregar_memorias()
+        fragmentos_ativos = buscar_fragmentos_relevantes(comando, fragmentos)
+
+        contexto_memoria = ""
+        if fragmentos_ativos:
+            contexto_memoria += "\n### 📚 Fragmentos sugeridos:\n"
+            contexto_memoria += "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
+        if mem:
+            contexto_memoria += "\n### 💾 Memórias sugeridas:\n"
+            contexto_memoria += mem["content"].replace("💾 Memórias relevantes:\n", "")
+
+        # Efeitos cinematográficos
+        emocao = st.session_state.emocao_oculta or "nenhuma"
+        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, CINEMATIC_EFFECTS["nenhuma"]))
+
+        # Monta prompt
+        entrada = f"""
+[ROTEIRISTA CINEMATOGRÁFICO] Cena solicitada: {comando}
+
+🎬 Efeitos cinematográficos:
+{efeitos}
+
+⚡ Regras de atuação:
+- Narre Mary em 3ª pessoa; use 1ª pessoa para falas e pensamentos.
+- Mantenha o modo narrativo ativo: '{modo_atual}'.
+- Emoção oculta atual: {emocao}.
+- Se Mary ama {estado_amor or 'ninguém'}, ela NÃO trairá. Converta provocações em tensão ou resistência elegante.
+{contexto_memoria.strip()}
+""".strip()
+        entrada_visivel = entrada_raw
+
+    # Caso 2: Apenas "*"
+    elif entrada_raw == "*":
+        emocao = st.session_state.emocao_oculta or "nenhuma"
+        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, []))
         entrada = (
-            f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
-            f"mantendo o mesmo clima, ritmo, ponto de vista e o modo '{modo_atual}'. "
-            "Não reinicie a cena, apenas prossiga naturalmente."
+            f"[CONTINUAR_CENA] Prossiga a cena anterior com estilo cinematográfico.\n"
+            f"Modo: '{modo_atual}' | Emoção oculta: {emocao}\n"
+            f"{efeitos}"
         )
         entrada_visivel = "*"
 
-    # CASO 2: "* algo"
+    # Caso 3: "* algo"
     elif entrada_raw.startswith("* "):
         extra = entrada_raw[2:].strip()
+        emocao = st.session_state.emocao_oculta or "nenhuma"
+        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, []))
         entrada = (
-            f"[CONTINUAR_CENA] Continue exatamente de onde a última resposta parou, "
-            f"mantendo o mesmo clima, ritmo, ponto de vista e o modo '{modo_atual}'. "
-            f"Incorpore o seguinte elemento na continuidade: {extra}"
+            f"[CONTINUAR_CENA] Prossiga a cena anterior com estilo cinematográfico.\n"
+            f"Modo: '{modo_atual}' | Emoção oculta: {emocao}\n"
+            f"Inclua: {extra}\n"
+            f"{efeitos}"
         )
         entrada_visivel = entrada_raw
 
-    # CASO 3: Mensagem comum
+    # Caso 4: Entrada comum
     else:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibe a entrada do usuário no chat
+    # Exibe entrada
     with st.chat_message("user"):
         st.markdown(entrada_visivel)
 
-    # Salva a entrada no histórico
+    # Salva e responde
     salvar_interacao("user", entrada)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # IA responde com streaming apenas se houver entrada do usuário
     resposta_final = ""
     with st.chat_message("assistant"):
         placeholder = st.empty()
-        with st.spinner("Mary está pensando..."):
+        with st.spinner("Mary está atuando na cena..."):
             try:
                 resposta_final = responder_com_modelo_escolhido()
-
-                # Aplica corte anticlímax nos modos sensuais
-                modo = st.session_state.get("modo_mary", "")
-                if modo in ["Hot", "Devassa", "Livre"]:
+                if modo_atual in ["Hot", "Devassa", "Livre"]:
                     resposta_final = cortar_antes_do_climax(resposta_final)
-
             except Exception as e:
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
 
-        # Salva resposta
         salvar_interacao("assistant", resposta_final)
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
-# --------------------------- #
-# Conversão de link Google Drive para preview
-# --------------------------- #
-def converter_link_drive(link):
-    match = re.search(r"/d/([a-zA-Z0-9_-]+)", link)
-    if match:
-        file_id = match.group(1)
-        return f"https://drive.google.com/file/d/{file_id}/preview"
-    return link
 
 # --------------------------- #
 # Carregar vídeos e imagens da aba "video_imagem"
