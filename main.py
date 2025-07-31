@@ -1216,30 +1216,30 @@ def carregar_midia_disponivel():
     try:
         aba_midia = planilha.worksheet("video_imagem")
         dados = aba_midia.get_all_records()
-
         midias = []
+
         for item in dados:
-            video = item.get("video", "").strip()
-            imagem = item.get("imagem", "").strip()
-            if video:
-                midias.append({"tipo": "video", "link": converter_link_drive(video)})
-            if imagem:
-                midias.append({"tipo": "imagem", "link": converter_link_drive(imagem)})
+            video_link = converter_link_drive(item.get("video", "").strip())
+            imagem_link = converter_link_drive(item.get("imagem", "").strip())
+            if video_link or imagem_link:
+                midias.append({"video": video_link, "imagem": imagem_link})
+
         return midias
     except Exception as e:
         st.error(f"Erro ao carregar mídia: {e}")
         return []
 
 midia_disponivel = carregar_midia_disponivel()
-videos = [m for m in midia_disponivel if m["tipo"] == "video"]
-imagens = [m for m in midia_disponivel if m["tipo"] == "imagem"]
+videos = [m["video"] for m in midia_disponivel if m["video"]]
+imagens = [m["imagem"] for m in midia_disponivel if m["imagem"]]
 
-# Inicializar índices se ainda não existem
+# --------------------------- #
+# Inicializar índices, se não existirem
+# --------------------------- #
 if "video_idx" not in st.session_state:
     st.session_state.video_idx = 0
 if "img_idx" not in st.session_state:
     st.session_state.img_idx = 0
-
 
 # --------------------------- #
 # Botões de controle
@@ -1252,14 +1252,14 @@ col1, col2, col3 = st.columns([1, 1, 2])
 with col1:
     if st.button("🎥 Vídeo Surpresa") and videos:
         st.session_state.video_idx = (st.session_state.video_idx + 1) % len(videos)
-        st.session_state.mostrar_video = videos[st.session_state.video_idx]["link"]
+        st.session_state.mostrar_video = videos[st.session_state.video_idx]
         st.session_state.mostrar_imagem = None
         st.session_state.ultima_entrada_recebida = None
 
 with col2:
     if st.button("🖼️ Imagem Surpresa") and imagens:
         st.session_state.img_idx = (st.session_state.img_idx + 1) % len(imagens)
-        st.session_state.mostrar_imagem = imagens[st.session_state.img_idx]["link"]
+        st.session_state.mostrar_imagem = imagens[st.session_state.img_idx]
         st.session_state.mostrar_video = None
         st.session_state.ultima_entrada_recebida = None
 
@@ -1270,7 +1270,7 @@ with col3:
         st.success("Mídia fechada.")
 
 # --------------------------- #
-# EXIBIÇÃO DE MÍDIA
+# Exibição da mídia
 # --------------------------- #
 if st.session_state.get("mostrar_video"):
     st.markdown("### 🎬 Mary quer te mostrar um vídeo...")
@@ -1280,4 +1280,3 @@ if st.session_state.get("mostrar_imagem"):
     st.markdown("### 📸 Mary quer te mostrar uma imagem...")
     largura = st.slider("📐 Ajustar largura da imagem", 200, 1200, 640, step=50)
     st.image(st.session_state.mostrar_imagem, width=largura)
-
