@@ -47,6 +47,10 @@ if 'mostrar_video' not in st.session_state:
 if 'ultima_entrada_recebida' not in st.session_state:
     st.session_state.ultima_entrada_recebida = None
 
+if "memorias_usadas" not in st.session_state:
+    st.session_state.memorias_usadas = set()
+
+
 
 # --------------------------- #
 # Configuração básica
@@ -109,6 +113,7 @@ def cortar_antes_do_climax(texto: str) -> str:
             return texto[:match.start()].rstrip(" .,;") + "."
     return texto
 
+
 def salvar_interacao(role, content):
     if not planilha:
         return
@@ -118,6 +123,7 @@ def salvar_interacao(role, content):
         aba.append_row([timestamp, role.strip(), content.strip()])
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
+
 
 def carregar_ultimas_interacoes(n=5):
     if not planilha:
@@ -130,15 +136,14 @@ def carregar_ultimas_interacoes(n=5):
         st.error(f"Erro ao carregar histórico: {e}")
         return []
 
+
 def carregar_memorias():
     if not planilha:
         return None
-
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_values()
         modo = st.session_state.get("modo_mary", "Racional").lower()
-
         mem_relevantes = []
         mem_lembrancas = []
 
@@ -148,10 +153,47 @@ def carregar_memorias():
 
             conteudo = linha[0].strip()
 
-            # Substitui "?" pelo nome do grande amor
+            # Substitui "?" pelo nome do grande amor (se houver)
             if "o grande amor de mary é ?" in conteudo.lower():
                 amor = st.session_state.get("grande_amor")
                 conteudo = conteudo.replace("?", amor if amor else "ninguém")
+
+            # Lê tags
+            if conteudo.startswith("[") and "]" in conteudo:
+                raw_tags = conteudo.split("]")[0].replace("[", "")
+                tags = [t.strip().lower() for t in raw_tags.split(",")]
+                texto_memoria = conteudo.split("]")[-1].strip()
+            else:
+                tags = ["all"]
+                texto_memoria = conteudo
+
+            # Se for lembrança
+            if "lembrança" in tags and texto_memoria not in st.session_state.memorias_usadas:
+                mem_lembrancas.append(texto_memoria)
+                st.session_state.memorias_usadas.add(texto_memoria)
+
+            # Se for memória relevante do modo
+            elif (modo in tags or "all" in tags) and texto_memoria not in st.session_state.memorias_usadas:
+                mem_relevantes.append(texto_memoria)
+                st.session_state.memorias_usadas.add(texto_memoria)
+
+        # Monta o retorno com seções separadas
+        blocos = []
+        if mem_relevantes:
+            blocos.append("💾 Memórias relevantes:\n" + "\n".join(f"- {m}" for m in mem_relevantes))
+        if mem_lembrancas:
+            blocos.append("🧠 Lembranças importantes:\n" + "\n".join(f"- {m}" for m in mem_lembrancas))
+
+        if blocos:
+            return {
+                "role": "user",
+                "content": "\n\n".join(blocos)
+            }
+
+    except Exception as e:
+        st.error(f"Erro ao carregar memórias: {e}")
+
+    return None
 
             # Lê tags
             if conteudo.startswith("[") and "]" in conteudo:
