@@ -1219,13 +1219,14 @@ def converter_link_drive(link, tipo="imagem"):
 def carregar_midia_disponivel():
     try:
         aba_midia = planilha.worksheet("video_imagem")
-        dados = aba_midia.get_all_records()
+        dados = aba_midia.get_all_values()
+
         midias = []
-
-        for item in dados:
-            video_link = converter_link_drive(item.get("video", "").strip(), tipo="video")
-            imagem_link = converter_link_drive(item.get("imagem", "").strip(), tipo="imagem")
-
+        for linha in dados:
+            if not linha:
+                continue
+            video_link = converter_link_drive(linha[0].strip()) if len(linha) > 0 else ""
+            imagem_link = converter_link_drive(linha[1].strip()) if len(linha) > 1 else ""
             if video_link or imagem_link:
                 midias.append({"video": video_link, "imagem": imagem_link})
 
