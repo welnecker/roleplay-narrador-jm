@@ -1116,6 +1116,21 @@ if entrada_raw:
         salvar_interacao("assistant", resposta_final)
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
+def converter_link_drive(link):
+    """
+    Converte um link de compartilhamento do Google Drive em link direto para visualização/download.
+    Suporta links no formato 'https://drive.google.com/file/d/ID/view?usp=sharing'
+    ou 'https://drive.google.com/open?id=ID'
+    """
+    match = re.search(r'/d/([a-zA-Z0-9_-]+)', link)
+    if not match:
+        match = re.search(r'id=([a-zA-Z0-9_-]+)', link)
+    if match:
+        file_id = match.group(1)
+        return f"https://drive.google.com/uc?export=download&id={file_id}"
+    return link  # Retorna o link original se não for um link do Drive conhecido
+
+
 
 # --------------------------- #
 # Carregar vídeos e imagens da aba "video_imagem"
