@@ -142,42 +142,37 @@ def carregar_memorias():
         return None
     try:
         aba = planilha.worksheet("memorias")
-        dados = aba.get_all_values()
+        dados = aba.get_all_records()
         modo = st.session_state.get("modo_mary", "Racional").lower()
         mem_relevantes = []
         mem_lembrancas = []
 
         for linha in dados:
-            if not linha or not linha[0].strip():
+            tipo = linha.get("tipo", "").strip().lower()
+            texto = linha.get("texto", "").strip()
+
+            if not texto:
                 continue
 
-            conteudo = linha[0].strip()
-
-            # Substitui "?" pelo nome do grande amor (se houver)
-            if "o grande amor de mary é ?" in conteudo.lower():
+            # Substituição do placeholder de amor
+            if "o grande amor de mary é ?" in texto.lower():
                 amor = st.session_state.get("grande_amor")
-                conteudo = conteudo.replace("?", amor if amor else "ninguém")
+                texto = texto.replace("?", amor if amor else "ninguém")
 
-            # Lê tags
-            if conteudo.startswith("[") and "]" in conteudo:
-                raw_tags = conteudo.split("]")[0].replace("[", "")
-                tags = [t.strip().lower() for t in raw_tags.split(",")]
-                texto_memoria = conteudo.split("]")[-1].strip()
-            else:
-                tags = ["all"]
-                texto_memoria = conteudo
+            # Já usada?
+            if texto in st.session_state.memorias_usadas:
+                continue
 
-            # Se for lembrança
-            if "lembrança" in tags and texto_memoria not in st.session_state.memorias_usadas:
-                mem_lembrancas.append(texto_memoria)
-                st.session_state.memorias_usadas.add(texto_memoria)
+            # Lembrança pontual
+            if "lembrança" in tipo:
+                mem_lembrancas.append(texto)
+                st.session_state.memorias_usadas.add(texto)
 
-            # Se for memória relevante do modo
-            elif (modo in tags or "all" in tags) and texto_memoria not in st.session_state.memorias_usadas:
-                mem_relevantes.append(texto_memoria)
-                st.session_state.memorias_usadas.add(texto_memoria)
+            # Modo atual ou memória global [all]
+            elif tipo == modo or tipo == "all":
+                mem_relevantes.append(texto)
+                st.session_state.memorias_usadas.add(texto)
 
-        # Monta o retorno com seções separadas
         blocos = []
         if mem_relevantes:
             blocos.append("💾 Memórias relevantes:\n" + "\n".join(f"- {m}" for m in mem_relevantes))
