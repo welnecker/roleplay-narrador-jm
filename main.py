@@ -875,7 +875,7 @@ with st.sidebar:
             temperatura_escolhida = {
                     "Hot": 0.9,
                     "Flerte": 0.8,
-                    "Racional": 0.5,
+                    "Racional": 0.7,
                     "Devassa": 1.0,
                     "Dissimulada": 0.6,
                     "Frágil": 0.7
