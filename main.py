@@ -537,15 +537,15 @@ def construir_prompt_mary():
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # Última mensagem do usuário
-    mensagens_sessao = st.session_state.get("mensagens", [])
+    # Detecta se há comando de continuidade
+    continuar_cena = False
     ultima_msg = ""
-    if mensagens_sessao:
-        ultima_msg = mensagens_sessao[-1].get("content", "")
+    if st.session_state.get("session_msgs"):
+        ultima_msg = st.session_state.session_msgs[-1].get("content", "")
+        if ultima_msg.startswith("[CONTINUAR_CENA]"):
+            continuar_cena = True
 
-    continuar_cena = ultima_msg.startswith("[CONTINUAR_CENA]")
-
-    # Bloco base do prompt
+    # Prompt base com instruções
     if continuar_cena:
         prompt = f"""{prompt_base}
 
@@ -572,22 +572,19 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # Fragmentos
+    # Fragmentos relevantes (lorebook)
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
-        prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
+        prompt += f"\n\n📚 **Fragmentos ativados pelo contexto:**\n{lista_fragmentos}"
 
-    # Memórias relevantes
-    mem = carregar_memorias_por_modo(modo)
+    # Memórias filtradas por modo
+    mem = carregar_memorias()
     if mem:
         prompt += f"\n\n{mem['content']}"
 
-    # Histórico completo (últimas 15 + sessão atual)
-    historico = carregar_ultimas_interacoes(15) + mensagens_sessao
-
-    return prompt.strip(), historico
+    return prompt.strip()
 
 
 
