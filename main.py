@@ -537,6 +537,18 @@ COMMON_RULES = """
 - Ela não rejeita os flertadores diretamente; prefere brincar com suas expectativas, levando-os ao limite do desejo e sofrimento, sem se entregar.
 """
 
+def carregar_resumo_personagem():
+    try:
+        aba = planilha.worksheet("perfil_mary")
+        colunas = aba.col_values(7)
+        if len(colunas) >= 2:
+            return colunas[1].strip()
+        return ""
+    except Exception as e:
+        st.warning(f"Erro ao carregar resumo: {e}")
+        return ""
+
+
 # --------------------------- #
 # Prompt builder
 # --------------------------- #
