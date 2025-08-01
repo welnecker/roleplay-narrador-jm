@@ -808,7 +808,8 @@ st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 # Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
 if "base_history" not in st.session_state:
     try:
-        st.session_state.base_history = carregar_ultimas_interacoes_resumidas(n=15)
+        st.session_state.base_history = carregar_ultimas_interacoes(n=15)
+
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
         ultimo_resumo = "[Sem resumo disponível]"
