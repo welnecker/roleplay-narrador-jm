@@ -544,17 +544,17 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # --------------------------- #
-    # ESTADO AFETIVO
-    # --------------------------- #
+    # 1. Resumo do perfil
+    resumo = carregar_resumo_personagem()
+    bloco_resumo = f"### 📌 RESUMO DA PERSONAGEM\n{resumo}" if resumo else ""
+
+    # 2. Estado afetivo
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # --------------------------- #
-    # DETECÇÃO DE CONTINUIDADE
-    # --------------------------- #
+    # 3. Detecção de continuidade
     continuar_cena = False
     ultima_msg = ""
     if st.session_state.get("session_msgs"):
@@ -562,66 +562,53 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # --------------------------- #
-    # INSTRUÇÃO BASE
-    # --------------------------- #
+    # 4. Bloco principal do prompt
     if continuar_cena:
-        instrucao = f"""
-💘 **Estado afetivo atual**: {estado_amor}
-
+        bloco_instrucao = f"""
 ⚠️ **INSTRUÇÃO:**  
-Continue exatamente de onde a cena parou.  
-Não reinicie contexto ou descrição inicial.  
-Mantenha o clima atual e o modo **{modo}**.  
-- Não invente falas, ações ou pensamentos de Jânio.  
-- Mary narra em 3ª pessoa e fala/pensa em 1ª.  
+Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
+- Nunca invente falas ou ações de Jânio.  
+- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
 """
     else:
-        instrucao = f"""
-💘 **Estado afetivo atual**: {estado_amor}
-
-⚠️ **REGRAS FIXAS:**  
-- Jânio é o nome real do usuário.  
-- Nunca invente falas ou ações de Jânio.  
-- Responda **apenas como Mary**.  
-- Evite usar "usuário". Chame-o de Jânio.  
+        bloco_instrucao = f"""
+⚠️ **RELEMBRANDO:**  
+- Jânio é o nome do usuário real que interage com você diretamente.  
+- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
+- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  
+- Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # --------------------------- #
-    # INÍCIO DO PROMPT
-    # --------------------------- #
+    # 5. Fragmentos
+    fragmentos = carregar_fragmentos()
+    fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
+    bloco_fragmentos = ""
+    if fragmentos_ativos:
+        lista = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
+        bloco_fragmentos = f"\n\n### 🎭 Fragmentos relevantes\n{lista}"
+
+    # 6. Memórias (modo e [all])
+    bloco_memorias = ""
+    try:
+        memorias_atuais = carregar_memorias()  # Essa função já filtra por modo e inclui [all]
+        if memorias_atuais:
+            bloco_memorias = f"\n\n{memorias_atuais['content']}"
+    except Exception as e:
+        st.warning(f"Erro ao carregar memórias: {e}")
+
+    # 7. Finalização do prompt
     prompt = f"""{prompt_base}
 
 {COMMON_RULES.strip()}
-{instrucao.strip()}"""
 
-    # --------------------------- #
-    # MEMÓRIAS
-    # --------------------------- #
-    mem = carregar_memorias()
-    if mem:
-        prompt += f"\n\n{mem['content']}"
+💘 **Estado afetivo atual**: {estado_amor}
+{bloco_instrucao}
+{bloco_resumo}
+{bloco_fragmentos}
+{bloco_memorias}
+""".strip()
 
-    # --------------------------- #
-    # RESUMO DO PERFIL
-    # --------------------------- #
-    try:
-        resumo = carregar_resumo_personagem()  # deve retornar str do campo "resumo"
-        if resumo:
-            prompt += f"\n\n📌 **Resumo anterior:**\n{resumo.strip()}"
-    except Exception as e:
-        st.warning(f"Erro ao carregar resumo: {e}")
-
-    # --------------------------- #
-    # FRAGMENTOS CONTEXTUAIS
-    # --------------------------- #
-    fragmentos = carregar_fragmentos()
-    fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
-    if fragmentos_ativos:
-        lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
-        prompt += f"\n\n📚 **Fragmentos relevantes:**\n{lista_fragmentos}"
-
-    return prompt.strip()
+    return prompt
 
 
 
