@@ -125,127 +125,77 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 
-def carregar_ultimas_interacoes(n=15):
+def carregar_ultimas_interacoes(n=5):
+    if not planilha:
+        return []
     try:
         aba = planilha.worksheet("interacoes_mary")
-        dados = aba.get_all_values()
-        headers = dados[0]
-        linhas = dados[1:]
-
-        historico = []
-        for linha in linhas[-n:]:  # Últimas n interações
-            registro = dict(zip(headers, linha))
-            role = registro.get("role", "").strip().lower()
-            content = registro.get("content", "").strip()
-
-            if role in ["user", "assistant"] and content:
-                historico.append({"role": role, "content": content})
-
-        return historico
-
+        dados = aba.get_all_records()
+        return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
     except Exception as e:
-        st.warning(f"⚠️ Erro ao carregar histórico: {e}")
+        st.error(f"Erro ao carregar histórico: {e}")
         return []
-
-
-        # Resumo das últimas N interações
-        interacoes_para_resumo = dados[-n_resumo:] if len(dados) >= n_resumo else dados
-        texto_resumo = "\n".join(f"{linha['role']}: {linha['content']}" for linha in interacoes_para_resumo)
-
-        prompt_resumo = (
-            "Resuma as seguintes interações como um capítulo de novela, com foco em Mary. "
-            "Descreva sentimentos, ações, tensão e evolução emocional, sem repetir diálogos nem incluir o nome 'usuário'.\n\n"
-            f"{texto_resumo}\n\nResumo:"
-        )
-
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "deepseek/deepseek-chat-v3-0324",  # ou outro modelo resumidor
-                "messages": [{"role": "user", "content": prompt_resumo}],
-                "max_tokens": 800,
-                "temperature": 0.7
-            }
-        )
-
-        # Se o resumo for bem-sucedido
-        if response.status_code == 200:
-            resumo = response.json()["choices"][0]["message"]["content"]
-            resumo_formatado = {
-                "role": "system",
-                "content": f"📖 **Resumo das últimas interações:**\n{resumo}"
-            }
-        else:
-            resumo_formatado = {
-                "role": "system",
-                "content": "📖 Resumo não pôde ser gerado automaticamente."
-            }
-
-        # Interações reais mais recentes (para precisão sensorial)
-        interacoes_recentes = [
-            {"role": row["role"], "content": row["content"]}
-            for row in dados[-n_recentes:]
-        ] if len(dados) >= n_recentes else [
-            {"role": row["role"], "content": row["content"]}
-            for row in dados
-        ]
-
-        return [resumo_formatado] + interacoes_recentes
-
-    except Exception as e:
-        st.error(f"Erro ao carregar interações com resumo: {e}")
-        return []
-
-
 
 
 def carregar_memorias():
+    if not planilha:
+        return None
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_values()
-        header = dados[0]
-        linhas = dados[1:]
+        modo = st.session_state.get("modo_mary", "Racional").lower()
+        mem_relevantes = []
+        mem_lembrancas = []
 
-        # Índices das colunas
-        idx_tipo = header.index("tipo")
-        idx_texto = header.index("texto")
+        for linha in dados:
+            if not linha or not linha[0].strip():
+                continue
 
-        modo = st.session_state.get("modo_mary", "racional").lower()
-        mem_usadas = set()
+            conteudo = linha[0].strip()
+
+            # Substitui "?" pelo nome do grande amor (se houver)
+            if "o grande amor de mary é ?" in conteudo.lower():
+                amor = st.session_state.get("grande_amor")
+                conteudo = conteudo.replace("?", amor if amor else "ninguém")
+
+            # Lê tags
+            if conteudo.startswith("[") and "]" in conteudo:
+                raw_tags = conteudo.split("]")[0].replace("[", "")
+                tags = [t.strip().lower() for t in raw_tags.split(",")]
+                texto_memoria = conteudo.split("]")[-1].strip()
+            else:
+                tags = ["all"]
+                texto_memoria = conteudo
+
+            # Se for lembrança
+            if "lembrança" in tags and texto_memoria not in st.session_state.memorias_usadas:
+                mem_lembrancas.append(texto_memoria)
+                st.session_state.memorias_usadas.add(texto_memoria)
+
+            # Se for memória relevante do modo
+            elif (modo in tags or "all" in tags) and texto_memoria not in st.session_state.memorias_usadas:
+                mem_relevantes.append(texto_memoria)
+                st.session_state.memorias_usadas.add(texto_memoria)
+
+        # Monta o retorno com seções separadas
         blocos = []
-
-        for linha in linhas:
-            if len(linha) <= max(idx_tipo, idx_texto):
-                continue
-
-            tipo_raw = linha[idx_tipo].strip().lower()
-            texto = linha[idx_texto].strip()
-
-            if not texto or texto in mem_usadas:
-                continue
-
-            # Se for memória [all] ou do modo atual
-            if f"[{modo}]" in tipo_raw or "[all]" in tipo_raw:
-                mem_usadas.add(texto)
-                blocos.append(f"- {texto}")
+        if mem_relevantes:
+            blocos.append("💾 Memórias relevantes:\n" + "\n".join(f"- {m}" for m in mem_relevantes))
+        if mem_lembrancas:
+            blocos.append("🧠 Lembranças importantes:\n" + "\n".join(f"- {m}" for m in mem_lembrancas))
 
         if blocos:
             return {
-                "content": f"🧠 **Memórias relevantes**:\n" + "\n".join(blocos)
+                "role": "user",
+                "content": "\n\n".join(blocos)
             }
-        return None
 
     except Exception as e:
-        st.warning(f"Erro ao carregar memórias: {e}")
-        return None
+        st.error(f"Erro ao carregar memórias: {e}")
+
+    return None
 
 
-
-          
 # --------------------------- #
 # Fragmentos (Lorebook)
 # --------------------------- #
@@ -521,7 +471,7 @@ Ela **reconhece erros**, sente falta de pessoas e versões de si que deixou para
 4. **Mary pode tentar se recompor, mas não precisa esconder o que sente.**
 """
 
-    
+
 }
 
 # --------------------------- #
@@ -548,32 +498,6 @@ COMMON_RULES = """
 - Ela não rejeita os flertadores diretamente; prefere brincar com suas expectativas, levando-os ao limite do desejo e sofrimento, sem se entregar.
 """
 
-def carregar_resumo_personagem():
-    try:
-        aba = planilha.worksheet("perfil_mary")
-        colunas = aba.col_values(7)
-        if len(colunas) >= 2:
-            return colunas[1].strip()
-        return ""
-    except Exception as e:
-        st.warning(f"Erro ao carregar resumo: {e}")
-        return ""
-
-
-# =============================== #
-# Script Corrigido e Funcional
-# Baseado no seu arquivo original: MARY_TOTALMENTE_FUNCIONAL1.txt
-# Corrige erro: 'str' object has no attribute 'get'
-# Inclui: OpenRouter + Together, fragmentos + memórias por modo
-# =============================== #
-
-import streamlit as st
-import requests
-import json
-import re
-from utils import carregar_fragmentos, buscar_fragmentos_relevantes, carregar_memorias
-from prompt_bases import modos, COMMON_RULES
-
 # --------------------------- #
 # Prompt builder
 # --------------------------- #
@@ -581,20 +505,21 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Estado emocional
+    # Estado afetivo
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # Verifica se é continuação de cena
+    # Detecta se há comando de continuidade
     continuar_cena = False
     ultima_msg = ""
     if st.session_state.get("session_msgs"):
         ultima_msg = st.session_state.session_msgs[-1].get("content", "")
-        if isinstance(ultima_msg, str) and ultima_msg.startswith("[CONTINUAR_CENA]"):
+        if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
+    # Bloco base do prompt
     if continuar_cena:
         prompt = f"""{prompt_base}
 
@@ -603,11 +528,10 @@ def construir_prompt_mary():
 💘 **Estado afetivo atual**: {estado_amor}
 
 ⚠️ **INSTRUÇÃO:**  
-Continue exatamente de onde a cena parou.  
-Não reinicie contexto, não mude o local, não narre novo início.  
-Siga a linha narrativa, mantendo o modo ativo \"{modo}\" e o clima anterior.  
-Nunca invente ações, falas ou emoções de Jânio.  
-Mary narra suas ações na 3ª pessoa, e fala/pensa na 1ª pessoa."""
+Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
+- Nunca invente falas ou ações de Jânio.  
+- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
+"""
     else:
         prompt = f"""{prompt_base}
 
@@ -615,66 +539,59 @@ Mary narra suas ações na 3ª pessoa, e fala/pensa na 1ª pessoa."""
 
 💘 **Estado afetivo atual**: {estado_amor}
 
-⚠️ **REGRAS DE INTERAÇÃO:**  
-- Jânio é o nome real do usuário.  
-- Nunca invente falas ou pensamentos de Jânio.  
-- Fale como Mary. Use 1ª pessoa em pensamentos e falas.  
-- Evite repetir informações já mencionadas na interação."""
+⚠️ **RELEMBRANDO:**  
+- Jânio é o nome do usuário real que interage com você diretamente.  
+- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
+- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  
+- Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
+"""
 
-    # Fragmentos
+    # --------------------------- #
+    # Fragmentos relevantes
+    # --------------------------- #
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
         prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
-    # Memórias
-    memorias = carregar_memorias()
-    mem_filtradas = []
-    for mem in memorias:
-        texto = mem.get("texto", "")
-        if "[all]" in texto or f"[{modo.lower()}]" in texto.lower():
-            mem_filtradas.append(texto)
-
-    if mem_filtradas:
-        lista_memorias = "\n".join([
-            f"- {m.replace(f'[{modo.lower()}]', '').replace('[all]', '').strip()}" for m in mem_filtradas
-        ])
-        prompt += f"\n\n### 🧠 Memórias importantes\n{lista_memorias}"
+    # --------------------------- #
+    # Memórias relevantes
+    # --------------------------- #
+    mem = carregar_memorias()
+    if mem:
+        prompt += f"\n\n{mem['content']}"
 
     return prompt.strip()
 
 
 # --------------------------- #
-# Gerar resposta OpenRouter
+# --------------------------- ##
+# OpenRouter - Streaming
 # --------------------------- #
-def gerar_resposta_openrouter_stream(modelo_id):
-    return gerar_resposta_stream("openrouter", modelo_id, "https://openrouter.ai/api/v1/chat/completions")
-
-# --------------------------- #
-# Gerar resposta Together
-# --------------------------- #
-def gerar_resposta_together_stream(modelo_id):
-    return gerar_resposta_stream("together", modelo_id, "https://api.together.xyz/v1/chat/completions")
-
-# --------------------------- #
-# Função base de resposta streaming
-# --------------------------- #
-def gerar_resposta_stream(provedor, modelo_id, endpoint):
+def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
 
-    historico = [m for m in (st.session_state.get("base_history", []) + st.session_state.get("session_msgs", []))
-                 if isinstance(m, dict) and "content" in m and "role" in m]
+    historico_base = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("base_history", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico_sessao = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("session_msgs", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico = historico_base + historico_sessao
 
     mensagens = [{"role": "system", "content": prompt}] + historico
-
     temperatura = {
         "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
         "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
     }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
-        "model": modelo_id,
+        "model": modelo_escolhido_id,
         "messages": mensagens,
         "max_tokens": 700,
         "temperature": temperatura,
@@ -682,20 +599,88 @@ def gerar_resposta_stream(provedor, modelo_id, endpoint):
     }
 
     headers = {
-        "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY'] if provedor=='openrouter' else st.secrets['TOGETHER_API_KEY']}",
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
     }
 
-    box = st.chat_message("assistant")
-    placeholder = box.empty()
+    assistant_box = st.chat_message("assistant")
+    placeholder = assistant_box.empty()
     full_text = ""
 
     try:
-        with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
+        with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload, stream=True, timeout=300) as r:
+            r.raise_for_status()
+            for raw_line in r.iter_lines(decode_unicode=False):
+                if not raw_line:
+                    continue
+                line = raw_line.decode("utf-8", errors="ignore")
+                if not line.startswith("data:"):
+                    continue
+                data = line[len("data:"):].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    j = json.loads(data)
+                    delta = j["choices"][0]["delta"].get("content", "")
+                    if delta:
+                        full_text += delta
+                        placeholder.markdown(full_text)
+                except Exception:
+                    continue
+    except Exception as e:
+        st.error(f"Erro no streaming com OpenRouter: {e}")
+        return "[ERRO STREAM]"
+
+    return full_text.strip()
+
+
+# --------------------------- #
+# Together - Streaming
+# --------------------------- #
+def gerar_resposta_together_stream(modelo_escolhido_id):
+    prompt = construir_prompt_mary()
+
+    historico_base = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("base_history", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico_sessao = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("session_msgs", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico = historico_base + historico_sessao
+
+    mensagens = [{"role": "system", "content": prompt}] + historico
+    temperatura = {
+        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+        "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
+    }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+
+    payload = {
+        "model": modelo_escolhido_id,
+        "messages": mensagens,
+        "max_tokens": 700,
+        "temperature": temperatura,
+        "stream": True,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {TOGETHER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    assistant_box = st.chat_message("assistant")
+    placeholder = assistant_box.empty()
+    full_text = ""
+
+    try:
+        with requests.post("https://api.together.xyz/v1/chat/completions", headers=headers, json=payload, stream=True, timeout=300) as r:
             r.raise_for_status()
             for line in r.iter_lines():
                 if line:
-                    line = line.decode("utf-8", errors="ignore").strip()
+                    line = line.decode("utf-8").strip()
                     if line.startswith("data:"):
                         data = line[len("data:"):].strip()
                         if data == "[DONE]":
@@ -705,10 +690,10 @@ def gerar_resposta_stream(provedor, modelo_id, endpoint):
                             if content:
                                 full_text += content
                                 placeholder.markdown(full_text)
-                        except:
+                        except Exception:
                             continue
     except Exception as e:
-        st.error(f"Erro no streaming com {provedor}: {e}")
+        st.error(f"Erro no streaming com Together: {e}")
         return "[ERRO STREAM]"
 
     return full_text.strip()
@@ -790,12 +775,10 @@ if st.session_state.get("mostrar_imagem") or st.session_state.get("mostrar_video
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
-# Inicialização do histórico e do último resumo
+# Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
 if "base_history" not in st.session_state:
     try:
-        st.session_state.base_history = carregar_ultimas_interacoes(n=15)
-
-        # Tenta carregar o último resumo da aba "perfil_mary"
+        st.session_state.base_history = carregar_ultimas_interacoes(n=10)
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
         ultimo_resumo = "[Sem resumo disponível]"
@@ -804,15 +787,12 @@ if "base_history" not in st.session_state:
                 ultimo_resumo = linha[6].strip()
                 break
         st.session_state.ultimo_resumo = ultimo_resumo
-
     except Exception as e:
         st.session_state.base_history = []
         st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
         st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
-
 if "session_msgs" not in st.session_state:
     st.session_state.session_msgs = []
-
 if "grande_amor" not in st.session_state:
     st.session_state.grande_amor = None
 
@@ -1003,7 +983,7 @@ with st.sidebar:
         excluir_ultimas_interacoes("interacoes_mary")
 
 
-            
+
     # --------------------------- #
     # Memórias com filtro de busca
     # --------------------------- #
