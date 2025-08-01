@@ -838,7 +838,7 @@ if st.session_state.get("mostrar_imagem") or st.session_state.get("mostrar_video
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
-# Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
+# Inicialização do histórico e do último resumo
 if "base_history" not in st.session_state:
     try:
         st.session_state.base_history = carregar_ultimas_interacoes(n=15)
