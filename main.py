@@ -526,45 +526,44 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Carrega memórias relevantes (prioridade)
+    # Carrega memórias relevantes (prioridade máxima, nunca ignora)
     mem = carregar_memorias()
-    memorias_texto = ""
-    if mem:
-        memorias_texto = mem['content']
-    else:
-        memorias_texto = "*[Nenhuma memória registrada]*"
+    memorias_texto = mem['content'] if mem and mem.get('content') else "*[Nenhuma memória registrada]*"
 
-    # Estado afetivo
+    # Estado afetivo (mantido, mas nunca sobrepõe memórias)
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # Última mensagem da sessão
-    mensagens_sessao = st.session_state.get("mensagens", [])
-    ultima_msg = mensagens_sessao[-1]["content"] if mensagens_sessao else ""
+    # Última mensagem enviada (correto: busca em session_msgs)
+    session_msgs = st.session_state.get("session_msgs", [])
+    ultima_msg = session_msgs[-1]["content"] if session_msgs else ""
 
     continuar_cena = ultima_msg.startswith("[CONTINUAR_CENA]")
 
-    # Montagem do prompt
-    prompt = f"""{prompt_base}
+    # Monta o prompt com prioridade absoluta das memórias
+    prompt = f"""
+### 💾 MEMÓRIAS FIXAS DE MARY (use SEMPRE, em TODA resposta):
+{memorias_texto}
+
+{prompt_base}
 
 {COMMON_RULES.strip()}
-
-### 💾 MEMÓRIAS FIXAS DE MARY (use sempre que possível):
-{memorias_texto}
 
 📌 **ATENÇÃO PARA A IA**:
 - Responda perguntas sobre a vida pessoal de Mary (onde mora, onde trabalha, família, histórico, experiências, sentimentos etc.) **usando SOMENTE as memórias fixas listadas acima**.
 - Se não existir memória sobre o tema perguntado, **diga que Mary ainda não revelou esse detalhe** ou que prefere não responder.
-- **NUNCA invente informações pessoais, locais, profissões, família ou passados que NÃO estejam nas memórias acima.**
+- **NUNCA invente informações pessoais, locais, profissões, família ou passado que NÃO estejam nas memórias acima.**
 - Nunca narre ações, pensamentos ou falas de Jânio (usuário).
 
 💘 **Estado afetivo atual**: {estado_amor}
-"""
+""".strip()
 
+    # Instrução extra se for continuação de cena
     if continuar_cena:
         prompt += f"""
+
 ⚠️ **INSTRUÇÃO:**  
 Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
 - Nunca invente falas ou ações de Jânio.  
@@ -572,6 +571,7 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 """
     else:
         prompt += f"""
+
 ⚠️ **RELEMBRANDO:**  
 - Jânio é o nome do usuário real que interage com você diretamente.  
 - **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
@@ -579,7 +579,7 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # Fragmentos relevantes
+    # Fragmentos relevantes (após memórias)
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
     if fragmentos_ativos:
@@ -587,6 +587,7 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
         prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
     return prompt.strip()
+
 
 
 
