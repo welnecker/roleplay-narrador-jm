@@ -565,7 +565,7 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
     return prompt.strip()
 
 
-# --------------------------- #
+# --------------------------- ##
 # OpenRouter - Streaming
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
