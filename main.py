@@ -90,35 +90,6 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
-###########################################################
-# --------------------------- #
-# Carregar memórias por modo
-# --------------------------- #
-def carregar_memorias_por_modo(modo_atual):
-    aba_memorias = planilha.worksheet("memorias")
-    dados = aba_memorias.get_all_records()
-
-    mem_relevantes = []
-    for item in dados:
-        tipo = item.get("tipo", "").strip().lower()
-        texto = item.get("texto", "").strip()
-
-        if not tipo or not texto:
-            continue
-
-        # Remove colchetes se houver e compara
-        tipo_base = tipo.replace("[", "").replace("]", "").lower()
-        if tipo_base == "all" or tipo_base == modo_atual.lower():
-            mem_relevantes.append(f"- {texto}")
-
-    if mem_relevantes:
-        return {
-            "content": "### 🧠 Memórias relevantes\n" + "\n".join(mem_relevantes)
-        }
-    else:
-        return None
-
-
 # --------------------------- #
 # Interrompe cenas antes do clímax explícito
 # --------------------------- #
@@ -154,18 +125,16 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 
-def carregar_ultimas_interacoes(n=15):
-    aba = planilha.worksheet("interacoes_mary")
-    todas = aba.get_all_records()
-    ultimas = todas[-n:] if len(todas) >= n else todas
-    mensagens = []
-    for linha in ultimas:
-        role = linha.get("role", "").strip()
-        content = linha.get("content", "").strip()
-        if role and content:
-            mensagens.append({"role": role, "content": content})
-    return mensagens
-
+def carregar_ultimas_interacoes(n=5):
+    if not planilha:
+        return []
+    try:
+        aba = planilha.worksheet("interacoes_mary")
+        dados = aba.get_all_records()
+        return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
+    except Exception as e:
+        st.error(f"Erro ao carregar histórico: {e}")
+        return []
 
 
 def carregar_memorias():
@@ -173,31 +142,42 @@ def carregar_memorias():
         return None
     try:
         aba = planilha.worksheet("memorias")
-        dados = aba.get_all_records()
-        modo = st.session_state.get("modo_mary", "racional").lower()
+        dados = aba.get_all_values()
+        modo = st.session_state.get("modo_mary", "Racional").lower()
         mem_relevantes = []
         mem_lembrancas = []
 
         for linha in dados:
-            tipo = linha.get("tipo", "").strip().lower()
-            texto = linha.get("texto", "").strip()
-
-            if not texto:
+            if not linha or not linha[0].strip():
                 continue
 
-            # Substituição do placeholder do grande amor
-            if "o grande amor de mary é ?" in texto.lower():
+            conteudo = linha[0].strip()
+
+            # Substitui "?" pelo nome do grande amor (se houver)
+            if "o grande amor de mary é ?" in conteudo.lower():
                 amor = st.session_state.get("grande_amor")
-                texto = texto.replace("?", amor if amor else "ninguém")
+                conteudo = conteudo.replace("?", amor if amor else "ninguém")
 
-            # Lembrança pontual
-            if "lembrança" in tipo:
-                mem_lembrancas.append(texto)
+            # Lê tags
+            if conteudo.startswith("[") and "]" in conteudo:
+                raw_tags = conteudo.split("]")[0].replace("[", "")
+                tags = [t.strip().lower() for t in raw_tags.split(",")]
+                texto_memoria = conteudo.split("]")[-1].strip()
+            else:
+                tags = ["all"]
+                texto_memoria = conteudo
 
-            # Modo atual ou memória global [all]
-            elif tipo == modo or tipo == "all":
-                mem_relevantes.append(texto)
+            # Se for lembrança
+            if "lembrança" in tags and texto_memoria not in st.session_state.memorias_usadas:
+                mem_lembrancas.append(texto_memoria)
+                st.session_state.memorias_usadas.add(texto_memoria)
 
+            # Se for memória relevante do modo
+            elif (modo in tags or "all" in tags) and texto_memoria not in st.session_state.memorias_usadas:
+                mem_relevantes.append(texto_memoria)
+                st.session_state.memorias_usadas.add(texto_memoria)
+
+        # Monta o retorno com seções separadas
         blocos = []
         if mem_relevantes:
             blocos.append("💾 Memórias relevantes:\n" + "\n".join(f"- {m}" for m in mem_relevantes))
@@ -522,47 +502,30 @@ COMMON_RULES = """
 # Prompt builder
 # --------------------------- #
 def construir_prompt_mary():
-    # Seleciona o modo narrativo
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Carrega memórias relevantes (prioridade máxima, nunca ignora)
-    mem = carregar_memorias()
-    memorias_texto = mem['content'] if mem and mem.get('content') else "*[Nenhuma memória registrada]*"
-
-    # Estado afetivo (mantido, mas nunca sobrepõe memórias)
+    # Estado afetivo
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # Última mensagem enviada (correto: busca em session_msgs)
-    session_msgs = st.session_state.get("session_msgs", [])
-    ultima_msg = session_msgs[-1]["content"] if session_msgs else ""
+    # Detecta se há comando de continuidade
+    continuar_cena = False
+    ultima_msg = ""
+    if st.session_state.get("session_msgs"):
+        ultima_msg = st.session_state.session_msgs[-1].get("content", "")
+        if ultima_msg.startswith("[CONTINUAR_CENA]"):
+            continuar_cena = True
 
-    continuar_cena = ultima_msg.startswith("[CONTINUAR_CENA]")
-
-    # Monta o prompt com prioridade absoluta das memórias
-    prompt = f"""
-### 💾 MEMÓRIAS FIXAS DE MARY (use SEMPRE, em TODA resposta):
-{memorias_texto}
-
-{prompt_base}
+    # Bloco base do prompt
+    if continuar_cena:
+        prompt = f"""{prompt_base}
 
 {COMMON_RULES.strip()}
 
-📌 **ATENÇÃO PARA A IA**:
-- Responda perguntas sobre a vida pessoal de Mary (onde mora, onde trabalha, família, histórico, experiências, sentimentos etc.) **usando SOMENTE as memórias fixas listadas acima**.
-- Se não existir memória sobre o tema perguntado, **diga que Mary ainda não revelou esse detalhe** ou que prefere não responder.
-- **NUNCA invente informações pessoais, locais, profissões, família ou passado que NÃO estejam nas memórias acima.**
-- Nunca narre ações, pensamentos ou falas de Jânio (usuário).
-
 💘 **Estado afetivo atual**: {estado_amor}
-""".strip()
-
-    # Instrução extra se for continuação de cena
-    if continuar_cena:
-        prompt += f"""
 
 ⚠️ **INSTRUÇÃO:**  
 Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
@@ -570,7 +533,11 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
 """
     else:
-        prompt += f"""
+        prompt = f"""{prompt_base}
+
+{COMMON_RULES.strip()}
+
+💘 **Estado afetivo atual**: {estado_amor}
 
 ⚠️ **RELEMBRANDO:**  
 - Jânio é o nome do usuário real que interage com você diretamente.  
@@ -579,16 +546,23 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # Fragmentos relevantes (após memórias)
+    # --------------------------- #
+    # Fragmentos relevantes
+    # --------------------------- #
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
         prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
+    # --------------------------- #
+    # Memórias relevantes
+    # --------------------------- #
+    mem = carregar_memorias()
+    if mem:
+        prompt += f"\n\n{mem['content']}"
+
     return prompt.strip()
-
-
 
 
 # --------------------------- #
