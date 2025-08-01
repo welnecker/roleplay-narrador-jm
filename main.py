@@ -648,10 +648,12 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     historico_sessao = st.session_state.get("session_msgs", [])
     historico_completo = historico_base + historico_sessao
 
-    mensagens = [{"role": "system", "content": prompt}] + [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in historico_completo if isinstance(m, dict) and "content" in m
-    ]
+    mensagens = [{"role": "system", "content": prompt}]
+    for m in historico_completo:
+        if isinstance(m, dict) and "content" in m:
+            role = m["role"] if isinstance(m.get("role"), str) else "user"
+            content = m["content"]
+            mensagens.append({"role": role, "content": content})
 
     temperatura = {
         "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
@@ -701,6 +703,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     return full_text.strip()
 
 
+
 # --------------------------- #
 # Together - Streaming
 # --------------------------- #
@@ -711,10 +714,12 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
     historico_sessao = st.session_state.get("session_msgs", [])
     historico_completo = historico_base + historico_sessao
 
-    mensagens = [{"role": "system", "content": prompt}] + [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in historico_completo if isinstance(m, dict) and "content" in m
-    ]
+    mensagens = [{"role": "system", "content": prompt}]
+    for m in historico_completo:
+        if isinstance(m, dict) and "content" in m:
+            role = m["role"] if isinstance(m.get("role"), str) else "user"
+            content = m["content"]
+            mensagens.append({"role": role, "content": content})
 
     temperatura = {
         "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
