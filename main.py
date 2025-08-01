@@ -125,19 +125,25 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 
-def carregar_ultimas_interacoes(n=15):
+def carregar_ultimas_interacoes(n_resumo=15, n_recentes=5):
     if not planilha:
         return []
+
     try:
         aba = planilha.worksheet("interacoes_mary")
         dados = aba.get_all_records()
-        ultimas = dados[-n:] if len(dados) >= n else dados
 
-        texto_resumo = "\n".join(f"{linha['role']}: {linha['content']}" for linha in ultimas)
+        # Prevenção de erro se não houver dados suficientes
+        if not dados:
+            return []
+
+        # Resumo das últimas N interações
+        interacoes_para_resumo = dados[-n_resumo:] if len(dados) >= n_resumo else dados
+        texto_resumo = "\n".join(f"{linha['role']}: {linha['content']}" for linha in interacoes_para_resumo)
 
         prompt_resumo = (
-            "Resuma as seguintes interações como um capítulo de novela curto, sensível e envolvente. "
-            "Mantenha a ordem dos acontecimentos, descreva os sentimentos de Mary, sua evolução e como a relação avançou:\n\n"
+            "Resuma as seguintes interações como um capítulo de novela, com foco em Mary. "
+            "Descreva sentimentos, ações, tensão e evolução emocional, sem repetir diálogos nem incluir o nome 'usuário'.\n\n"
             f"{texto_resumo}\n\nResumo:"
         )
 
@@ -148,23 +154,41 @@ def carregar_ultimas_interacoes(n=15):
                 "Content-Type": "application/json"
             },
             json={
-                "model": "deepseek/deepseek-chat-v3-0324",  # Você pode trocar aqui por outro modelo
+                "model": "deepseek/deepseek-chat-v3-0324",  # ou outro modelo resumidor
                 "messages": [{"role": "user", "content": prompt_resumo}],
                 "max_tokens": 800,
                 "temperature": 0.7
             }
         )
 
+        # Se o resumo for bem-sucedido
         if response.status_code == 200:
             resumo = response.json()["choices"][0]["message"]["content"]
-            return [{"role": "system", "content": f"📖 **Resumo das últimas interações:**\n{resumo}"}]
+            resumo_formatado = {
+                "role": "system",
+                "content": f"📖 **Resumo das últimas interações:**\n{resumo}"
+            }
         else:
-            st.warning("⚠️ Erro ao gerar resumo das interações.")
-            return []
+            resumo_formatado = {
+                "role": "system",
+                "content": "📖 Resumo não pôde ser gerado automaticamente."
+            }
+
+        # Interações reais mais recentes (para precisão sensorial)
+        interacoes_recentes = [
+            {"role": row["role"], "content": row["content"]}
+            for row in dados[-n_recentes:]
+        ] if len(dados) >= n_recentes else [
+            {"role": row["role"], "content": row["content"]}
+            for row in dados
+        ]
+
+        return [resumo_formatado] + interacoes_recentes
 
     except Exception as e:
-        st.error(f"Erro ao carregar histórico resumido: {e}")
+        st.error(f"Erro ao carregar interações com resumo: {e}")
         return []
+
 
 
 
@@ -808,7 +832,7 @@ st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 # Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
 if "base_history" not in st.session_state:
     try:
-        st.session_state.base_history = carregar_ultimas_interacoes(n=15)
+        st.session_state.base_history = carregar_ultimas_interacoes()
 
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
