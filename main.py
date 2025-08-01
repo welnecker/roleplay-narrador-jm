@@ -522,8 +522,17 @@ COMMON_RULES = """
 # Prompt builder
 # --------------------------- #
 def construir_prompt_mary():
+    # Seleciona o modo narrativo
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
+
+    # Carrega memórias relevantes (prioridade)
+    mem = carregar_memorias()
+    memorias_texto = ""
+    if mem:
+        memorias_texto = mem['content']
+    else:
+        memorias_texto = "*[Nenhuma memória registrada]*"
 
     # Estado afetivo
     if st.session_state.get("grande_amor"):
@@ -531,34 +540,38 @@ def construir_prompt_mary():
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # Detecta se há comando de continuidade
-    continuar_cena = False
-    ultima_msg = ""
-    if st.session_state.get("session_msgs"):
-        ultima_msg = st.session_state.session_msgs[-1].get("content", "")
-        if ultima_msg.startswith("[CONTINUAR_CENA]"):
-            continuar_cena = True
+    # Última mensagem da sessão
+    mensagens_sessao = st.session_state.get("mensagens", [])
+    ultima_msg = mensagens_sessao[-1]["content"] if mensagens_sessao else ""
 
-    # Prompt base com instruções
-    if continuar_cena:
-        prompt = f"""{prompt_base}
+    continuar_cena = ultima_msg.startswith("[CONTINUAR_CENA]")
+
+    # Montagem do prompt
+    prompt = f"""{prompt_base}
 
 {COMMON_RULES.strip()}
 
-💘 **Estado afetivo atual**: {estado_amor}
+### 💾 MEMÓRIAS FIXAS DE MARY (use sempre que possível):
+{memorias_texto}
 
+📌 **ATENÇÃO PARA A IA**:
+- Responda perguntas sobre a vida pessoal de Mary (onde mora, onde trabalha, família, histórico, experiências, sentimentos etc.) **usando SOMENTE as memórias fixas listadas acima**.
+- Se não existir memória sobre o tema perguntado, **diga que Mary ainda não revelou esse detalhe** ou que prefere não responder.
+- **NUNCA invente informações pessoais, locais, profissões, família ou passados que NÃO estejam nas memórias acima.**
+- Nunca narre ações, pensamentos ou falas de Jânio (usuário).
+
+💘 **Estado afetivo atual**: {estado_amor}
+"""
+
+    if continuar_cena:
+        prompt += f"""
 ⚠️ **INSTRUÇÃO:**  
 Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
 - Nunca invente falas ou ações de Jânio.  
 - Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
 """
     else:
-        prompt = f"""{prompt_base}
-
-{COMMON_RULES.strip()}
-
-💘 **Estado afetivo atual**: {estado_amor}
-
+        prompt += f"""
 ⚠️ **RELEMBRANDO:**  
 - Jânio é o nome do usuário real que interage com você diretamente.  
 - **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
@@ -566,17 +579,12 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # Fragmentos relevantes (lorebook)
+    # Fragmentos relevantes
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
-        prompt += f"\n\n📚 **Fragmentos ativados pelo contexto:**\n{lista_fragmentos}"
-
-    # Memórias filtradas por modo
-    mem = carregar_memorias()
-    if mem:
-        prompt += f"\n\n{mem['content']}"
+        prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
     return prompt.strip()
 
