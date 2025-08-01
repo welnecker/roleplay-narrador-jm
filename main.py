@@ -125,17 +125,28 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 
-def carregar_ultimas_interacoes(n_resumo=15, n_recentes=5):
-    if not planilha:
-        return []
-
+def carregar_ultimas_interacoes(n=15):
     try:
         aba = planilha.worksheet("interacoes_mary")
-        dados = aba.get_all_records()
+        dados = aba.get_all_values()
+        headers = dados[0]
+        linhas = dados[1:]
 
-        # Prevenção de erro se não houver dados suficientes
-        if not dados:
-            return []
+        historico = []
+        for linha in linhas[-n:]:  # Últimas n interações
+            registro = dict(zip(headers, linha))
+            role = registro.get("role", "").strip().lower()
+            content = registro.get("content", "").strip()
+
+            if role in ["user", "assistant"] and content:
+                historico.append({"role": role, "content": content})
+
+        return historico
+
+    except Exception as e:
+        st.warning(f"⚠️ Erro ao carregar histórico: {e}")
+        return []
+
 
         # Resumo das últimas N interações
         interacoes_para_resumo = dados[-n_resumo:] if len(dados) >= n_resumo else dados
@@ -556,17 +567,13 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # 1. Resumo do perfil
-    resumo = carregar_resumo_personagem()
-    bloco_resumo = f"### 📌 RESUMO DA PERSONAGEM\n{resumo}" if resumo else ""
-
-    # 2. Estado afetivo
+    # Estado emocional
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # 3. Detecção de continuidade
+    # Verifica se é continuação de cena
     continuar_cena = False
     ultima_msg = ""
     if st.session_state.get("session_msgs"):
@@ -574,75 +581,78 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # 4. Bloco principal do prompt
+    # Prompt inicial (instruções diferentes se for continuação)
     if continuar_cena:
-        bloco_instrucao = f"""
-⚠️ **INSTRUÇÃO:**  
-Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
-- Nunca invente falas ou ações de Jânio.  
-- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
-"""
-    else:
-        bloco_instrucao = f"""
-⚠️ **RELEMBRANDO:**  
-- Jânio é o nome do usuário real que interage com você diretamente.  
-- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
-- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  
-- Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
-"""
-
-    # 5. Fragmentos
-    fragmentos = carregar_fragmentos()
-    fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
-    bloco_fragmentos = ""
-    if fragmentos_ativos:
-        lista = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
-        bloco_fragmentos = f"\n\n### 🎭 Fragmentos relevantes\n{lista}"
-
-    # 6. Memórias (modo e [all])
-    bloco_memorias = ""
-    try:
-        memorias_atuais = carregar_memorias()  # Essa função já filtra por modo e inclui [all]
-        if memorias_atuais:
-            bloco_memorias = f"\n\n{memorias_atuais['content']}"
-    except Exception as e:
-        st.warning(f"Erro ao carregar memórias: {e}")
-
-    # 7. Finalização do prompt
-    prompt = f"""{prompt_base}
+        prompt = f"""{prompt_base}
 
 {COMMON_RULES.strip()}
 
 💘 **Estado afetivo atual**: {estado_amor}
-{bloco_instrucao}
-{bloco_resumo}
-{bloco_fragmentos}
-{bloco_memorias}
-""".strip()
 
-    return prompt
+⚠️ **INSTRUÇÃO:**  
+Continue exatamente de onde a cena parou.  
+Não reinicie contexto, não mude o local, não narre novo início.  
+Siga a linha narrativa, mantendo o modo ativo "{modo}" e o clima anterior.  
+Nunca invente ações, falas ou emoções de Jânio.  
+Mary narra suas ações na 3ª pessoa, e fala/pensa na 1ª pessoa.
+"""
+    else:
+        prompt = f"""{prompt_base}
+
+{COMMON_RULES.strip()}
+
+💘 **Estado afetivo atual**: {estado_amor}
+
+⚠️ **REGRAS DE INTERAÇÃO:**  
+- Jânio é o nome real do usuário.  
+- Nunca invente falas ou pensamentos de Jânio.  
+- Fale como Mary. Use 1ª pessoa em pensamentos e falas.  
+- Evite repetir informações já mencionadas na interação.  
+"""
+
+    # ------------------------- #
+    # 📚 Fragmentos relevantes
+    # ------------------------- #
+    fragmentos = carregar_fragmentos()
+    fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
+    if fragmentos_ativos:
+        lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
+        prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
+
+    # ------------------------- #
+    # 🧠 Memórias relevantes
+    # ------------------------- #
+    memorias = carregar_memorias()
+    mem_filtradas = []
+
+    for mem in memorias:
+        texto = mem.get("texto", "")
+        if "[all]" in texto or f"[{modo.lower()}]" in texto.lower():
+            mem_filtradas.append(texto)
+
+    if mem_filtradas:
+        lista_memorias = "\n".join([f"- {m.replace(f'[{modo.lower()}]', '').replace('[all]', '').strip()}" for m in mem_filtradas])
+        prompt += f"\n\n### 🧠 Memórias importantes\n{lista_memorias}"
+
+    return prompt.strip()
 
 
 
-# --------------------------- ##
+# --------------------------- #
 # OpenRouter - Streaming
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
 
-    historico_base = [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in st.session_state.get("base_history", [])
-        if isinstance(m, dict) and "content" in m
-    ]
-    historico_sessao = [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in st.session_state.get("session_msgs", [])
-        if isinstance(m, dict) and "content" in m
-    ]
-    historico = historico_base + historico_sessao
+    historico_base = st.session_state.get("base_history", [])
+    historico_sessao = st.session_state.get("session_msgs", [])
+    historico_completo = historico_base + historico_sessao
 
-    mensagens = [{"role": "system", "content": prompt}] + historico
+    mensagens = [{"role": "system", "content": prompt}] + [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in historico_completo if isinstance(m, dict) and "content" in m
+    ]
+
     temperatura = {
         "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
         "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
@@ -678,8 +688,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
                 if data == "[DONE]":
                     break
                 try:
-                    j = json.loads(data)
-                    delta = j["choices"][0]["delta"].get("content", "")
+                    delta = json.loads(data)["choices"][0]["delta"].get("content", "")
                     if delta:
                         full_text += delta
                         placeholder.markdown(full_text)
@@ -698,19 +707,15 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
 def gerar_resposta_together_stream(modelo_escolhido_id):
     prompt = construir_prompt_mary()
 
-    historico_base = [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in st.session_state.get("base_history", [])
-        if isinstance(m, dict) and "content" in m
-    ]
-    historico_sessao = [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in st.session_state.get("session_msgs", [])
-        if isinstance(m, dict) and "content" in m
-    ]
-    historico = historico_base + historico_sessao
+    historico_base = st.session_state.get("base_history", [])
+    historico_sessao = st.session_state.get("session_msgs", [])
+    historico_completo = historico_base + historico_sessao
 
-    mensagens = [{"role": "system", "content": prompt}] + historico
+    mensagens = [{"role": "system", "content": prompt}] + [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in historico_completo if isinstance(m, dict) and "content" in m
+    ]
+
     temperatura = {
         "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
         "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
@@ -836,7 +841,10 @@ st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 # Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
 if "base_history" not in st.session_state:
     try:
-        st.session_state.base_history = carregar_ultimas_interacoes()
+        st.session_state.base_history = carregar_ultimas_interacoes(n=15)
+    except:
+        st.session_state.base_history = []
+
 
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
