@@ -90,6 +90,35 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
+###########################################################
+# --------------------------- #
+# Carregar memórias por modo
+# --------------------------- #
+def carregar_memorias_por_modo(modo_atual):
+    aba_memorias = planilha.worksheet("memorias")
+    dados = aba_memorias.get_all_records()
+
+    mem_relevantes = []
+    for item in dados:
+        tipo = item.get("tipo", "").strip().lower()
+        texto = item.get("texto", "").strip()
+
+        if not tipo or not texto:
+            continue
+
+        # Remove colchetes se houver e compara
+        tipo_base = tipo.replace("[", "").replace("]", "").lower()
+        if tipo_base == "all" or tipo_base == modo_atual.lower():
+            mem_relevantes.append(f"- {texto}")
+
+    if mem_relevantes:
+        return {
+            "content": "### 🧠 Memórias relevantes\n" + "\n".join(mem_relevantes)
+        }
+    else:
+        return None
+
+
 # --------------------------- #
 # Interrompe cenas antes do clímax explícito
 # --------------------------- #
@@ -125,16 +154,18 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 
-def carregar_ultimas_interacoes(n=5):
-    if not planilha:
-        return []
-    try:
-        aba = planilha.worksheet("interacoes_mary")
-        dados = aba.get_all_records()
-        return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
-    except Exception as e:
-        st.error(f"Erro ao carregar histórico: {e}")
-        return []
+def carregar_ultimas_interacoes(n=15):
+    aba = planilha.worksheet("interacoes_mary")
+    todas = aba.get_all_records()
+    ultimas = todas[-n:] if len(todas) >= n else todas
+    mensagens = []
+    for linha in ultimas:
+        role = linha.get("role", "").strip()
+        content = linha.get("content", "").strip()
+        if role and content:
+            mensagens.append({"role": role, "content": content})
+    return mensagens
+
 
 
 def carregar_memorias():
@@ -506,14 +537,13 @@ def construir_prompt_mary():
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # Detecta se há comando de continuidade
-    continuar_cena = False
-    ultima_msg = ""
+    # Última mensagem do usuário
     mensagens_sessao = st.session_state.get("mensagens", [])
+    ultima_msg = ""
     if mensagens_sessao:
         ultima_msg = mensagens_sessao[-1].get("content", "")
-        if ultima_msg.startswith("[CONTINUAR_CENA]"):
-            continuar_cena = True
+
+    continuar_cena = ultima_msg.startswith("[CONTINUAR_CENA]")
 
     # Bloco base do prompt
     if continuar_cena:
@@ -542,24 +572,22 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # --------------------------- #
-    # Fragmentos relevantes
-    # --------------------------- #
+    # Fragmentos
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
         prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
-    # --------------------------- #
     # Memórias relevantes
-    # --------------------------- #
-    mem_lista = carregar_memorias_por_modo(modo)
-    if mem_lista:
-        bloco_memorias = "\n".join([f"- {m}" for m in mem_lista])
-        prompt += f"\n\n### 🧠 Memórias relevantes\n{bloco_memorias}"
+    mem = carregar_memorias_por_modo(modo)
+    if mem:
+        prompt += f"\n\n{mem['content']}"
 
-    return prompt.strip()
+    # Histórico completo (últimas 15 + sessão atual)
+    historico = carregar_ultimas_interacoes(15) + mensagens_sessao
+
+    return prompt.strip(), historico
 
 
 
