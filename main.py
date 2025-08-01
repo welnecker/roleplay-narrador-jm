@@ -142,11 +142,13 @@ def carregar_memorias():
         aba = planilha.worksheet("memorias")
         registros = aba.get_all_records()
         modo = st.session_state.get("modo_mary", "Racional").lower()
-        textos = []
 
+        textos = []
         for linha in registros:
             tipo = linha["tipo"].strip().lower()
+            tipo = tipo.replace("[", "").replace("]", "")  # remove os colchetes
             texto = linha["texto"].strip()
+
             if tipo == "all" or tipo == modo:
                 textos.append(f"- {texto}")
 
