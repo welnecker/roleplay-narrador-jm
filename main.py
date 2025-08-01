@@ -125,16 +125,47 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 
-def carregar_ultimas_interacoes(n=5):
+def carregar_ultimas_interacoes(n=15):
     if not planilha:
         return []
     try:
         aba = planilha.worksheet("interacoes_mary")
         dados = aba.get_all_records()
-        return [{"role": row["role"], "content": row["content"]} for row in dados[-n:]]
+        ultimas = dados[-n:] if len(dados) >= n else dados
+
+        texto_resumo = "\n".join(f"{linha['role']}: {linha['content']}" for linha in ultimas)
+
+        prompt_resumo = (
+            "Resuma as seguintes interações como um capítulo de novela curto, sensível e envolvente. "
+            "Mantenha a ordem dos acontecimentos, descreva os sentimentos de Mary, sua evolução e como a relação avançou:\n\n"
+            f"{texto_resumo}\n\nResumo:"
+        )
+
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek/deepseek-chat-v3-0324",  # Você pode trocar aqui por outro modelo
+                "messages": [{"role": "user", "content": prompt_resumo}],
+                "max_tokens": 800,
+                "temperature": 0.7
+            }
+        )
+
+        if response.status_code == 200:
+            resumo = response.json()["choices"][0]["message"]["content"]
+            return [{"role": "system", "content": f"📖 **Resumo das últimas interações:**\n{resumo}"}]
+        else:
+            st.warning("⚠️ Erro ao gerar resumo das interações.")
+            return []
+
     except Exception as e:
-        st.error(f"Erro ao carregar histórico: {e}")
+        st.error(f"Erro ao carregar histórico resumido: {e}")
         return []
+
 
 
 def carregar_memorias():
@@ -777,7 +808,7 @@ st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 # Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
 if "base_history" not in st.session_state:
     try:
-        st.session_state.base_history = carregar_ultimas_interacoes(n=10)
+        st.session_state.base_history = carregar_ultimas_interacoes_resumidas(n=15)
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
         ultimo_resumo = "[Sem resumo disponível]"
