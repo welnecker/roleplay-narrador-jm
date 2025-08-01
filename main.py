@@ -174,7 +174,7 @@ def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_records()
-        modo = st.session_state.get("modo_mary", "Racional").lower()
+        modo = st.session_state.get("modo_mary", "racional").lower()
         mem_relevantes = []
         mem_lembrancas = []
 
@@ -185,24 +185,18 @@ def carregar_memorias():
             if not texto:
                 continue
 
-            # Substituição do placeholder de amor
+            # Substituição do placeholder do grande amor
             if "o grande amor de mary é ?" in texto.lower():
                 amor = st.session_state.get("grande_amor")
                 texto = texto.replace("?", amor if amor else "ninguém")
 
-            # Já usada?
-            if texto in st.session_state.memorias_usadas:
-                continue
-
             # Lembrança pontual
             if "lembrança" in tipo:
                 mem_lembrancas.append(texto)
-                st.session_state.memorias_usadas.add(texto)
 
             # Modo atual ou memória global [all]
             elif tipo == modo or tipo == "all":
                 mem_relevantes.append(texto)
-                st.session_state.memorias_usadas.add(texto)
 
         blocos = []
         if mem_relevantes:
