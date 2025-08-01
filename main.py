@@ -576,23 +576,36 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
 - Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # --------------------------- #
     # Fragmentos relevantes
-    # --------------------------- #
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
         prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
-    # --------------------------- #
-    # Memórias relevantes
-    # --------------------------- #
-    mem = carregar_memorias()
-    if mem:
-        prompt += f"\n\n{mem['content']}"
+    # Memórias por modo (com fallback para [all])
+    def carregar_memorias_por_modo(modo_ativo: str):
+        try:
+            aba = planilha.worksheet("fragmentos_mary")
+            dados = aba.get_all_values()[1:]
+            resultado = []
+            for linha in dados:
+                tipo = linha[0].strip().lower()
+                conteudo = linha[1].strip()
+                if tipo == "[all]" or tipo == f"[{modo_ativo.lower()}]":
+                    resultado.append(conteudo)
+            return resultado
+        except Exception as e:
+            print(f"Erro ao carregar memórias: {e}")
+            return []
+
+    memorias = carregar_memorias_por_modo(modo)
+    if memorias:
+        prompt += "\n\n### 💾 Memórias ativas:\n"
+        prompt += "\n".join(f"- {m}" for m in memorias)
 
     return prompt.strip()
+
 
 
 # --------------------------- ##
