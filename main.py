@@ -509,8 +509,9 @@ def construir_prompt_mary():
     # Detecta se há comando de continuidade
     continuar_cena = False
     ultima_msg = ""
-    if st.session_state.get("session_msgs"):
-        ultima_msg = st.session_state.session_msgs[-1].get("content", "")
+    mensagens_sessao = st.session_state.get("mensagens", [])
+    if mensagens_sessao:
+        ultima_msg = mensagens_sessao[-1].get("content", "")
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
@@ -553,11 +554,13 @@ Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição 
     # --------------------------- #
     # Memórias relevantes
     # --------------------------- #
-    mem = carregar_memorias()
-    if mem:
-        prompt += f"\n\n{mem['content']}"
+    mem_lista = carregar_memorias_por_modo(modo)
+    if mem_lista:
+        bloco_memorias = "\n".join([f"- {m}" for m in mem_lista])
+        prompt += f"\n\n### 🧠 Memórias relevantes\n{bloco_memorias}"
 
     return prompt.strip()
+
 
 
 # --------------------------- #
