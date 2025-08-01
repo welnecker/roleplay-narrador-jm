@@ -198,9 +198,8 @@ def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias")
         dados = aba.get_all_values()
-        modo = st.session_state.get("modo_mary", "Racional").lower()
-        mem_relevantes = []
-        mem_lembrancas = []
+
+        todas_memorias = []
 
         for linha in dados:
             if not linha or not linha[0].strip():
@@ -208,47 +207,23 @@ def carregar_memorias():
 
             conteudo = linha[0].strip()
 
-            # Substitui "?" pelo nome do grande amor (se houver)
-            if "o grande amor de mary é ?" in conteudo.lower():
-                amor = st.session_state.get("grande_amor")
-                conteudo = conteudo.replace("?", amor if amor else "ninguém")
-
-            # Lê tags
+            # Remove tags como [all], [hot], etc., se existirem
             if conteudo.startswith("[") and "]" in conteudo:
-                raw_tags = conteudo.split("]")[0].replace("[", "")
-                tags = [t.strip().lower() for t in raw_tags.split(",")]
-                texto_memoria = conteudo.split("]")[-1].strip()
-            else:
-                tags = ["all"]
-                texto_memoria = conteudo
+                conteudo = conteudo.split("]")[-1].strip()
 
-            # Se for lembrança
-            if "lembrança" in tags and texto_memoria not in st.session_state.memorias_usadas:
-                mem_lembrancas.append(texto_memoria)
-                st.session_state.memorias_usadas.add(texto_memoria)
+            todas_memorias.append(conteudo)
 
-            # Se for memória relevante do modo
-            elif (modo in tags or "all" in tags) and texto_memoria not in st.session_state.memorias_usadas:
-                mem_relevantes.append(texto_memoria)
-                st.session_state.memorias_usadas.add(texto_memoria)
-
-        # Monta o retorno com seções separadas
-        blocos = []
-        if mem_relevantes:
-            blocos.append("💾 Memórias relevantes:\n" + "\n".join(f"- {m}" for m in mem_relevantes))
-        if mem_lembrancas:
-            blocos.append("🧠 Lembranças importantes:\n" + "\n".join(f"- {m}" for m in mem_lembrancas))
-
-        if blocos:
+        if todas_memorias:
             return {
                 "role": "user",
-                "content": "\n\n".join(blocos)
+                "content": "📌 **Todas as memórias conhecidas da Mary:**\n" + "\n".join(f"- {m}" for m in todas_memorias)
             }
 
     except Exception as e:
-        st.error(f"Erro ao carregar memórias: {e}")
+        st.error(f"Erro ao carregar memórias completas: {e}")
 
     return None
+
 
           
 # --------------------------- #
