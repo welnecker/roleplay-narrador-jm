@@ -567,13 +567,11 @@ def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
 
-    # Estado emocional
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # Verifica se é continuação de cena
     continuar_cena = False
     ultima_msg = ""
     if st.session_state.get("session_msgs"):
@@ -581,7 +579,6 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # Prompt inicial (instruções diferentes se for continuação)
     if continuar_cena:
         prompt = f"""{prompt_base}
 
@@ -592,7 +589,7 @@ def construir_prompt_mary():
 ⚠️ **INSTRUÇÃO:**  
 Continue exatamente de onde a cena parou.  
 Não reinicie contexto, não mude o local, não narre novo início.  
-Siga a linha narrativa, mantendo o modo ativo "{modo}" e o clima anterior.  
+Siga a linha narrativa, mantendo o modo ativo \"{modo}\" e o clima anterior.  
 Nunca invente ações, falas ou emoções de Jânio.  
 Mary narra suas ações na 3ª pessoa, e fala/pensa na 1ª pessoa.
 """
@@ -610,21 +607,14 @@ Mary narra suas ações na 3ª pessoa, e fala/pensa na 1ª pessoa.
 - Evite repetir informações já mencionadas na interação.  
 """
 
-    # ------------------------- #
-    # 📚 Fragmentos relevantes
-    # ------------------------- #
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
         prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
-    # ------------------------- #
-    # 🧠 Memórias relevantes
-    # ------------------------- #
     memorias = carregar_memorias()
     mem_filtradas = []
-
     for mem in memorias:
         texto = mem.get("texto", "")
         if "[all]" in texto or f"[{modo.lower()}]" in texto.lower():
@@ -637,89 +627,42 @@ Mary narra suas ações na 3ª pessoa, e fala/pensa na 1ª pessoa.
     return prompt.strip()
 
 
-
 # --------------------------- #
 # OpenRouter - Streaming
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
-    prompt = construir_prompt_mary()
-
-    historico_base = st.session_state.get("base_history", [])
-    historico_sessao = st.session_state.get("session_msgs", [])
-    historico_completo = historico_base + historico_sessao
-
-    mensagens = [{"role": "system", "content": prompt}]
-    for m in historico_completo:
-        if isinstance(m, dict) and "content" in m:
-            role = m["role"] if isinstance(m.get("role"), str) else "user"
-            content = m["content"]
-            mensagens.append({"role": role, "content": content})
-
-    temperatura = {
-        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
-        "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
-    }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
-
-    payload = {
-        "model": modelo_escolhido_id,
-        "messages": mensagens,
-        "max_tokens": 700,
-        "temperature": temperatura,
-        "stream": True,
-    }
-
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    assistant_box = st.chat_message("assistant")
-    placeholder = assistant_box.empty()
-    full_text = ""
-
-    try:
-        with requests.post(OPENROUTER_ENDPOINT, headers=headers, json=payload, stream=True, timeout=300) as r:
-            r.raise_for_status()
-            for raw_line in r.iter_lines(decode_unicode=False):
-                if not raw_line:
-                    continue
-                line = raw_line.decode("utf-8", errors="ignore")
-                if not line.startswith("data:"):
-                    continue
-                data = line[len("data:"):].strip()
-                if data == "[DONE]":
-                    break
-                try:
-                    delta = json.loads(data)["choices"][0]["delta"].get("content", "")
-                    if delta:
-                        full_text += delta
-                        placeholder.markdown(full_text)
-                except Exception:
-                    continue
-    except Exception as e:
-        st.error(f"Erro no streaming com OpenRouter: {e}")
-        return "[ERRO STREAM]"
-
-    return full_text.strip()
-
+    return gerar_resposta_streaming(
+        modelo_escolhido_id,
+        endpoint=OPENROUTER_ENDPOINT,
+        api_key=OPENROUTER_API_KEY
+    )
 
 
 # --------------------------- #
 # Together - Streaming
 # --------------------------- #
 def gerar_resposta_together_stream(modelo_escolhido_id):
+    return gerar_resposta_streaming(
+        modelo_escolhido_id,
+        endpoint="https://api.together.xyz/v1/chat/completions",
+        api_key=TOGETHER_API_KEY
+    )
+
+
+# --------------------------- #
+# Função genérica de streaming
+# --------------------------- #
+def gerar_resposta_streaming(modelo_id, endpoint, api_key):
     prompt = construir_prompt_mary()
 
     historico_base = st.session_state.get("base_history", [])
     historico_sessao = st.session_state.get("session_msgs", [])
-    historico_completo = historico_base + historico_sessao
+    historico_completo = [
+        m for m in (historico_base + historico_sessao)
+        if isinstance(m, dict) and "content" in m and "role" in m
+    ]
 
-    mensagens = [{"role": "system", "content": prompt}]
-    for m in historico_completo:
-        if isinstance(m, dict) and "content" in m:
-            role = m["role"] if isinstance(m.get("role"), str) else "user"
-            content = m["content"]
-            mensagens.append({"role": role, "content": content})
+    mensagens = [{"role": "system", "content": prompt}] + historico_completo
 
     temperatura = {
         "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
@@ -727,7 +670,7 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
     }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
 
     payload = {
-        "model": modelo_escolhido_id,
+        "model": modelo_id,
         "messages": mensagens,
         "max_tokens": 700,
         "temperature": temperatura,
@@ -735,7 +678,7 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
     }
 
     headers = {
-        "Authorization": f"Bearer {TOGETHER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
@@ -744,24 +687,25 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
     full_text = ""
 
     try:
-        with requests.post("https://api.together.xyz/v1/chat/completions", headers=headers, json=payload, stream=True, timeout=300) as r:
+        with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
             r.raise_for_status()
             for line in r.iter_lines():
-                if line:
-                    line = line.decode("utf-8").strip()
-                    if line.startswith("data:"):
-                        data = line[len("data:"):].strip()
-                        if data == "[DONE]":
-                            break
-                        try:
-                            content = json.loads(data)["choices"][0]["delta"].get("content", "")
-                            if content:
-                                full_text += content
-                                placeholder.markdown(full_text)
-                        except Exception:
-                            continue
+                if not line:
+                    continue
+                line = line.decode("utf-8", errors="ignore").strip()
+                if line.startswith("data:"):
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        delta = json.loads(data)["choices"][0]["delta"].get("content", "")
+                        if delta:
+                            full_text += delta
+                            placeholder.markdown(full_text)
+                    except Exception:
+                        continue
     except Exception as e:
-        st.error(f"Erro no streaming com Together: {e}")
+        st.error(f"Erro no streaming: {e}")
         return "[ERRO STREAM]"
 
     return full_text.strip()
