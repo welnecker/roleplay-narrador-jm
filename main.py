@@ -145,20 +145,12 @@ def carregar_memorias():
         dados = aba.get_all_values()
         modo = st.session_state.get("modo_mary", "Racional").lower()
         mem_relevantes = []
-        mem_lembrancas = []
-
+        # Garante que só inclui memórias relevantes ao modo ou [all]
         for linha in dados:
             if not linha or not linha[0].strip():
                 continue
-
             conteudo = linha[0].strip()
-
-            # Substitui "?" pelo nome do grande amor (se houver)
-            if "o grande amor de mary é ?" in conteudo.lower():
-                amor = st.session_state.get("grande_amor")
-                conteudo = conteudo.replace("?", amor if amor else "ninguém")
-
-            # Lê tags
+            # Extrai tags (ex: [hot, all])
             if conteudo.startswith("[") and "]" in conteudo:
                 raw_tags = conteudo.split("]")[0].replace("[", "")
                 tags = [t.strip().lower() for t in raw_tags.split(",")]
@@ -166,33 +158,17 @@ def carregar_memorias():
             else:
                 tags = ["all"]
                 texto_memoria = conteudo
-
-            # Se for lembrança
-            if "lembrança" in tags and texto_memoria not in st.session_state.memorias_usadas:
-                mem_lembrancas.append(texto_memoria)
-                st.session_state.memorias_usadas.add(texto_memoria)
-
-            # Se for memória relevante do modo
-            elif (modo in tags or "all" in tags) and texto_memoria not in st.session_state.memorias_usadas:
+            # Só inclui se [all] OU se modo está nas tags
+            if "all" in tags or modo in tags:
                 mem_relevantes.append(texto_memoria)
-                st.session_state.memorias_usadas.add(texto_memoria)
-
-        # Monta o retorno com seções separadas
-        blocos = []
         if mem_relevantes:
-            blocos.append("💾 Memórias relevantes:\n" + "\n".join(f"- {m}" for m in mem_relevantes))
-        if mem_lembrancas:
-            blocos.append("🧠 Lembranças importantes:\n" + "\n".join(f"- {m}" for m in mem_lembrancas))
-
-        if blocos:
             return {
                 "role": "user",
-                "content": "\n\n".join(blocos)
+                "content": "💾 MEMÓRIAS RELEVANTES DE MARY (aplique obrigatoriamente):\n" +
+                           "\n".join(f"- {m}" for m in mem_relevantes)
             }
-
     except Exception as e:
         st.error(f"Erro ao carregar memórias: {e}")
-
     return None
 
 
@@ -519,13 +495,15 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # Bloco base do prompt
+        # Injeta memórias sempre ANTES de tudo (como instrução global)
+    mem = carregar_memorias()
+    bloco_memorias = f"\n{mem['content']}\n" if mem else ""
     if continuar_cena:
-        prompt = f"""{prompt_base}
-
+        prompt = f"""{bloco_memorias}{prompt_base}
 {COMMON_RULES.strip()}
-
 💘 **Estado afetivo atual**: {estado_amor}
+...
+
 
 ⚠️ **INSTRUÇÃO:**  
 Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
@@ -1080,6 +1058,9 @@ if entrada_raw:
     entrada_raw = entrada_raw.strip()
     modo_atual = st.session_state.get("modo_mary", "Racional")
     estado_amor = st.session_state.get("grande_amor")
+
+    # Reset de memórias usadas a cada nova entrada
+    st.session_state.memorias_usadas = set()
 
     if "emocao_oculta" not in st.session_state:
         st.session_state.emocao_oculta = None
