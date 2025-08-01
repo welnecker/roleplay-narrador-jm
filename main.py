@@ -138,38 +138,25 @@ def carregar_ultimas_interacoes(n=5):
 
 
 def carregar_memorias():
-    if not planilha:
-        return None
     try:
         aba = planilha.worksheet("memorias")
-        dados = aba.get_all_values()
+        registros = aba.get_all_records()
         modo = st.session_state.get("modo_mary", "Racional").lower()
-        mem_relevantes = []
-        # Garante que só inclui memórias relevantes ao modo ou [all]
-        for linha in dados:
-            if not linha or not linha[0].strip():
-                continue
-            conteudo = linha[0].strip()
-            # Extrai tags (ex: [hot, all])
-            if conteudo.startswith("[") and "]" in conteudo:
-                raw_tags = conteudo.split("]")[0].replace("[", "")
-                tags = [t.strip().lower() for t in raw_tags.split(",")]
-                texto_memoria = conteudo.split("]")[-1].strip()
-            else:
-                tags = ["all"]
-                texto_memoria = conteudo
-            # Só inclui se [all] OU se modo está nas tags
-            if "all" in tags or modo in tags:
-                mem_relevantes.append(texto_memoria)
-        if mem_relevantes:
-            return {
-                "role": "user",
-                "content": "💾 MEMÓRIAS RELEVANTES DE MARY (aplique obrigatoriamente):\n" +
-                           "\n".join(f"- {m}" for m in mem_relevantes)
-            }
+        textos = []
+
+        for linha in registros:
+            tipo = linha["tipo"].strip().lower()
+            texto = linha["texto"].strip()
+            if tipo == "all" or tipo == modo:
+                textos.append(f"- {texto}")
+
+        if textos:
+            return {"content": "\n".join(textos)}
+        else:
+            return None
     except Exception as e:
-        st.error(f"Erro ao carregar memórias: {e}")
-    return None
+        st.warning(f"Erro ao carregar memórias: {e}")
+        return None
 
 
 # --------------------------- #
@@ -484,7 +471,7 @@ def construir_prompt_mary():
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # Detecta se há comando de continuidade
+    # Última mensagem da sessão
     continuar_cena = False
     ultima_msg = ""
     if st.session_state.get("session_msgs"):
@@ -492,44 +479,41 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # ---- Carrega memórias e fragmentos ----
+    # Carrega memórias relevantes e injeta no topo
     mem = carregar_memorias()
-    bloco_memorias = f"\n{mem['content']}\n" if mem else ""
+    bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use sempre que possível):\n{mem['content']}\n" if mem else ""
+
+    # Início do prompt
+    prompt = f"""{bloco_memorias}
+{prompt_base}
+
+{COMMON_RULES.strip()}
+
+💘 **Estado afetivo atual**: {estado_amor}
+"""
+
+    if continuar_cena:
+        prompt += f"""
+⚠️ **INSTRUÇÃO:**  
+Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
+- Nunca invente falas ou ações de Jânio.  
+- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
+"""
+    else:
+        prompt += f"""
+⚠️ **RELEMBRANDO:**  
+- Jânio é o nome do usuário real que interage com você diretamente.  
+- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
+- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  
+- Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
+"""
+
+    # Fragmentos relevantes (opcional)
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
-    bloco_fragmentos = ""
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
-        bloco_fragmentos = f"\n### 📚 Fragmentos relevantes\n{lista_fragmentos}\n"
-
-    # ---- Monta prompt ----
-    if continuar_cena:
-        prompt = (
-            f"{prompt_base}\n"
-            f"{COMMON_RULES.strip()}\n"
-            f"💘 **Estado afetivo atual**: {estado_amor}\n"
-            f"{bloco_memorias}"
-            f"{bloco_fragmentos}"
-            "\n"
-            "⚠️ **INSTRUÇÃO:**  \n"
-            f"Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo \"{modo}\" e as interações anteriores.  \n"
-            "- Nunca invente falas ou ações de Jânio.  \n"
-            "- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  \n"
-        )
-    else:
-        prompt = (
-            f"{prompt_base}\n"
-            f"{COMMON_RULES.strip()}\n"
-            f"💘 **Estado afetivo atual**: {estado_amor}\n"
-            f"{bloco_memorias}"
-            f"{bloco_fragmentos}"
-            "\n"
-            "⚠️ **RELEMBRANDO:**  \n"
-            "- Jânio é o nome do usuário real que interage com você diretamente.  \n"
-            "- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  \n"
-            "- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  \n"
-            "- Não utilize o termo \"usuário\" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.\n"
-        )
+        prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
     return prompt.strip()
 
