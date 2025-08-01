@@ -842,10 +842,8 @@ st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 if "base_history" not in st.session_state:
     try:
         st.session_state.base_history = carregar_ultimas_interacoes(n=15)
-    except:
-        st.session_state.base_history = []
 
-
+        # Tenta carregar o último resumo da aba "perfil_mary"
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
         ultimo_resumo = "[Sem resumo disponível]"
@@ -854,12 +852,15 @@ if "base_history" not in st.session_state:
                 ultimo_resumo = linha[6].strip()
                 break
         st.session_state.ultimo_resumo = ultimo_resumo
+
     except Exception as e:
         st.session_state.base_history = []
         st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
         st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
+
 if "session_msgs" not in st.session_state:
     st.session_state.session_msgs = []
+
 if "grande_amor" not in st.session_state:
     st.session_state.grande_amor = None
 
