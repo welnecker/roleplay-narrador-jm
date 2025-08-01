@@ -474,9 +474,6 @@ COMMON_RULES = """
 - Ela não rejeita os flertadores diretamente; prefere brincar com suas expectativas, levando-os ao limite do desejo e sofrimento, sem se entregar.
 """
 
-# --------------------------- #
-# Prompt builder
-# --------------------------- #
 def construir_prompt_mary():
     modo = st.session_state.get("modo_mary", "Racional")
     prompt_base = modos.get(modo, modos["Racional"]).strip()
@@ -495,50 +492,44 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-        # Injeta memórias sempre ANTES de tudo (como instrução global)
+    # ---- Carrega memórias e fragmentos ----
     mem = carregar_memorias()
     bloco_memorias = f"\n{mem['content']}\n" if mem else ""
-    if continuar_cena:
-        prompt = f"""{bloco_memorias}{prompt_base}
-{COMMON_RULES.strip()}
-💘 **Estado afetivo atual**: {estado_amor}
-...
-
-
-⚠️ **INSTRUÇÃO:**  
-Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
-- Nunca invente falas ou ações de Jânio.  
-- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
-"""
-    else:
-        prompt = f"""{prompt_base}
-
-{COMMON_RULES.strip()}
-
-💘 **Estado afetivo atual**: {estado_amor}
-
-⚠️ **RELEMBRANDO:**  
-- Jânio é o nome do usuário real que interage com você diretamente.  
-- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
-- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  
-- Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
-"""
-
-    # --------------------------- #
-    # Fragmentos relevantes
-    # --------------------------- #
     fragmentos = carregar_fragmentos()
     fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
+    bloco_fragmentos = ""
     if fragmentos_ativos:
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
-        prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
+        bloco_fragmentos = f"\n### 📚 Fragmentos relevantes\n{lista_fragmentos}\n"
 
-    # --------------------------- #
-    # Memórias relevantes
-    # --------------------------- #
-    mem = carregar_memorias()
-    if mem:
-        prompt += f"\n\n{mem['content']}"
+    # ---- Monta prompt ----
+    if continuar_cena:
+        prompt = (
+            f"{prompt_base}\n"
+            f"{COMMON_RULES.strip()}\n"
+            f"💘 **Estado afetivo atual**: {estado_amor}\n"
+            f"{bloco_memorias}"
+            f"{bloco_fragmentos}"
+            "\n"
+            "⚠️ **INSTRUÇÃO:**  \n"
+            f"Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo \"{modo}\" e as interações anteriores.  \n"
+            "- Nunca invente falas ou ações de Jânio.  \n"
+            "- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  \n"
+        )
+    else:
+        prompt = (
+            f"{prompt_base}\n"
+            f"{COMMON_RULES.strip()}\n"
+            f"💘 **Estado afetivo atual**: {estado_amor}\n"
+            f"{bloco_memorias}"
+            f"{bloco_fragmentos}"
+            "\n"
+            "⚠️ **RELEMBRANDO:**  \n"
+            "- Jânio é o nome do usuário real que interage com você diretamente.  \n"
+            "- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  \n"
+            "- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  \n"
+            "- Não utilize o termo \"usuário\" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.\n"
+        )
 
     return prompt.strip()
 
