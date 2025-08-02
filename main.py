@@ -633,7 +633,39 @@ with st.sidebar:
 
             st.success("✨ Desejo adicionado ao chat.")
 
+
+
     modelos_disponiveis = {
+    # === OPENROUTER ===
+    # --- FLUÊNCIA E NARRATIVA COERENTE ---
+    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+
+    # --- EMOÇÃO E PROFUNDIDADE ---
+    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+
+    # --- EROTISMO E CRIATIVIDADE ---
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+
+    # --- ATMOSFÉRICO E ESTÉTICO ---
+    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+
+    # === TOGETHER AI ===
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
+}
         # === OPENROUTER ===
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
@@ -678,6 +710,8 @@ with st.sidebar:
             texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
             prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
+           # --------------------------- #
+# Geração de resumo com DeepSeek (modo fixo "Mary")
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
@@ -705,6 +739,18 @@ with st.sidebar:
 # --------------------------- #
 # Interface
 # --------------------------- #
+try:
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "deepseek/deepseek-chat-v3-0324",
+            "messages": [{"role": "user", "content": prompt_resumo}],
+            "max_tokens": 800,
+            "temperature": 0.85  # Temperatura fixa para a personalidade Mary
 st.title("🌹 Mary")
 st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 
@@ -771,18 +817,22 @@ with st.sidebar:
             "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
         }
 
-        st.markdown("Escolha um desejo para adicionar ao chat:")
+        desejo_escolhido = st.selectbox(
+            "Escolha um desejo para adicionar ao chat",
+            [""] + list(desejos_mary.keys()),
+            key="escolha_desejo_sexual"
+        )
 
-colunas = st.columns(2)
-for i, (emoji, frase) in enumerate(desejos_mary.items()):
-    with colunas[i % 2]:
-        if st.button(emoji):
+        if desejo_escolhido and desejo_escolhido in desejos_mary:
+            if "session_msgs" not in st.session_state:
+                st.session_state.session_msgs = []
+
             st.session_state.session_msgs.append({
                 "role": "user",
-                "content": frase
+                "content": desejos_mary[desejo_escolhido]
             })
-            st.success("✨ Desejo adicionado ao chat.")
 
+            st.success("✨ Desejo adicionado ao chat.")
 
     modelos_disponiveis = {
         # === OPENROUTER ===
@@ -820,6 +870,13 @@ for i, (emoji, frase) in enumerate(desejos_mary.items()):
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
+    if response.status_code == 200:
+        resumo_gerado = response.json()["choices"][0]["message"]["content"]
+        salvar_resumo(resumo_gerado)
+        st.session_state.ultimo_resumo = resumo_gerado
+        st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+    else:
+        st.error("Erro ao gerar resumo automaticamente.")
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
@@ -854,6 +911,8 @@ for i, (emoji, frase) in enumerate(desejos_mary.items()):
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
 
+except Exception as e:
+    st.error(f"Erro durante a geração do resumo: {e}")
 
 # --------------------------- #
 # 💘 Grande amor
