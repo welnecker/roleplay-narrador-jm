@@ -598,10 +598,15 @@ def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
         st.error(f"Erro ao excluir interação: {e}")
 
 # --------------------------- #
-# Sidebar (versão unificada)
+# Sidebar (versão unificada, sem selectbox)
 # --------------------------- #
+
 with st.sidebar:
     st.title("🧠 Configurações de Mary")
+
+    # 🔁 Remove a chave antiga se ainda existir
+    if "escolha_desejo_sexual" in st.session_state:
+        del st.session_state["escolha_desejo_sexual"]
 
     with st.expander("💋 Desejos de Mary (atalhos rápidos)", expanded=False):
         st.caption("Escolha um desejo para Mary expressar automaticamente.")
@@ -616,78 +621,35 @@ with st.sidebar:
             "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
         }
 
-        desejo_escolhido = st.selectbox(
-            "Escolha um desejo para adicionar ao chat",
-            [""] + list(desejos_mary.keys()),
-            key="escolha_desejo_sexual"
-        )
-
-        if desejo_escolhido and desejo_escolhido in desejos_mary:
-            if "session_msgs" not in st.session_state:
-                st.session_state.session_msgs = []
-
-            st.session_state.session_msgs.append({
-                "role": "user",
-                "content": desejos_mary[desejo_escolhido]
-            })
-
-            st.success("✨ Desejo adicionado ao chat.")
-
-
+        colunas = st.columns(2)
+        for i, (emoji, frase) in enumerate(desejos_mary.items()):
+            with colunas[i % 2]:
+                if st.button(emoji):
+                    st.session_state.session_msgs.append({
+                        "role": "user",
+                        "content": frase
+                    })
+                    st.success("✨ Desejo adicionado ao chat.")
 
     modelos_disponiveis = {
-    # === OPENROUTER ===
-    # --- FLUÊNCIA E NARRATIVA COERENTE ---
-    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
-    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-
-    # --- EMOÇÃO E PROFUNDIDADE ---
-    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-
-    # --- EROTISMO E CRIATIVIDADE ---
-    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-
-    # --- ATMOSFÉRICO E ESTÉTICO ---
-    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-
-    # === TOGETHER AI ===
-    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
-}
         # === OPENROUTER ===
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
         "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
         "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-
         "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
         "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
         "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
         "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
         "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-
         "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
         "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
         "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
         "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
         "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-
         "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
         "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
         "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-
         # === TOGETHER AI ===
         "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
         "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
@@ -701,182 +663,6 @@ with st.sidebar:
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    if st.button("🎮 Ver vídeo atual"):
-        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            ultimas = carregar_ultimas_interacoes(n=3)
-            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
-
-           # --------------------------- #
-# Geração de resumo com DeepSeek (modo fixo "Mary")
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": 0.85
-                }
-            )
-
-            if response.status_code == 200:
-                resumo_gerado = response.json()["choices"][0]["message"]["content"]
-                salvar_resumo(resumo_gerado)
-                st.session_state.ultimo_resumo = resumo_gerado
-                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            else:
-                st.error("Erro ao gerar resumo automaticamente.")
-
-        except Exception as e:
-            st.error(f"Erro durante a geração do resumo: {e}")
-# --------------------------- #
-# Interface
-# --------------------------- #
-try:
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "deepseek/deepseek-chat-v3-0324",
-            "messages": [{"role": "user", "content": prompt_resumo}],
-            "max_tokens": 800,
-            "temperature": 0.85  # Temperatura fixa para a personalidade Mary
-st.title("🌹 Mary")
-st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
-
-# Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
-if "base_history" not in st.session_state:
-    try:
-        st.session_state.base_history = carregar_ultimas_interacoes(n=15)
-        aba_resumo = planilha.worksheet("perfil_mary")
-        dados = aba_resumo.get_all_values()
-        ultimo_resumo = "[Sem resumo disponível]"
-        for linha in reversed(dados[1:]):
-            if len(linha) >= 7 and linha[6].strip():
-                ultimo_resumo = linha[6].strip()
-                break
-        st.session_state.ultimo_resumo = ultimo_resumo
-    except Exception as e:
-        st.session_state.base_history = []
-        st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
-        st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
-
-if "session_msgs" not in st.session_state:
-    st.session_state.session_msgs = []
-
-if "grande_amor" not in st.session_state:
-    st.session_state.grande_amor = None
-
-# --------------------------- #
-# Botão para excluir última interação da planilha
-# --------------------------- #
-def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
-    try:
-        planilha = conectar_planilha()
-        aba = planilha.worksheet(aba_nome)
-        total_linhas = len(aba.get_all_values())
-
-        if total_linhas <= 1:
-            st.warning("Nenhuma interação para excluir.")
-            return
-
-        # Remove as duas últimas linhas (usuário e resposta)
-        aba.delete_rows(total_linhas - 1)
-        aba.delete_rows(total_linhas - 2)
-
-        st.success("🗑️ Última interação excluída da planilha com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao excluir interação: {e}")
-
-# --------------------------- #
-# Sidebar (versão unificada)
-# --------------------------- #
-with st.sidebar:
-    st.title("🧠 Configurações de Mary")
-
-    with st.expander("💋 Desejos de Mary (atalhos rápidos)", expanded=False):
-        st.caption("Escolha um desejo para Mary expressar automaticamente.")
-
-        desejos_mary = {
-            "🫦 Chupar Jânio": "Mary se ajoelha lentamente, encarando Jânio com olhos famintos. — Deixa eu cuidar de você do meu jeito... com a boca.",
-            "🙈 De quatro": "Mary se vira e se apoia nos cotovelos, empinando os quadris com um sorriso provocante. — Assim… do jeitinho que você gosta.",
-            "🐎 Cavalgar": "Mary monta em Jânio com ousadia, os cabelos caindo sobre os ombros. — Agora você vai me sentir inteirinha…",
-            "🌪️ Contra a parede": "Ela é empurrada contra a parede, gemendo baixinho. — Me domina... aqui mesmo.",
-            "🛏️ Em cima da cama": "Mary se joga sobre os lençóis e abre espaço. — Vem… aqui é nosso palco agora.",
-            "🚿 No banho": "Com a água escorrendo pelo corpo, Mary se aproxima molhada e nua. — Quer brincar comigo aqui dentro?",
-            "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
-        }
-
-        desejo_escolhido = st.selectbox(
-            "Escolha um desejo para adicionar ao chat",
-            [""] + list(desejos_mary.keys()),
-            key="escolha_desejo_sexual"
-        )
-
-        if desejo_escolhido and desejo_escolhido in desejos_mary:
-            if "session_msgs" not in st.session_state:
-                st.session_state.session_msgs = []
-
-            st.session_state.session_msgs.append({
-                "role": "user",
-                "content": desejos_mary[desejo_escolhido]
-            })
-
-            st.success("✨ Desejo adicionado ao chat.")
-
-    modelos_disponiveis = {
-        # === OPENROUTER ===
-        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
-        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-
-        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-        "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-        "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-
-        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-
-        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-
-        # === TOGETHER AI ===
-        "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
-        "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    }
-
-    modelo_selecionado = st.selectbox(
-        "🤖 Modelo de IA",
-        list(modelos_disponiveis.keys()),
-        key="modelo_ia",
-        index=0
-    )
-    modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
-
-    if response.status_code == 200:
-        resumo_gerado = response.json()["choices"][0]["message"]["content"]
-        salvar_resumo(resumo_gerado)
-        st.session_state.ultimo_resumo = resumo_gerado
-        st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-    else:
-        st.error("Erro ao gerar resumo automaticamente.")
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
@@ -907,12 +693,9 @@ with st.sidebar:
                 st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
             else:
                 st.error("Erro ao gerar resumo automaticamente.")
-
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
 
-except Exception as e:
-    st.error(f"Erro durante a geração do resumo: {e}")
 
 # --------------------------- #
 # 💘 Grande amor
