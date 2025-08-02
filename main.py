@@ -771,22 +771,18 @@ with st.sidebar:
             "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
         }
 
-        desejo_escolhido = st.selectbox(
-            "Escolha um desejo para adicionar ao chat",
-            [""] + list(desejos_mary.keys()),
-            key="escolha_desejo_sexual"
-        )
+        st.markdown("Escolha um desejo para adicionar ao chat:")
 
-        if desejo_escolhido and desejo_escolhido in desejos_mary:
-            if "session_msgs" not in st.session_state:
-                st.session_state.session_msgs = []
-
+colunas = st.columns(2)
+for i, (emoji, frase) in enumerate(desejos_mary.items()):
+    with colunas[i % 2]:
+        if st.button(emoji):
             st.session_state.session_msgs.append({
                 "role": "user",
-                "content": desejos_mary[desejo_escolhido]
+                "content": frase
             })
-
             st.success("✨ Desejo adicionado ao chat.")
+
 
     modelos_disponiveis = {
         # === OPENROUTER ===
