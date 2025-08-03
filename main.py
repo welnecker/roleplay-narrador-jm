@@ -842,7 +842,8 @@ def is_modelo_together(modelo):
 # --------------------------- #
 # Função unificada de resposta (OpenRouter + Together)
 # --------------------------- #
-def responder_com_modelo_escolhido(modelo):
+def responder_com_modelo_escolhido():
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
     prompt = construir_prompt_mary()
 
     historico_base = [
@@ -861,22 +862,20 @@ def responder_com_modelo_escolhido(modelo):
 
     temperatura = 0.85  # Temperatura fixa para Mary
 
-    if is_modelo_together(modelo):
-        endpoint = TOGETHER_ENDPOINT
-        api_key = TOGETHER_API_KEY
-        modelo_payload = modelo.split("/")[-1]  # Ex: "mistralai/Mixtral" => "Mixtral"
-    else:
-        endpoint = OPENROUTER_ENDPOINT
-        api_key = OPENROUTER_API_KEY
-        modelo_payload = modelo
-
     payload = {
-        "model": modelo_payload,
+        "model": modelo.split("/")[-1] if is_modelo_together(modelo) else modelo,
         "messages": mensagens,
         "max_tokens": 1000,
         "temperature": temperatura,
         "stream": True,
     }
+
+    if is_modelo_together(modelo):
+        endpoint = TOGETHER_ENDPOINT
+        api_key = TOGETHER_API_KEY
+    else:
+        endpoint = OPENROUTER_ENDPOINT
+        api_key = OPENROUTER_API_KEY
 
     headers = {
         "Authorization": f"Bearer {api_key}",
