@@ -624,7 +624,6 @@ with st.sidebar:
 
     with st.expander("💋 Desejos de Mary (atalhos rápidos)", expanded=False):
         st.caption("Escolha um desejo para Mary expressar automaticamente.")
-
         desejos_mary = {
             "🫦 Chupar Jânio": "Mary se ajoelha lentamente, encarando Jânio com olhos famintos. — Deixa eu cuidar de você do meu jeito... com a boca.",
             "🙈 De quatro": "Mary se vira e se apoia nos cotovelos, empinando os quadris com um sorriso provocante. — Assim… do jeitinho que você gosta.",
@@ -634,7 +633,6 @@ with st.sidebar:
             "🚿 No banho": "Com a água escorrendo pelo corpo, Mary se aproxima molhada e nua. — Quer brincar comigo aqui dentro?",
             "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
         }
-
         colunas = st.columns(2)
         for i, (emoji, frase) in enumerate(desejos_mary.items()):
             with colunas[i % 2]:
@@ -676,23 +674,19 @@ with st.sidebar:
         index=0
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+    st.session_state["modelo_escolhido_id"] = modelo_escolhido_id
 
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
-   if st.button("📝 Gerar resumo do capítulo"):
-    try:
-        ultimas = carregar_ultimas_interacoes(n=3)
-        texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-        prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
+    if st.button("📝 Gerar resumo do capítulo"):
+        try:
+            ultimas = carregar_ultimas_interacoes(n=3)
+            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
-        # Pega o modelo selecionado e define o provedor correto
-        modelo_id = st.session_state.get("modelo_ia", "openai/gpt-4")
-        modelo_escolhido_id = modelos_disponiveis.get(modelo_id, "openai/gpt-4")
-        endpoint, api_key = obter_provedor(modelo_escolhido_id)
-
-        modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
-mensagens = [{"role": "user", "content": prompt_resumo}]
+            modelo = modelo_escolhido_id
+            mensagens = [{"role": "user", "content": prompt_resumo}]
 
             if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
                 endpoint = TOGETHER_ENDPOINT
@@ -706,7 +700,7 @@ mensagens = [{"role": "user", "content": prompt_resumo}]
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json"
                 }
-            
+
             response = requests.post(
                 endpoint,
                 headers=headers,
@@ -718,7 +712,6 @@ mensagens = [{"role": "user", "content": prompt_resumo}]
                 }
             )
 
-
             if response.status_code == 200:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
                 salvar_resumo(resumo_gerado)
@@ -728,6 +721,7 @@ mensagens = [{"role": "user", "content": prompt_resumo}]
                 st.error("Erro ao gerar resumo automaticamente.")
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
+
 
 
 # --------------------------- #
