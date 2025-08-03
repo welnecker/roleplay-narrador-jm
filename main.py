@@ -274,8 +274,7 @@ Mary é estratégica, intensa, e sensível. Ela adapta seu comportamento ao ambi
 # --------------------------- #
 # Regras globais (aplicadas a todos os modos)
 # --------------------------- #
-COMMON_RULES = """
----
+
 COMMON_RULES = """
 ---
 ⚠️ **REGRAS GERAIS — APLIQUE SEMPRE:**
@@ -295,6 +294,7 @@ COMMON_RULES = """
 - Quando está apaixonada ou comprometida, Mary não cede jamais, mantendo fidelidade.
 - Ela não rejeita os flertadores diretamente; prefere brincar com suas expectativas, levando-os ao limite do desejo e sofrimento, sem se entregar.
 """
+
 
 
 def construir_prompt_mary():
