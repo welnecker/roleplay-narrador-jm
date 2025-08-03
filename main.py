@@ -618,7 +618,6 @@ def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
 # --------------------------- #
 # Sidebar (versão unificada, sem selectbox)
 # --------------------------- #
-
 with st.sidebar:
     st.title("🧠 Configurações de Mary")
 
@@ -648,7 +647,6 @@ with st.sidebar:
                     st.success("✨ Desejo adicionado ao chat.")
 
     modelos_disponiveis = {
-        # === OPENROUTER ===
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
         "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
@@ -666,7 +664,6 @@ with st.sidebar:
         "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
         "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
         "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-        # === TOGETHER AI ===
         "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
         "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
     }
@@ -694,27 +691,17 @@ with st.sidebar:
 
             if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
                 endpoint = TOGETHER_ENDPOINT
-                headers = {
-                    "Authorization": f"Bearer {TOGETHER_API_KEY}",
-                    "Content-Type": "application/json"
-                }
+                headers = {"Authorization": f"Bearer {TOGETHER_API_KEY}", "Content-Type": "application/json"}
             else:
                 endpoint = OPENROUTER_ENDPOINT
-                headers = {
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
-                }
+                headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
 
-            response = requests.post(
-                endpoint,
-                headers=headers,
-                json={
-                    "model": modelo,
-                    "messages": mensagens,
-                    "max_tokens": 800,
-                    "temperature": 0.85
-                }
-            )
+            response = requests.post(endpoint, headers=headers, json={
+                "model": modelo,
+                "messages": mensagens,
+                "max_tokens": 800,
+                "temperature": 0.85
+            })
 
             if response.status_code == 200:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
@@ -726,17 +713,12 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
 
-
-
 # --------------------------- #
 # 💘 Grande amor
 # --------------------------- #
 st.markdown("---")
 st.subheader("💘 Grande amor")
-amor_input = st.text_input(
-    "Nome do grande amor (deixe vazio se não existe)",
-    value=st.session_state.grande_amor or ""
-)
+amor_input = st.text_input("Nome do grande amor (deixe vazio se não existe)", value=st.session_state.get("grande_amor", ""))
 if st.button("Definir grande amor"):
     st.session_state.grande_amor = amor_input.strip() or None
     if st.session_state.grande_amor:
@@ -749,25 +731,20 @@ if st.button("Definir grande amor"):
 # --------------------------- #
 st.markdown("---")
 st.subheader("➕ Adicionar memória fixa")
-nova_memoria = st.text_area(
-    "🧠 Nova memória",
-    height=80,
-    placeholder="Ex: Mary odeia ficar sozinha à noite..."
-)
+nova_memoria = st.text_area("🧠 Nova memória", height=80, placeholder="Ex: Mary odeia ficar sozinha à noite...")
 if st.button("💾 Salvar memória"):
     if nova_memoria.strip():
         salvar_memoria(nova_memoria)
     else:
         st.warning("Digite algo antes de salvar.")
-    def salvar_memoria(nova_memoria):
+
+def salvar_memoria(nova_memoria):
     try:
         aba = planilha.worksheet("memorias")
         aba.append_row(["[all]", nova_memoria.strip()])
         st.success("✅ Memória salva com sucesso!")
     except Exception as e:
         st.error(f"Erro ao salvar memória: {e}")
-
-        
 
 # --------------------------- #
 # 🗑️ Excluir última interação
