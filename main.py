@@ -631,70 +631,89 @@ with st.sidebar:
                     })
                     st.success("✨ Desejo adicionado ao chat.")
 
-    modelos_disponiveis = {
-        # === OPENROUTER ===
-        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
-        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-        "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-        "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-        # === TOGETHER AI ===
-        "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
-        "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    }
+    # --------------------------- #
+# Modelos disponíveis
+# --------------------------- #
+modelos_disponiveis = {
+    # === OPENROUTER ===
+    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
 
-    modelo_selecionado = st.selectbox(
-        "🤖 Modelo de IA",
-        list(modelos_disponiveis.keys()),
-        key="modelo_ia",
-        index=0
-    )
-    modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+    # === TOGETHER AI ===
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
+}
 
-    if st.button("🎮 Ver vídeo atual"):
-        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+modelo_selecionado = st.selectbox(
+    "🤖 Modelo de IA",
+    list(modelos_disponiveis.keys()),
+    key="modelo_ia",
+    index=0
+)
+modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+st.session_state.modelo_escolhido_id = modelo_escolhido_id  # ✅ Salva no session_state
 
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            ultimas = carregar_ultimas_interacoes(n=3)
-            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
+# --------------------------- #
+# Vídeo atual
+# --------------------------- #
+if st.button("🎮 Ver vídeo atual"):
+    st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": 0.85
-                }
-            )
+# --------------------------- #
+# Resumo do capítulo
+# --------------------------- #
+if st.button("📝 Gerar resumo do capítulo"):
+    try:
+        ultimas = carregar_ultimas_interacoes(n=3)
+        texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+        prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
-            if response.status_code == 200:
-                resumo_gerado = response.json()["choices"][0]["message"]["content"]
-                salvar_resumo(resumo_gerado)
-                st.session_state.ultimo_resumo = resumo_gerado
-                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            else:
-                st.error("Erro ao gerar resumo automaticamente.")
-        except Exception as e:
-            st.error(f"Erro durante a geração do resumo: {e}")
+        # Detecta endpoint correto
+        if modelo_escolhido_id.startswith("togethercomputer/") or modelo_escolhido_id.startswith("mistralai/"):
+            endpoint_url = "https://api.together.xyz/v1/chat/completions"
+            api_key = st.secrets["TOGETHER_API_KEY"]
+        else:
+            endpoint_url = "https://openrouter.ai/api/v1/chat/completions"
+            api_key = st.secrets["OPENROUTER_API_KEY"]
+
+        response = requests.post(
+            endpoint_url,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": modelo_escolhido_id,
+                "messages": [{"role": "user", "content": prompt_resumo}],
+                "max_tokens": 800,
+                "temperature": 0.85
+            }
+        )
+
+        if response.status_code == 200:
+            resumo_gerado = response.json()["choices"][0]["message"]["content"]
+            salvar_resumo(resumo_gerado)
+            st.session_state.ultimo_resumo = resumo_gerado
+            st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+        else:
+            st.error(f"Erro ao gerar resumo: {response.status_code} – {response.text}")
+    except Exception as e:
+        st.error(f"Erro durante a geração do resumo: {e}")
 
 
 # --------------------------- #
@@ -783,15 +802,40 @@ if st.session_state.get("ultimo_resumo"):
 # Função de resposta (OpenRouter + Together)
 # --------------------------- #
 def responder_com_modelo_escolhido():
-    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+    modelo_escolhido_id = st.session_state.get("modelo_escolhido_id")
 
-    # Detecta provedor com base no ID do modelo
-    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
-        st.session_state["provedor_ia"] = "together"
-        return gerar_resposta_together_stream(modelo)
+    if not modelo_escolhido_id:
+        raise ValueError("Nenhum modelo de IA selecionado.")
+
+    # Detecta se é Together ou OpenRouter
+    if modelo_escolhido_id.startswith("togethercomputer/") or modelo_escolhido_id.startswith("mistralai/"):
+        endpoint_url = "https://api.together.xyz/v1/chat/completions"
+        api_key = st.secrets["TOGETHER_API_KEY"]
     else:
-        st.session_state["provedor_ia"] = "openrouter"
-        return gerar_resposta_openrouter_stream(modelo)
+        endpoint_url = "https://openrouter.ai/api/v1/chat/completions"
+        api_key = st.secrets["OPENROUTER_API_KEY"]
+
+    mensagens = [{"role": m["role"], "content": m["content"]} for m in st.session_state.session_msgs]
+
+    response = requests.post(
+        endpoint_url,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": modelo_escolhido_id,
+            "messages": mensagens,
+            "max_tokens": 1200,
+            "temperature": 0.9
+        }
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"Erro na resposta: {response.status_code} - {response.text}")
+
+    return response.json()["choices"][0]["message"]["content"]
+
 
 # ---------------------------
 # 🎬 Efeitos Cinematográficos por Emoção Oculta
