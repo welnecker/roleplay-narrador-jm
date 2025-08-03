@@ -833,12 +833,12 @@ def gerar_resposta_together_normal(modelo, mensagens):
     else:
         return f"[Erro Together: {response.status_code} - {response.text}]"
 
-
 # --------------------------- #
 # Função auxiliar: detectar se modelo é da Together
 # --------------------------- #
 def is_modelo_together(modelo):
     return any(modelo.startswith(p) for p in ["togethercomputer/", "mistralai/"])
+
 
 # --------------------------- #
 # Função unificada de resposta (OpenRouter + Together)
@@ -861,10 +861,13 @@ def responder_com_modelo_escolhido():
 
     mensagens = [{"role": "system", "content": prompt}] + historico
 
-    temperatura = 0.85
+    temperatura = 0.85  # Temperatura fixa para Mary
+
+    # TOGETHER exige o nome sem prefixo
+    modelo_para_envio = modelo.split("/", 1)[-1] if is_modelo_together(modelo) else modelo
 
     payload = {
-        "model": modelo,
+        "model": modelo_para_envio,
         "messages": mensagens,
         "max_tokens": 1000,
         "temperature": temperatura,
@@ -874,18 +877,14 @@ def responder_com_modelo_escolhido():
     if is_modelo_together(modelo):
         endpoint = TOGETHER_ENDPOINT
         api_key = TOGETHER_API_KEY
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "text/event-stream"
-        }
     else:
         endpoint = OPENROUTER_ENDPOINT
         api_key = OPENROUTER_API_KEY
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
 
     assistant_box = st.chat_message("assistant")
     placeholder = assistant_box.empty()
@@ -905,7 +904,7 @@ def responder_com_modelo_escolhido():
                     break
                 try:
                     j = json.loads(data)
-                    delta = j["choices"][0].get("delta", {}).get("content", "") or j["choices"][0].get("message", {}).get("content", "")
+                    delta = j["choices"][0]["delta"].get("content", "")
                     if delta:
                         full_text += delta
                         placeholder.markdown(full_text)
@@ -916,6 +915,7 @@ def responder_com_modelo_escolhido():
         return "[ERRO STREAM]"
 
     return full_text.strip()
+
 
 
 
