@@ -844,7 +844,8 @@ def is_modelo_together(modelo):
 # --------------------------- #
 # Função unificada de resposta (OpenRouter + Together)
 # --------------------------- #
-def responder_com_modelo_escolhido(modelo):
+def responder_com_modelo_escolhido():
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
     prompt = construir_prompt_mary()
 
     historico_base = [
@@ -861,8 +862,7 @@ def responder_com_modelo_escolhido(modelo):
 
     mensagens = [{"role": "system", "content": prompt}] + historico
 
-    temperatura = 0.85  # Temperatura fixa para Mary
-
+    temperatura = 0.85
     payload = {
         "model": modelo,
         "messages": mensagens,
