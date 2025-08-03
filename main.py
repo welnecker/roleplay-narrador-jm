@@ -811,8 +811,7 @@ if st.session_state.get("ultimo_resumo"):
     with st.chat_message("assistant"):
         st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
 
-def gerar_resposta_together_normal(modelo):
-    mensagens = st.session_state.get("session_msgs", [])
+def gerar_resposta_together_normal(modelo, mensagens):
     headers = {
         "Authorization": f"Bearer {TOGETHER_API_KEY}",
         "Content-Type": "application/json"
@@ -843,17 +842,77 @@ def is_modelo_together(modelo):
 
 
 # --------------------------- #
-# Função de resposta (OpenRouter + Together)
+# Função unificada de resposta (OpenRouter + Together)
 # --------------------------- #
-def responder_com_modelo_escolhido():
-    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+def responder_com_modelo_escolhido(modelo):
+    prompt = construir_prompt_mary()
+
+    historico_base = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("base_history", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico_sessao = [
+        {"role": m.get("role", "user"), "content": m.get("content", "")}
+        for m in st.session_state.get("session_msgs", [])
+        if isinstance(m, dict) and "content" in m
+    ]
+    historico = historico_base + historico_sessao
+
+    mensagens = [{"role": "system", "content": prompt}] + historico
+
+    temperatura = 0.85  # Temperatura fixa para Mary
+
+    payload = {
+        "model": modelo,
+        "messages": mensagens,
+        "max_tokens": 1000,
+        "temperature": temperatura,
+        "stream": True,
+    }
 
     if is_modelo_together(modelo):
-        st.session_state["provedor_ia"] = "together"
-        return gerar_resposta_together_normal(modelo)
+        endpoint = TOGETHER_ENDPOINT
+        api_key = TOGETHER_API_KEY
     else:
-        st.session_state["provedor_ia"] = "openrouter"
-        return gerar_resposta_openrouter_stream(modelo)
+        endpoint = OPENROUTER_ENDPOINT
+        api_key = OPENROUTER_API_KEY
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    assistant_box = st.chat_message("assistant")
+    placeholder = assistant_box.empty()
+    full_text = ""
+
+    try:
+        with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
+            r.raise_for_status()
+            for raw_line in r.iter_lines(decode_unicode=False):
+                if not raw_line:
+                    continue
+                line = raw_line.decode("utf-8", errors="ignore")
+                if not line.startswith("data:"):
+                    continue
+                data = line[len("data:"):].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    j = json.loads(data)
+                    delta = j["choices"][0]["delta"].get("content", "")
+                    if delta:
+                        full_text += delta
+                        placeholder.markdown(full_text)
+                except Exception:
+                    continue
+    except Exception as e:
+        st.error(f"Erro no streaming com {endpoint}: {e}")
+        return "[ERRO STREAM]"
+
+    return full_text.strip()
+
 
 
 # ---------------------------
