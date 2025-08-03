@@ -840,7 +840,6 @@ def gerar_resposta_together_normal(modelo, mensagens):
 def is_modelo_together(modelo):
     return any(modelo.startswith(p) for p in ["togethercomputer/", "mistralai/"])
 
-
 # --------------------------- #
 # Função unificada de resposta (OpenRouter + Together)
 # --------------------------- #
@@ -863,6 +862,7 @@ def responder_com_modelo_escolhido():
     mensagens = [{"role": "system", "content": prompt}] + historico
 
     temperatura = 0.85
+
     payload = {
         "model": modelo,
         "messages": mensagens,
@@ -874,14 +874,18 @@ def responder_com_modelo_escolhido():
     if is_modelo_together(modelo):
         endpoint = TOGETHER_ENDPOINT
         api_key = TOGETHER_API_KEY
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream"
+        }
     else:
         endpoint = OPENROUTER_ENDPOINT
         api_key = OPENROUTER_API_KEY
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
 
     assistant_box = st.chat_message("assistant")
     placeholder = assistant_box.empty()
@@ -901,7 +905,7 @@ def responder_com_modelo_escolhido():
                     break
                 try:
                     j = json.loads(data)
-                    delta = j["choices"][0]["delta"].get("content", "")
+                    delta = j["choices"][0].get("delta", {}).get("content", "") or j["choices"][0].get("message", {}).get("content", "")
                     if delta:
                         full_text += delta
                         placeholder.markdown(full_text)
