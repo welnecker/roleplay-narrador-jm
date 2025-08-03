@@ -833,14 +833,14 @@ def gerar_resposta_together_normal(modelo, mensagens):
         return f"[Erro Together: {response.status_code} - {response.text}]"
 
 # --------------------------- #
-# Função auxiliar: detectar se modelo é da Together
+# Endpoint correto para Together
 # --------------------------- #
-def is_modelo_together(modelo):
-    return any(modelo.startswith(p) for p in ["togethercomputer/", "mistralai/"])
-
+TOGETHER_ENDPOINT = "https://api.together.xyz/v1/chat/completions"  # ERRADO ❌
+# DEVE SER:
+TOGETHER_ENDPOINT = "https://api.together.xyz/inference"  # CORRETO ✅
 
 # --------------------------- #
-# Função unificada de resposta (OpenRouter + Together)
+# Função de resposta unificada
 # --------------------------- #
 def responder_com_modelo_escolhido():
     modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
@@ -856,14 +856,11 @@ def responder_com_modelo_escolhido():
         for m in st.session_state.get("session_msgs", [])
         if isinstance(m, dict) and "content" in m
     ]
-    historico = historico_base + historico_sessao
+    mensagens = [{"role": "system", "content": prompt}] + historico_base + historico_sessao
 
-    mensagens = [{"role": "system", "content": prompt}] + historico
-
-    temperatura = 0.85  # Temperatura fixa para Mary
-
+    temperatura = 0.85
     payload = {
-        "model": modelo.split("/")[-1] if is_modelo_together(modelo) else modelo,
+        "model": modelo,
         "messages": mensagens,
         "max_tokens": 1000,
         "temperature": temperatura,
@@ -871,7 +868,7 @@ def responder_com_modelo_escolhido():
     }
 
     if is_modelo_together(modelo):
-        endpoint = TOGETHER_ENDPOINT
+        endpoint = "https://api.together.xyz/inference"  # CORRIGIDO
         api_key = TOGETHER_API_KEY
     else:
         endpoint = OPENROUTER_ENDPOINT
