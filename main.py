@@ -759,6 +759,15 @@ if st.button("💾 Salvar memória"):
         salvar_memoria(nova_memoria)
     else:
         st.warning("Digite algo antes de salvar.")
+    def salvar_memoria(nova_memoria):
+    try:
+        aba = planilha.worksheet("memorias")
+        aba.append_row(["[all]", nova_memoria.strip()])
+        st.success("✅ Memória salva com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao salvar memória: {e}")
+
+        
 
 # --------------------------- #
 # 🗑️ Excluir última interação
@@ -835,9 +844,10 @@ def gerar_resposta_together_normal(modelo, mensagens):
 # --------------------------- #
 # Endpoint correto para Together
 # --------------------------- #
-TOGETHER_ENDPOINT = "https://api.together.xyz/v1/chat/completions"  # ERRADO ❌
-# DEVE SER:
-TOGETHER_ENDPOINT = "https://api.together.xyz/inference"  # CORRETO ✅
+TOGETHER_ENDPOINT = "https://api.together.xyz/v1/chat/completions"  # ✅ correto
+
+def is_modelo_together(modelo_id: str) -> bool:
+    return modelo_id.startswith("togethercomputer/") or modelo_id.startswith("mistralai/")
 
 # --------------------------- #
 # Função de resposta unificada
