@@ -62,6 +62,15 @@ TOGETHER_API_KEY = st.secrets["TOGETHER_API_KEY"]
 TOGETHER_ENDPOINT = "https://api.together.xyz/v1/chat/completions"
 
 # --------------------------- #
+# Provedor dinâmico (NOVO)
+# --------------------------- #
+def obter_provedor(modelo_escolhido_id):
+    if "togethercomputer" in modelo_escolhido_id or "mistralai" in modelo_escolhido_id:
+        return TOGETHER_ENDPOINT, TOGETHER_API_KEY
+    else:
+        return OPENROUTER_ENDPOINT, OPENROUTER_API_KEY
+
+# --------------------------- #
 # Imagem / vídeo dinâmico
 # --------------------------- #
 def imagem_de_fundo():
@@ -671,25 +680,44 @@ with st.sidebar:
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            ultimas = carregar_ultimas_interacoes(n=3)
-            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
+   if st.button("📝 Gerar resumo do capítulo"):
+    try:
+        ultimas = carregar_ultimas_interacoes(n=3)
+        texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+        prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
+        # Pega o modelo selecionado e define o provedor correto
+        modelo_id = st.session_state.get("modelo_ia", "openai/gpt-4")
+        modelo_escolhido_id = modelos_disponiveis.get(modelo_id, "openai/gpt-4")
+        endpoint, api_key = obter_provedor(modelo_escolhido_id)
+
+        modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+mensagens = [{"role": "user", "content": prompt_resumo}]
+
+            if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+                endpoint = TOGETHER_ENDPOINT
+                headers = {
+                    "Authorization": f"Bearer {TOGETHER_API_KEY}",
+                    "Content-Type": "application/json"
+                }
+            else:
+                endpoint = OPENROUTER_ENDPOINT
+                headers = {
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json"
-                },
+                }
+            
+            response = requests.post(
+                endpoint,
+                headers=headers,
                 json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
-                    "messages": [{"role": "user", "content": prompt_resumo}],
+                    "model": modelo,
+                    "messages": mensagens,
                     "max_tokens": 800,
                     "temperature": 0.85
                 }
             )
+
 
             if response.status_code == 200:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
