@@ -523,34 +523,33 @@ if st.session_state.get("ultima_entrada_recebida"):
         placeholder = st.empty()
         with st.spinner("Mary está pensando..."):
             try:
-                resposta_final = responder_com_modelo_escolhido()
+                modelo_escolhido = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+                resposta_final = responder_com_modelo_escolhido(modelo_escolhido)
 
-                # Validação semântica / sintática
+                # Validação semântica/sintática
                 if not resposta_valida(resposta_final):
                     st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
-                    resposta_final = responder_com_modelo_escolhido()
+                    resposta_final = responder_com_modelo_escolhido(modelo_escolhido)
 
                     if not resposta_valida(resposta_final):
                         resposta_final = "[⚠️ A resposta da IA veio corrompida. Tente reformular sua entrada ou reenviar.]"
 
-                # Interrompe antes do clímax se necessário
+                # Cortar antes do clímax se necessário
                 modo = st.session_state.get("modo_mary", "")
                 if modo in ["Hot", "Devassa", "Livre"]:
                     resposta_final = cortar_antes_do_climax(resposta_final)
 
-                # 👇 EXIBE A RESPOSTA NO APP
-                placeholder.markdown(resposta_final)
+                placeholder.markdown(resposta_final)  # Exibe resposta no app
 
             except Exception as e:
-                st.error(f"Erro: {e}")
+                st.error(f"Erro geral na geração da resposta: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
-                placeholder.markdown(resposta_final)  # Mostra erro no chat
+                placeholder.markdown(resposta_final)  # Exibe erro no chat
 
-    # Salva na planilha e no histórico da sessão
+    # Salva interação
     salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
     st.session_state.ultima_entrada_recebida = None
-
 
 # --------------------------- #
 # Reset de entrada ao clicar em imagem/vídeo
@@ -843,8 +842,7 @@ def is_modelo_together(modelo):
 # --------------------------- #
 # Função unificada de resposta (OpenRouter + Together)
 # --------------------------- #
-def responder_com_modelo_escolhido():
-    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+def responder_com_modelo_escolhido(modelo):
     prompt = construir_prompt_mary()
 
     historico_base = [
@@ -863,23 +861,22 @@ def responder_com_modelo_escolhido():
 
     temperatura = 0.85  # Temperatura fixa para Mary
 
-    # TOGETHER exige o nome sem prefixo
-    modelo_para_envio = modelo.split("/", 1)[-1] if is_modelo_together(modelo) else modelo
+    if is_modelo_together(modelo):
+        endpoint = TOGETHER_ENDPOINT
+        api_key = TOGETHER_API_KEY
+        modelo_payload = modelo.split("/")[-1]  # Ex: "mistralai/Mixtral" => "Mixtral"
+    else:
+        endpoint = OPENROUTER_ENDPOINT
+        api_key = OPENROUTER_API_KEY
+        modelo_payload = modelo
 
     payload = {
-        "model": modelo_para_envio,
+        "model": modelo_payload,
         "messages": mensagens,
         "max_tokens": 1000,
         "temperature": temperatura,
         "stream": True,
     }
-
-    if is_modelo_together(modelo):
-        endpoint = TOGETHER_ENDPOINT
-        api_key = TOGETHER_API_KEY
-    else:
-        endpoint = OPENROUTER_ENDPOINT
-        api_key = OPENROUTER_API_KEY
 
     headers = {
         "Authorization": f"Bearer {api_key}",
