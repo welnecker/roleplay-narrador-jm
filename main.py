@@ -538,10 +538,15 @@ if st.session_state.get("ultima_entrada_recebida"):
                 if modo in ["Hot", "Devassa", "Livre"]:
                     resposta_final = cortar_antes_do_climax(resposta_final)
 
+                # 👇 EXIBE A RESPOSTA NO APP
+                placeholder.markdown(resposta_final)
+
             except Exception as e:
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
+                placeholder.markdown(resposta_final)  # Mostra erro no chat
 
+    # Salva na planilha e no histórico da sessão
     salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
     st.session_state.ultima_entrada_recebida = None
