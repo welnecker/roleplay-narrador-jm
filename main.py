@@ -598,17 +598,19 @@ def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
         st.error(f"Erro ao excluir interação: {e}")
 
 # --------------------------- #
-# Sidebar (completo e corrigido)
+# Sidebar (versão unificada, sem selectbox)
 # --------------------------- #
+
 with st.sidebar:
     st.title("🧠 Configurações de Mary")
 
-    # 🔁 Limpa chave obsoleta
+    # 🔁 Remove a chave antiga se ainda existir
     if "escolha_desejo_sexual" in st.session_state:
         del st.session_state["escolha_desejo_sexual"]
 
     with st.expander("💋 Desejos de Mary (atalhos rápidos)", expanded=False):
         st.caption("Escolha um desejo para Mary expressar automaticamente.")
+
         desejos_mary = {
             "🫦 Chupar Jânio": "Mary se ajoelha lentamente, encarando Jânio com olhos famintos. — Deixa eu cuidar de você do meu jeito... com a boca.",
             "🙈 De quatro": "Mary se vira e se apoia nos cotovelos, empinando os quadris com um sorriso provocante. — Assim… do jeitinho que você gosta.",
@@ -629,9 +631,6 @@ with st.sidebar:
                     })
                     st.success("✨ Desejo adicionado ao chat.")
 
-    # --------------------------- #
-    # Menu de modelos
-    # --------------------------- #
     modelos_disponiveis = {
         # === OPENROUTER ===
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
@@ -663,11 +662,7 @@ with st.sidebar:
         index=0
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
-    st.session_state.modelo_escolhido_id = modelo_escolhido_id
 
-    # --------------------------- #
-    # Botões de vídeo e resumo
-    # --------------------------- #
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
@@ -677,22 +672,14 @@ with st.sidebar:
             texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
             prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
-            # Detecta endpoint correto
-            if modelo_escolhido_id.startswith("togethercomputer/") or modelo_escolhido_id.startswith("mistralai/"):
-                endpoint_url = "https://api.together.xyz/v1/chat/completions"
-                api_key = st.secrets["TOGETHER_API_KEY"]
-            else:
-                endpoint_url = "https://openrouter.ai/api/v1/chat/completions"
-                api_key = st.secrets["OPENROUTER_API_KEY"]
-
             response = requests.post(
-                endpoint_url,
+                "https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {api_key}",
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": modelo_escolhido_id,
+                    "model": "deepseek/deepseek-chat-v3-0324",
                     "messages": [{"role": "user", "content": prompt_resumo}],
                     "max_tokens": 800,
                     "temperature": 0.85
@@ -705,10 +692,9 @@ with st.sidebar:
                 st.session_state.ultimo_resumo = resumo_gerado
                 st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
             else:
-                st.error(f"Erro ao gerar resumo: {response.status_code} – {response.text}")
+                st.error("Erro ao gerar resumo automaticamente.")
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
-
 
 
 # --------------------------- #
@@ -797,40 +783,15 @@ if st.session_state.get("ultimo_resumo"):
 # Função de resposta (OpenRouter + Together)
 # --------------------------- #
 def responder_com_modelo_escolhido():
-    modelo_escolhido_id = st.session_state.get("modelo_escolhido_id")
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
 
-    if not modelo_escolhido_id:
-        raise ValueError("Nenhum modelo de IA selecionado.")
-
-    # Detecta se é Together ou OpenRouter
-    if modelo_escolhido_id.startswith("togethercomputer/") or modelo_escolhido_id.startswith("mistralai/"):
-        endpoint_url = "https://api.together.xyz/v1/chat/completions"
-        api_key = st.secrets["TOGETHER_API_KEY"]
+    # Detecta provedor com base no ID do modelo
+    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+        st.session_state["provedor_ia"] = "together"
+        return gerar_resposta_together_stream(modelo)
     else:
-        endpoint_url = "https://openrouter.ai/api/v1/chat/completions"
-        api_key = st.secrets["OPENROUTER_API_KEY"]
-
-    mensagens = [{"role": m["role"], "content": m["content"]} for m in st.session_state.session_msgs]
-
-    response = requests.post(
-        endpoint_url,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": modelo_escolhido_id,
-            "messages": mensagens,
-            "max_tokens": 1200,
-            "temperature": 0.9
-        }
-    )
-
-    if response.status_code != 200:
-        raise Exception(f"Erro na resposta: {response.status_code} - {response.text}")
-
-    return response.json()["choices"][0]["message"]["content"]
-
+        st.session_state["provedor_ia"] = "openrouter"
+        return gerar_resposta_openrouter_stream(modelo)
 
 # ---------------------------
 # 🎬 Efeitos Cinematográficos por Emoção Oculta
