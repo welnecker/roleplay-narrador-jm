@@ -62,15 +62,6 @@ TOGETHER_API_KEY = st.secrets["TOGETHER_API_KEY"]
 TOGETHER_ENDPOINT = "https://api.together.xyz/v1/chat/completions"
 
 # --------------------------- #
-# Provedor dinâmico (NOVO)
-# --------------------------- #
-def obter_provedor(modelo_escolhido_id):
-    if "togethercomputer" in modelo_escolhido_id or "mistralai" in modelo_escolhido_id:
-        return TOGETHER_ENDPOINT, TOGETHER_API_KEY
-    else:
-        return OPENROUTER_ENDPOINT, OPENROUTER_API_KEY
-
-# --------------------------- #
 # Imagem / vídeo dinâmico
 # --------------------------- #
 def imagem_de_fundo():
@@ -523,33 +514,29 @@ if st.session_state.get("ultima_entrada_recebida"):
         placeholder = st.empty()
         with st.spinner("Mary está pensando..."):
             try:
-                modelo_escolhido = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
-                resposta_final = responder_com_modelo_escolhido(modelo_escolhido)
+                resposta_final = responder_com_modelo_escolhido()
 
-                # Validação semântica/sintática
+                # Validação semântica / sintática
                 if not resposta_valida(resposta_final):
                     st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
-                    resposta_final = responder_com_modelo_escolhido(modelo_escolhido)
+                    resposta_final = responder_com_modelo_escolhido()
 
                     if not resposta_valida(resposta_final):
                         resposta_final = "[⚠️ A resposta da IA veio corrompida. Tente reformular sua entrada ou reenviar.]"
 
-                # Cortar antes do clímax se necessário
+                # Interrompe antes do clímax se necessário
                 modo = st.session_state.get("modo_mary", "")
                 if modo in ["Hot", "Devassa", "Livre"]:
                     resposta_final = cortar_antes_do_climax(resposta_final)
 
-                placeholder.markdown(resposta_final)  # Exibe resposta no app
-
             except Exception as e:
-                st.error(f"Erro geral na geração da resposta: {e}")
+                st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
-                placeholder.markdown(resposta_final)  # Exibe erro no chat
 
-    # Salva interação
     salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
     st.session_state.ultima_entrada_recebida = None
+
 
 # --------------------------- #
 # Reset de entrada ao clicar em imagem/vídeo
@@ -618,6 +605,7 @@ def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
 # --------------------------- #
 # Sidebar (versão unificada, sem selectbox)
 # --------------------------- #
+
 with st.sidebar:
     st.title("🧠 Configurações de Mary")
 
@@ -627,6 +615,7 @@ with st.sidebar:
 
     with st.expander("💋 Desejos de Mary (atalhos rápidos)", expanded=False):
         st.caption("Escolha um desejo para Mary expressar automaticamente.")
+
         desejos_mary = {
             "🫦 Chupar Jânio": "Mary se ajoelha lentamente, encarando Jânio com olhos famintos. — Deixa eu cuidar de você do meu jeito... com a boca.",
             "🙈 De quatro": "Mary se vira e se apoia nos cotovelos, empinando os quadris com um sorriso provocante. — Assim… do jeitinho que você gosta.",
@@ -636,6 +625,7 @@ with st.sidebar:
             "🚿 No banho": "Com a água escorrendo pelo corpo, Mary se aproxima molhada e nua. — Quer brincar comigo aqui dentro?",
             "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
         }
+
         colunas = st.columns(2)
         for i, (emoji, frase) in enumerate(desejos_mary.items()):
             with colunas[i % 2]:
@@ -647,6 +637,7 @@ with st.sidebar:
                     st.success("✨ Desejo adicionado ao chat.")
 
     modelos_disponiveis = {
+        # === OPENROUTER ===
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
         "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
@@ -664,6 +655,7 @@ with st.sidebar:
         "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
         "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
         "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+        # === TOGETHER AI ===
         "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
         "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
     }
@@ -675,7 +667,6 @@ with st.sidebar:
         index=0
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
-    st.session_state["modelo_escolhido_id"] = modelo_escolhido_id
 
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
@@ -686,22 +677,19 @@ with st.sidebar:
             texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
             prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
 
-            modelo = modelo_escolhido_id
-            mensagens = [{"role": "user", "content": prompt_resumo}]
-
-            if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
-                endpoint = TOGETHER_ENDPOINT
-                headers = {"Authorization": f"Bearer {TOGETHER_API_KEY}", "Content-Type": "application/json"}
-            else:
-                endpoint = OPENROUTER_ENDPOINT
-                headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
-
-            response = requests.post(endpoint, headers=headers, json={
-                "model": modelo,
-                "messages": mensagens,
-                "max_tokens": 800,
-                "temperature": 0.85
-            })
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "deepseek/deepseek-chat-v3-0324",
+                    "messages": [{"role": "user", "content": prompt_resumo}],
+                    "max_tokens": 800,
+                    "temperature": 0.85
+                }
+            )
 
             if response.status_code == 200:
                 resumo_gerado = response.json()["choices"][0]["message"]["content"]
@@ -713,12 +701,16 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro durante a geração do resumo: {e}")
 
+
 # --------------------------- #
 # 💘 Grande amor
 # --------------------------- #
 st.markdown("---")
 st.subheader("💘 Grande amor")
-amor_input = st.text_input("Nome do grande amor (deixe vazio se não existe)", value=st.session_state.get("grande_amor", ""))
+amor_input = st.text_input(
+    "Nome do grande amor (deixe vazio se não existe)",
+    value=st.session_state.grande_amor or ""
+)
 if st.button("Definir grande amor"):
     st.session_state.grande_amor = amor_input.strip() or None
     if st.session_state.grande_amor:
@@ -731,20 +723,16 @@ if st.button("Definir grande amor"):
 # --------------------------- #
 st.markdown("---")
 st.subheader("➕ Adicionar memória fixa")
-nova_memoria = st.text_area("🧠 Nova memória", height=80, placeholder="Ex: Mary odeia ficar sozinha à noite...")
+nova_memoria = st.text_area(
+    "🧠 Nova memória",
+    height=80,
+    placeholder="Ex: Mary odeia ficar sozinha à noite..."
+)
 if st.button("💾 Salvar memória"):
     if nova_memoria.strip():
         salvar_memoria(nova_memoria)
     else:
         st.warning("Digite algo antes de salvar.")
-
-def salvar_memoria(nova_memoria):
-    try:
-        aba = planilha.worksheet("memorias")
-        aba.append_row(["[all]", nova_memoria.strip()])
-        st.success("✅ Memória salva com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao salvar memória: {e}")
 
 # --------------------------- #
 # 🗑️ Excluir última interação
@@ -796,108 +784,19 @@ if st.session_state.get("ultimo_resumo"):
     with st.chat_message("assistant"):
         st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
 
-def gerar_resposta_together_normal(modelo, mensagens):
-    headers = {
-        "Authorization": f"Bearer {TOGETHER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    response = requests.post(
-        TOGETHER_ENDPOINT,
-        headers=headers,
-        json={
-            "model": modelo,
-            "messages": mensagens,
-            "temperature": 0.85,
-            "max_tokens": 800
-        }
-    )
-
-    if response.status_code == 200:
-        return response.json()["choices"][0]["message"]["content"]
-    else:
-        return f"[Erro Together: {response.status_code} - {response.text}]"
-
 # --------------------------- #
-# Endpoint correto para Together
-# --------------------------- #
-TOGETHER_ENDPOINT = "https://api.together.xyz/v1/chat/completions"  # ✅ correto
-
-def is_modelo_together(modelo_id: str) -> bool:
-    return modelo_id.startswith("togethercomputer/") or modelo_id.startswith("mistralai/")
-
-# --------------------------- #
-# Função de resposta unificada
+# Função de resposta (OpenRouter + Together)
 # --------------------------- #
 def responder_com_modelo_escolhido():
     modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
-    prompt = construir_prompt_mary()
 
-    historico_base = [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in st.session_state.get("base_history", [])
-        if isinstance(m, dict) and "content" in m
-    ]
-    historico_sessao = [
-        {"role": m.get("role", "user"), "content": m.get("content", "")}
-        for m in st.session_state.get("session_msgs", [])
-        if isinstance(m, dict) and "content" in m
-    ]
-    mensagens = [{"role": "system", "content": prompt}] + historico_base + historico_sessao
-
-    temperatura = 0.85
-    payload = {
-        "model": modelo,
-        "messages": mensagens,
-        "max_tokens": 1000,
-        "temperature": temperatura,
-        "stream": True,
-    }
-
-    if is_modelo_together(modelo):
-        endpoint = "https://api.together.xyz/inference"  # CORRIGIDO
-        api_key = TOGETHER_API_KEY
+    # Detecta provedor com base no ID do modelo
+    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+        st.session_state["provedor_ia"] = "together"
+        return gerar_resposta_together_stream(modelo)
     else:
-        endpoint = OPENROUTER_ENDPOINT
-        api_key = OPENROUTER_API_KEY
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-
-    assistant_box = st.chat_message("assistant")
-    placeholder = assistant_box.empty()
-    full_text = ""
-
-    try:
-        with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
-            r.raise_for_status()
-            for raw_line in r.iter_lines(decode_unicode=False):
-                if not raw_line:
-                    continue
-                line = raw_line.decode("utf-8", errors="ignore")
-                if not line.startswith("data:"):
-                    continue
-                data = line[len("data:"):].strip()
-                if data == "[DONE]":
-                    break
-                try:
-                    j = json.loads(data)
-                    delta = j["choices"][0]["delta"].get("content", "")
-                    if delta:
-                        full_text += delta
-                        placeholder.markdown(full_text)
-                except Exception:
-                    continue
-    except Exception as e:
-        st.error(f"Erro no streaming com {endpoint}: {e}")
-        return "[ERRO STREAM]"
-
-    return full_text.strip()
-
-
-
+        st.session_state["provedor_ia"] = "openrouter"
+        return gerar_resposta_openrouter_stream(modelo)
 
 # ---------------------------
 # 🎬 Efeitos Cinematográficos por Emoção Oculta
