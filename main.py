@@ -806,19 +806,50 @@ if st.session_state.get("ultimo_resumo"):
     with st.chat_message("assistant"):
         st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.ultimo_resumo}")
 
+def gerar_resposta_together_normal(modelo):
+    mensagens = st.session_state.get("session_msgs", [])
+    headers = {
+        "Authorization": f"Bearer {TOGETHER_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(
+        TOGETHER_ENDPOINT,
+        headers=headers,
+        json={
+            "model": modelo,
+            "messages": mensagens,
+            "temperature": 0.85,
+            "max_tokens": 800
+        }
+    )
+
+    if response.status_code == 200:
+        return response.json()["choices"][0]["message"]["content"]
+    else:
+        return f"[Erro Together: {response.status_code} - {response.text}]"
+
+
+# --------------------------- #
+# Função auxiliar: detectar se modelo é da Together
+# --------------------------- #
+def is_modelo_together(modelo):
+    return any(modelo.startswith(p) for p in ["togethercomputer/", "mistralai/"])
+
+
 # --------------------------- #
 # Função de resposta (OpenRouter + Together)
 # --------------------------- #
 def responder_com_modelo_escolhido():
     modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
 
-    # Detecta provedor com base no ID do modelo
-    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+    if is_modelo_together(modelo):
         st.session_state["provedor_ia"] = "together"
-        return gerar_resposta_together_stream(modelo)
+        return gerar_resposta_together_normal(modelo)
     else:
         st.session_state["provedor_ia"] = "openrouter"
         return gerar_resposta_openrouter_stream(modelo)
+
 
 # ---------------------------
 # 🎬 Efeitos Cinematográficos por Emoção Oculta
