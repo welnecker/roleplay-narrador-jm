@@ -837,6 +837,7 @@ CINEMATIC_EFFECTS = {
 # Entrada do usuário (Mary única com efeitos)
 # --------------------------- #
 entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' ou '@Mary:')")
+
 if entrada_raw:
     entrada_raw = entrada_raw.strip()
     estado_amor = st.session_state.get("grande_amor")
@@ -846,33 +847,33 @@ if entrada_raw:
         st.session_state.emocao_oculta = None
 
     # Caso 1: Comando de roteirista
-if entrada_raw.lower().startswith("@mary:"):
-    comando = entrada_raw[len("@mary:"):].strip()
+    if entrada_raw.lower().startswith("@mary:"):
+        comando = entrada_raw[len("@mary:"):].strip()
 
-    # Emoção oculta
-    if any(x in comando.lower() for x in ["triste", "sozinha", "choro", "saudade"]):
-        st.session_state.emocao_oculta = "tristeza"
-    elif any(x in comando.lower() for x in ["raiva", "ciúme", "ódio", "furiosa"]):
-        st.session_state.emocao_oculta = "raiva"
-    elif any(x in comando.lower() for x in ["feliz", "alegre", "orgulhosa", "leve"]):
-        st.session_state.emocao_oculta = "felicidade"
-    elif any(x in comando.lower() for x in ["desejo", "provocação", "tensão", "calor"]):
-        st.session_state.emocao_oculta = "tensão"
-    else:
-        st.session_state.emocao_oculta = "nenhuma"
+        # Emoção oculta
+        if any(x in comando.lower() for x in ["triste", "sozinha", "choro", "saudade"]):
+            st.session_state.emocao_oculta = "tristeza"
+        elif any(x in comando.lower() for x in ["raiva", "ciúme", "ódio", "furiosa"]):
+            st.session_state.emocao_oculta = "raiva"
+        elif any(x in comando.lower() for x in ["feliz", "alegre", "orgulhosa", "leve"]):
+            st.session_state.emocao_oculta = "felicidade"
+        elif any(x in comando.lower() for x in ["desejo", "provocação", "tensão", "calor"]):
+            st.session_state.emocao_oculta = "tensão"
+        else:
+            st.session_state.emocao_oculta = "nenhuma"
 
-    # Fragmentos e memórias
-    fragmentos = carregar_fragmentos()
-    mem = carregar_memorias()
-    fragmentos_ativos = buscar_fragmentos_relevantes(comando, fragmentos)
+        # Fragmentos e memórias
+        fragmentos = carregar_fragmentos()
+        mem = carregar_memorias()
+        fragmentos_ativos = buscar_fragmentos_relevantes(comando, fragmentos)
 
-    contexto_memoria = ""
-    if fragmentos_ativos:
-        contexto_memoria += "\n" + "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
-    if mem:
-        contexto_memoria += "\n" + mem["content"]
+        contexto_memoria = ""
+        if fragmentos_ativos:
+            contexto_memoria += "\n" + "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
+        if mem:
+            contexto_memoria += "\n" + mem["content"]
 
-    entrada = f"""
+        entrada = f"""
 [CENA_AUTÔNOMA]
 Mary inicia a cena com base no seguinte comando: {comando}
 
@@ -883,7 +884,7 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
 {contexto_memoria.strip()}
 """.strip()
 
-    entrada_visivel = entrada_raw
+        entrada_visivel = entrada_raw
 
     # Caso 2: Apenas "*"
     elif entrada_raw == "*":
@@ -938,13 +939,14 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
         salvar_interacao("assistant", resposta_final)
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
-# Verificação semântica após resposta
-if len(st.session_state.session_msgs) >= 2:
-    texto_anterior = st.session_state.session_msgs[-2]["content"]
-    texto_atual = st.session_state.session_msgs[-1]["content"]
-    alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
-    if alerta_semantica:
-        st.info(alerta_semantica)
+    # Verificação semântica após resposta
+    if len(st.session_state.session_msgs) >= 2:
+        texto_anterior = st.session_state.session_msgs[-2]["content"]
+        texto_atual = st.session_state.session_msgs[-1]["content"]
+        alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
+        if alerta_semantica:
+            st.info(alerta_semantica)
+
 
 def converter_link_drive(link, tipo="imagem"):
     """
