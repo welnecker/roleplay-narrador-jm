@@ -314,6 +314,20 @@ def construir_prompt_mary():
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
+    # 🔍 Verifica se clímax foi autorizado
+    if st.session_state.get("climax_autorizado", False):
+        instrucao_climax = (
+            "\n⚠️ **O usuário autorizou o clímax sexual explícito.** "
+            "Mary pode narrar a cena até o fim, incluindo o clímax, "
+            "com intensidade emocional e sensorial completas."
+        )
+    else:
+        instrucao_climax = (
+            "\n⚠️ **O usuário não autorizou clímax sexual explícito.** "
+            "Mary deve interromper a narrativa antes do clímax, "
+            "mantendo tensão e sensualidade sem descrever o ato final."
+        )
+
     # Verifica se é cena longa
     cena_longa = st.session_state.get("cena_longa_ativa", False)
 
@@ -336,6 +350,7 @@ def construir_prompt_mary():
 {COMMON_RULES.strip()}
 
 💘 **Estado afetivo atual**: {estado_amor}
+{instrucao_climax}
 """
 
     # Fragmentos
@@ -983,6 +998,20 @@ if entrada_raw:
 
     if "emocao_oculta" not in st.session_state:
         st.session_state.emocao_oculta = None
+    if "climax_autorizado" not in st.session_state:
+        st.session_state.climax_autorizado = False
+
+    # 🔍 Detecta se o usuário autorizou clímax
+    frases_autorizacao = [
+        "vou gozar", "estou gozando", "goza comigo",
+        "quero gozar", "gozando", "vem comigo"
+    ]
+    respostas_rapidas = ["sim", "quero", "vai", "continua", "pode"]
+
+    entrada_lower = entrada_raw.lower()
+    if any(frase in entrada_lower for frase in frases_autorizacao) or entrada_lower in respostas_rapidas:
+        st.session_state.climax_autorizado = True
+        st.success("🔓 Clímax autorizado pelo usuário!")
 
     # Caso 1: Comando de roteirista com @Mary:
     if entrada_raw.lower().startswith("@mary:"):
@@ -1074,16 +1103,17 @@ Adapte o tom conforme a emoção oculta: {st.session_state.emocao_oculta or "nen
             try:
                 resposta_final = responder_com_modelo_escolhido()
 
-                # ⚠️ Proteção contra clímax técnico
-                if "gozar" in resposta_final.lower() or "clímax" in resposta_final.lower():
+                # ⚠️ Proteção contra clímax técnico, apenas se não for autorizado
+                climas_proibidos = ["gozar", "clímax"]
+                if not st.session_state.get("climax_autorizado", False) and any(p in resposta_final.lower() for p in climas_proibidos):
                     resposta_final = cortar_antes_do_climax(resposta_final)
 
             except Exception as e:
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
 
-        salvar_interacao("assistant", resposta_final)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+    salvar_interacao("assistant", resposta_final)
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
     # --------------------------- #
     # Validação semântica
@@ -1094,6 +1124,7 @@ Adapte o tom conforme a emoção oculta: {st.session_state.emocao_oculta or "nen
         alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
         if alerta_semantica:
             st.info(alerta_semantica)
+
 
 
 
