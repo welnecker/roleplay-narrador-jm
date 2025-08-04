@@ -671,6 +671,30 @@ with st.sidebar:
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
+    # ------------------------------- #
+    # 🎭 Emoção Oculta de Mary
+    # ------------------------------- #
+    st.markdown("---")
+    st.subheader("🎭 Emoção Oculta de Mary")
+
+    emoes = ["nenhuma", "tristeza", "raiva", "felicidade", "tensão"]
+    escolhida = st.selectbox("Escolha a emoção dominante:", emoes, index=0)
+
+    if st.button("Definir emoção"):
+        st.session_state.emocao_oculta = escolhida
+        st.success(f"Mary agora está sentindo: {escolhida}")
+
+    # ------------------------------- #
+    # 🎲 Emoção Aleatória
+    # ------------------------------- #
+    import random
+    if st.button("Sortear emoção aleatória"):
+        emocoes_possiveis = ["tristeza", "raiva", "felicidade", "tensão"]
+        sorteada = random.choice(emocoes_possiveis)
+        st.session_state.emocao_oculta = sorteada
+        st.success(f"✨ Emoção sorteada: {sorteada}")
+
+
     if st.button("🎮 Ver vídeo atual"):
         st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
