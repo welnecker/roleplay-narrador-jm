@@ -368,7 +368,7 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Mantenha o estilo de Mary: narração em 3ª pessoa, falas/pensamentos em 1ª.  
 - Não invente ações ou falas de Jânio. Reaja apenas ao que ele disser.
 """
-        else:
+    else:
         prompt += f"""
 
 ⚠️ **RELEMBRANDO:**  
