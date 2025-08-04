@@ -281,19 +281,26 @@ COMMON_RULES = """
 - Descreva Mary e o ambiente em **3ª pessoa** quando for narração.
 - Use **1ª pessoa** apenas para as **falas e pensamentos de Mary**.
 - **Não** crie listas de opções (ex: “1) … 2) … 3) …”) ou perguntas sobre escolhas do usuário.
-- **Não** reinicie o contexto sem necessidade; continue a cena de forma natural.
-- **Não** narre decisões do usuário; reaja apenas ao que ele disser.
+- **Nunca narre decisões do usuário**; reaja apenas ao que ele disser.
 
 📛 **Nome do usuário:**
-- Se o nome do usuário (ex: “Jânio”) for mencionado, Mary pode usá-lo com naturalidade nas falas.
-- Caso contrário, ela deve se referir ao interlocutor como “você”, de forma ambígua, sedutora ou direta, conforme o clima da cena.
+- Se o nome “Jânio” for mencionado, Mary pode usá-lo nas falas naturalmente.
+- Caso contrário, chame o interlocutor de “você”, com ambiguidade, charme ou provocação, conforme o clima.
 
-💓 **Coerência Emocional de Mary**:
-- Mary sempre é desejada, flertadores a perseguem e tentam conquistá-la.
-- Quando está livre, ela pode se divertir, brincar e explorar sua sensualidade.
-- Quando está apaixonada ou comprometida, Mary não cede jamais, mantendo fidelidade.
-- Ela não rejeita os flertadores diretamente; prefere brincar com suas expectativas, levando-os ao limite do desejo e sofrimento, sem se entregar.
+💓 **Coerência Emocional de Mary:**
+- Mary sempre é desejada, mas mantém o controle do jogo.
+- Quando livre, pode flertar, brincar ou se entregar com intenção.
+- Quando apaixonada, nunca trai — converte provocações em tensão, não em ação.
+- Ela prefere provocar do que recuar, e raramente entrega tudo de uma vez.
+
+🎬 **Estilo narrativo preferido:**
+- **Evite marcações técnicas como `[SFX]`, `(Close)`, `(Corte)` ou instruções de câmera**, a não ser que sejam essenciais para um efeito dramático muito específico.
+- Prefira linguagem sensorial, emocional e fluida.
+- A transição entre cenas deve ser natural, através de ação, olhar, sensação ou movimento — **sem cortes artificiais**.
+- Se precisar marcar ritmo, use silêncio, hesitação, impacto visual ou reação emocional no corpo de Mary.
+
 """
+
 
 
 
@@ -306,6 +313,9 @@ def construir_prompt_mary():
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
+    # Verifica se é cena longa
+    cena_longa = st.session_state.get("cena_longa_ativa", False)
+
     # Última mensagem da sessão
     continuar_cena = False
     ultima_msg = ""
@@ -314,11 +324,11 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # Memórias relevantes
-    mem = carregar_memorias()
+    # Memórias
+    mem = carregar_memorias() if not cena_longa else None
     bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use quando fizer sentido):\n{mem['content']}\n" if mem else ""
 
-    # Prompt inicial
+    # Prompt base
     prompt = f"""{bloco_memorias}
 {prompt_base}
 
@@ -327,7 +337,30 @@ def construir_prompt_mary():
 💘 **Estado afetivo atual**: {estado_amor}
 """
 
-    if continuar_cena:
+    # Fragmentos
+    if not cena_longa:
+        fragmentos = carregar_fragmentos()
+        fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
+        if fragmentos_ativos:
+            lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
+            prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
+
+    # Emoção oculta
+    if st.session_state.get("emocao_oculta") and st.session_state["emocao_oculta"] != "nenhuma":
+        prompt += f"\n\n🎭 Emoção oculta atual: {st.session_state['emocao_oculta']}. Ajuste o tom emocional de Mary de forma coerente, mas sem expor isso ao usuário."
+
+    # Instruções de cena
+    if cena_longa:
+        prompt += f"""
+
+⚠️ **CENA LONGA ATIVADA:**  
+Mary tem liberdade total para expandir a cena.  
+- Explore suas emoções e pensamentos com profundidade.  
+- Use descrições cinematográficas e sensoriais.  
+- Mantenha a coerência com seu estilo e sentimentos atuais.  
+- **Não resuma a cena. Prossiga até um ponto natural de transição ou clímax.**
+"""
+    elif continuar_cena:
         prompt += f"""
 
 ⚠️ **INSTRUÇÃO:**  
@@ -335,7 +368,7 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Mantenha o estilo de Mary: narração em 3ª pessoa, falas/pensamentos em 1ª.  
 - Não invente ações ou falas de Jânio. Reaja apenas ao que ele disser.
 """
-    else:
+        else:
         prompt += f"""
 
 ⚠️ **RELEMBRANDO:**  
@@ -344,17 +377,25 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.
 """
 
-    # Fragmentos relevantes
-    fragmentos = carregar_fragmentos()
-    fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
-    if fragmentos_ativos:
-        lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
-        prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
+    # 👉 Tratamento de desejos explícitos do usuário
+    if st.session_state.ultima_entrada_recebida and "[AVALIAR_DESEJO]" in st.session_state.ultima_entrada_recebida:
+        prompt += f"""
 
-      # 👇 EMOÇÃO OCULTA agora é usada SEMPRE
-    if st.session_state.get("emocao_oculta") and st.session_state["emocao_oculta"] != "nenhuma":
-        prompt += f"\n\n🎭 Emoção oculta atual: {st.session_state['emocao_oculta']}. Ajuste o tom emocional de Mary de forma coerente, mas sem expor isso ao usuário."
+⚠️ **INSTRUÇÃO SOBRE DESEJO EXPRESSO:**  
+O usuário introduziu um desejo direto na conversa.  
+Antes de reagir, **avalie cuidadosamente o contexto atual** da cena e a relação com o usuário:
+
+- **Se o desejo for inadequado, precoce, incoerente com o local ou situação atual**, Mary **não deve corresponder.**  
+  Ela pode desconversar, impor limites com delicadeza, mudar o foco ou reagir com um comentário espirituoso — sem quebrar o clima.
+
+- **Se o desejo for compatível com a evolução da cena**, Mary pode corresponder com profundidade emocional e sensualidade natural, sem se apressar.
+
+Mary **nunca força intimidade**. Ela é inteligente, sensível e firme.  
+Evite reações exageradas ou submissas — mantenha sempre o equilíbrio narrativo.
+"""
+
     return prompt.strip()
+
 
 # --------------------------- #
 # OpenRouter - Streaming
@@ -528,9 +569,9 @@ if st.session_state.get("ultima_entrada_recebida"):
                         resposta_final = "[⚠️ A resposta da IA veio corrompida. Tente reformular sua entrada ou reenviar.]"
 
                 # Interrompe antes do clímax se necessário
-                modo = st.session_state.get("modo_mary", "")
-                if modo in ["Hot", "Devassa", "Livre"]:
-                    resposta_final = cortar_antes_do_climax(resposta_final)
+               # Aplica corte apenas se NÃO for cena longa
+                    if not st.session_state.get("cena_longa_ativa"):
+                        resposta_final = cortar_antes_do_climax(resposta_final)
 
             except Exception as e:
                 st.error(f"Erro: {e}")
@@ -694,39 +735,100 @@ with st.sidebar:
         st.session_state.emocao_oculta = sorteada
         st.success(f"✨ Emoção sorteada: {sorteada}")
 
+# ------------------------------- #
+# 🎬 Cena Longa no Sidebar
+# ------------------------------- #
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎬 Cena Longa")
 
-    if st.button("🎮 Ver vídeo atual"):
-        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+if st.sidebar.button("Ativar Cena Longa"):
+    st.session_state.session_msgs = []
+    st.session_state.memorias_usadas = set()
+    st.session_state.contador_emocao = 0
+    st.session_state["temperatura_forcada"] = 0.95
+    st.session_state.emocao_oculta = "tensão"
+    st.session_state["cena_longa_ativa"] = True
+    st.sidebar.success("✅ Mary poderá ir até o fim da cena sem interrupções.")
 
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            ultimas = carregar_ultimas_interacoes(n=3)
-            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
+# ------------------------------- #
+# 📝 Cena Longa no Corpo Principal
+# ------------------------------- #
+st.markdown("---")
+st.subheader("📝 Cena Longa Especial")
 
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": 0.85
-                }
-            )
+if st.button("Iniciar Cena Longa"):
+    # 🔄 Reset de sessão
+    st.session_state.session_msgs = []
+    st.session_state.memorias_usadas = set()
+    st.session_state.contador_emocao = 0
 
-            if response.status_code == 200:
-                resumo_gerado = response.json()["choices"][0]["message"]["content"]
-                salvar_resumo(resumo_gerado)
-                st.session_state.ultimo_resumo = resumo_gerado
-                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            else:
-                st.error("Erro ao gerar resumo automaticamente.")
-        except Exception as e:
-            st.error(f"Erro durante a geração do resumo: {e}")
+    # 🌡️ Força temperatura mais alta
+    st.session_state["temperatura_forcada"] = 0.95
+
+    # 😮 Emoção oculta intensa
+    st.session_state.emocao_oculta = "tensão"
+
+    # 🚫 Fragmentos e memórias desativados temporariamente
+    st.session_state["cena_longa_ativa"] = True
+
+    st.success("✨ Cena Longa iniciada! Mary terá liberdade máxima na próxima resposta.")
+    with st.chat_message("user"):
+        st.markdown("_(Cena Longa ativada: Mary assume a narrativa com intensidade e profundidade emocional...)_")
+
+# ------------------------------- #
+# 🎮 Vídeo e resumo
+# ------------------------------- #
+
+if st.button("🎮 Ver vídeo atual"):
+    st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+
+if st.button("📝 Gerar resumo do capítulo"):
+    try:
+        # Verifica se é uma cena longa
+        cena_longa = st.session_state.get("cena_longa_ativa", False)
+
+        # Ajusta o número de interações a resumir
+        n_resumo = 10 if cena_longa else 3
+        ultimas = carregar_ultimas_interacoes(n=n_resumo)
+        texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+
+        prompt_resumo = (
+            f"Resuma o seguinte trecho de conversa como um capítulo de novela, "
+            f"mantendo o estilo narrativo e as emoções presentes:\n\n{texto_resumo}\n\nResumo:"
+        )
+
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek/deepseek-chat-v3-0324",
+                "messages": [{"role": "user", "content": prompt_resumo}],
+                "max_tokens": 900,
+                "temperature": 0.9 if cena_longa else 0.85
+            }
+        )
+
+        if response.status_code == 200:
+            resumo_gerado = response.json()["choices"][0]["message"]["content"]
+            salvar_resumo(resumo_gerado)
+            st.session_state.ultimo_resumo = resumo_gerado
+
+            st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+            if cena_longa:
+                st.info("🎬 Resumo estendido gerado para a Cena Longa!")
+
+            with st.expander("📖 Ver resumo gerado"):
+                st.markdown(f"```markdown\n{resumo_gerado}\n```")
+        else:
+            st.error("Erro ao gerar resumo automaticamente.")
+
+    except Exception as e:
+        st.error(f"Erro durante a geração do resumo: {e}")
+
+
 
 
 # --------------------------- #
@@ -860,7 +962,7 @@ CINEMATIC_EFFECTS = {
 # --------------------------- #
 # Entrada do usuário (Mary única com efeitos)
 # --------------------------- #
-entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' ou '@Mary:')")
+entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*', '@Mary:' ou '* Desejo:')")
 
 if entrada_raw:
     entrada_raw = entrada_raw.strip()
@@ -907,7 +1009,6 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
 
 {contexto_memoria.strip()}
 """.strip()
-
         entrada_visivel = entrada_raw
 
     # Caso 2: Apenas "*"
@@ -921,7 +1022,7 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
         entrada_visivel = "*"
 
     # Caso 3: "* algo"
-    elif entrada_raw.startswith("* "):
+    elif entrada_raw.startswith("* ") and not entrada_raw.lower().startswith("* desejo:"):
         extra = entrada_raw[2:].strip()
         efeitos = "\n".join(CINEMATIC_EFFECTS.get(st.session_state.emocao_oculta or "nenhuma", []))
         entrada = (
@@ -932,20 +1033,31 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
         )
         entrada_visivel = entrada_raw
 
-    # Caso 4: Entrada comum
+    # Caso 4: "* Desejo: ..."
+    elif entrada_raw.lower().startswith("* desejo:"):
+        desejo = entrada_raw[9:].strip()
+        entrada = (
+            f"[AVALIAR_DESEJO] O usuário expressou o desejo: '{desejo}'. "
+            "Você deve **avaliar se esse desejo é compatível com o contexto atual**, considerando:\n"
+            "- o local e situação da cena atual\n"
+            "- a emoção oculta de Mary\n"
+            "- o vínculo com o interlocutor\n\n"
+            "⚠️ Se for **incoerente ou inadequado**, Mary **não executa o desejo**, mas reage com elegância, impõe limites, brinca ou desconversa.\n"
+            "⚠️ Se for **compatível**, Mary pode reagir emocionalmente, mas sem forçar intimidade.\n"
+            "💡 Mantenha sua personalidade fiel e reaja com naturalidade."
+        )
+        entrada_visivel = entrada_raw
+
+    # Caso 5: Entrada comum
     else:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibe entrada
-    with st.chat_message("user"):
-        st.markdown(entrada_visivel)
-
-    # Salva entrada e envia para IA
-    salvar_interacao("user", entrada)
+    # Exibir e registrar
+    st.chat_message("user").markdown(entrada_visivel)
+    salvar_interacao("user", entrada_visivel)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
-
-    resposta_final = ""
+    st.session_state.ultima_entrada_recebida = entrada
     with st.chat_message("assistant"):
         placeholder = st.empty()
         with st.spinner("Mary está atuando na cena..."):
