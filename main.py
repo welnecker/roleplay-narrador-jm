@@ -963,33 +963,7 @@ CINEMATIC_EFFECTS = {
         "Tudo parece comum, mas ainda assim... cheio de possibilidades."
     ]
 }
- = {
-    "tristeza": [
-        "Câmera lenta nos gestos de Mary.",
-        "Som ambiente abafado, como se o mundo estivesse distante.",
-        "Luz azulada ou fria, sombras longas ao redor."
-    ],
-    "raiva": [
-        "Cortes rápidos, câmera tremida acompanhando os passos de Mary.",
-        "Batidas de coração fortes, respiração acelerada ao fundo.",
-        "Luz vermelha ou sombras projetadas nos olhos."
-    ],
-    "felicidade": [
-        "Câmera girando suavemente ao redor de Mary.",
-        "Som ambiente vívido: risadas, vento leve, música ao fundo.",
-        "Luz dourada atravessando janelas, atmosfera acolhedora."
-    ],
-    "tensão": [
-        "Close nos olhos ou lábios de Mary, em câmera lenta.",
-        "Som intermitente de respiração e silêncio tenso.",
-        "Contraste de luz e sombra destacando contornos do corpo."
-    ],
-    "nenhuma": [
-        "Plano médio neutro com iluminação ambiente comum.",
-        "Som ambiente sem efeitos especiais.",
-        "Cenário descritivo padrão, sem efeitos visuais."
-    ]
-}
+ 
 
 
 # --------------------------- #
