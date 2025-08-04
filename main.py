@@ -962,7 +962,7 @@ CINEMATIC_EFFECTS = {
 # --------------------------- #
 # Entrada do usuário (Mary única com efeitos)
 # --------------------------- #
-entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*', '@Mary:' ou '* Desejo:')")
+entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' ou '@Mary:')")
 
 if entrada_raw:
     entrada_raw = entrada_raw.strip()
@@ -972,11 +972,11 @@ if entrada_raw:
     if "emocao_oculta" not in st.session_state:
         st.session_state.emocao_oculta = None
 
-    # Caso 1: Comando de roteirista
+    # Caso 1: Comando de roteirista com @Mary:
     if entrada_raw.lower().startswith("@mary:"):
         comando = entrada_raw[len("@mary:"):].strip()
 
-        # Emoção oculta
+        # Define emoção oculta automaticamente com base no comando
         if any(x in comando.lower() for x in ["triste", "sozinha", "choro", "saudade"]):
             st.session_state.emocao_oculta = "tristeza"
         elif any(x in comando.lower() for x in ["raiva", "ciúme", "ódio", "furiosa"]):
@@ -988,7 +988,7 @@ if entrada_raw:
         else:
             st.session_state.emocao_oculta = "nenhuma"
 
-        # Fragmentos e memórias
+        # Carrega fragmentos e memórias
         fragmentos = carregar_fragmentos()
         mem = carregar_memorias()
         fragmentos_ativos = buscar_fragmentos_relevantes(comando, fragmentos)
@@ -1013,25 +1013,19 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
 
     # Caso 2: Apenas "*"
     elif entrada_raw == "*":
-        efeitos = "\n".join(CINEMATIC_EFFECTS.get(st.session_state.emocao_oculta or "nenhuma", []))
         entrada = (
             f"[CONTINUAR_CENA] Prossiga a cena anterior com naturalidade.\n"
             f"Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}\n"
         )
-
         entrada_visivel = "*"
 
     # Caso 3: "* algo"
     elif entrada_raw.startswith("* ") and not entrada_raw.lower().startswith("* desejo:"):
         extra = entrada_raw[2:].strip()
-        efeitos = "\n".join(CINEMATIC_EFFECTS.get(st.session_state.emocao_oculta or "nenhuma", []))
-       entrada = (
+        entrada = (
             f"[CONTINUAR_CENA] Prossiga a cena anterior com naturalidade.\n"
             f"Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}\n"
-        )
-
-            f"Inclua: {extra}\n"
-            f"{efeitos}"
+            f"Inclua: {extra}"
         )
         entrada_visivel = entrada_raw
 
@@ -1060,6 +1054,7 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
     salvar_interacao("user", entrada_visivel)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
     st.session_state.ultima_entrada_recebida = entrada
+
     with st.chat_message("assistant"):
         placeholder = st.empty()
         with st.spinner("Mary está atuando na cena..."):
@@ -1084,6 +1079,7 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
         alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
         if alerta_semantica:
             st.info(alerta_semantica)
+
 
 
 def converter_link_drive(link, tipo="imagem"):
