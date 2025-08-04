@@ -576,17 +576,17 @@ if st.session_state.get("ultima_entrada_recebida"):
                         resposta_final = "[⚠️ A resposta da IA veio corrompida. Tente reformular sua entrada ou reenviar.]"
 
                 # Interrompe antes do clímax se necessário
-               # Aplica corte apenas se NÃO for cena longa
-                    if not st.session_state.get("cena_longa_ativa"):
-                        resposta_final = cortar_antes_do_climax(resposta_final)
+                if not st.session_state.get("cena_longa_ativa"):
+                    resposta_final = cortar_antes_do_climax(resposta_final)
 
             except Exception as e:
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
 
-    "assistant", resposta_final)
+    salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
     st.session_state.ultima_entrada_recebida = None
+
 
 
 # --------------------------- #
