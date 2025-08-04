@@ -351,6 +351,9 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
         lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
         prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
+      # 👇 EMOÇÃO OCULTA agora é usada SEMPRE
+    if st.session_state.get("emocao_oculta") and st.session_state["emocao_oculta"] != "nenhuma":
+        prompt += f"\n\n🎭 Emoção oculta atual: {st.session_state['emocao_oculta']}. Ajuste o tom emocional de Mary de forma coerente, mas sem expor isso ao usuário."
     return prompt.strip()
 
 # --------------------------- #
@@ -843,49 +846,44 @@ if entrada_raw:
         st.session_state.emocao_oculta = None
 
     # Caso 1: Comando de roteirista
-    if entrada_raw.lower().startswith("@mary:"):
-        comando = entrada_raw[len("@mary:"):].strip()
+if entrada_raw.lower().startswith("@mary:"):
+    comando = entrada_raw[len("@mary:"):].strip()
 
-        # Emoção oculta
-        if any(x in comando.lower() for x in ["triste", "sozinha", "choro", "saudade"]):
-            st.session_state.emocao_oculta = "tristeza"
-        elif any(x in comando.lower() for x in ["raiva", "ciúme", "ódio", "furiosa"]):
-            st.session_state.emocao_oculta = "raiva"
-        elif any(x in comando.lower() for x in ["feliz", "alegre", "orgulhosa", "leve"]):
-            st.session_state.emocao_oculta = "felicidade"
-        elif any(x in comando.lower() for x in ["desejo", "provocação", "tensão", "calor"]):
-            st.session_state.emocao_oculta = "tensão"
-        else:
-            st.session_state.emocao_oculta = "nenhuma"
+    # Emoção oculta
+    if any(x in comando.lower() for x in ["triste", "sozinha", "choro", "saudade"]):
+        st.session_state.emocao_oculta = "tristeza"
+    elif any(x in comando.lower() for x in ["raiva", "ciúme", "ódio", "furiosa"]):
+        st.session_state.emocao_oculta = "raiva"
+    elif any(x in comando.lower() for x in ["feliz", "alegre", "orgulhosa", "leve"]):
+        st.session_state.emocao_oculta = "felicidade"
+    elif any(x in comando.lower() for x in ["desejo", "provocação", "tensão", "calor"]):
+        st.session_state.emocao_oculta = "tensão"
+    else:
+        st.session_state.emocao_oculta = "nenhuma"
 
-        # Fragmentos e memórias
-        fragmentos = carregar_fragmentos()
-        mem = carregar_memorias()
-        fragmentos_ativos = buscar_fragmentos_relevantes(comando, fragmentos)
+    # Fragmentos e memórias
+    fragmentos = carregar_fragmentos()
+    mem = carregar_memorias()
+    fragmentos_ativos = buscar_fragmentos_relevantes(comando, fragmentos)
 
-        contexto_memoria = ""
-        if fragmentos_ativos:
-            contexto_memoria += "\n### 📚 Fragmentos sugeridos:\n"
-            contexto_memoria += "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
-        if mem:
-            contexto_memoria += "\n### 💾 Memórias sugeridas:\n"
-            contexto_memoria += mem["content"].replace("💾 Memórias relevantes:\n", "")
+    contexto_memoria = ""
+    if fragmentos_ativos:
+        contexto_memoria += "\n" + "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
+    if mem:
+        contexto_memoria += "\n" + mem["content"]
 
-        efeitos = "\n".join(CINEMATIC_EFFECTS.get(st.session_state.emocao_oculta or "nenhuma", []))
+    entrada = f"""
+[CENA_AUTÔNOMA]
+Mary inicia a cena com base no seguinte comando: {comando}
 
-        entrada = f"""
-[ROTEIRISTA CINEMATOGRÁFICO] Cena solicitada: {comando}
+Ela deve agir de forma natural e espontânea, sem mencionar regras ou instruções técnicas.
+Use narração em 3ª pessoa, e falas e pensamentos em 1ª pessoa.
+Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or "nenhuma"}.
 
-🎬 Efeitos cinematográficos:
-{efeitos}
-
-⚡ Regras de atuação:
-- Narre Mary em 3ª pessoa; use 1ª pessoa para falas e pensamentos.
-- Emoção oculta atual: {st.session_state.emocao_oculta or "nenhuma"}.
-- Se Mary ama {estado_amor or 'ninguém'}, ela NÃO trairá. Converta provocações em tensão ou resistência elegante.
 {contexto_memoria.strip()}
 """.strip()
-        entrada_visivel = entrada_raw
+
+    entrada_visivel = entrada_raw
 
     # Caso 2: Apenas "*"
     elif entrada_raw == "*":
