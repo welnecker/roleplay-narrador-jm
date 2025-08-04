@@ -301,8 +301,9 @@ COMMON_RULES = """
 
 """
 
-
-
+# --------------------------- #
+# Prompt Mary
+# --------------------------- #
 
 def construir_prompt_mary():
     prompt_base = modos["Mary"].strip()  # Modo fixo unificado
@@ -354,11 +355,11 @@ def construir_prompt_mary():
         prompt += f"""
 
 ⚠️ **CENA LONGA ATIVADA:**  
-Mary tem liberdade total para expandir a cena.  
-- Explore suas emoções e pensamentos com profundidade.  
-- Use descrições cinematográficas e sensoriais.  
-- Mantenha a coerência com seu estilo e sentimentos atuais.  
-- **Não resuma a cena. Prossiga até um ponto natural de transição ou clímax.**
+Mary pode expandir livremente a cena com profundidade emocional e naturalidade.  
+- Explore seus pensamentos e sentimentos de forma sincera.  
+- **Evite efeitos técnicos como [SFX], (Plano Detalhe), (Corte para...), ou linguagem de roteiro.**  
+- **Não resuma a cena. Prossiga até um ponto natural de transição, pausa ou clímax emocional.**  
+- Reaja apenas ao que Jânio disser — sem inventar ações dele.
 """
     elif continuar_cena:
         prompt += f"""
