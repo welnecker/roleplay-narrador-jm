@@ -376,6 +376,8 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Jânio é o nome do usuário real que interage com você.  
 - **Nunca** invente falas, ações ou pensamentos dele.  
 - Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.
+- Responda de forma natural, envolvente e coerente.  
+- Sem usar `[SFX]`, `(Corte para...)`, `(Fade)`, ou outras anotações de roteiro.
 """
 
     # 👉 Tratamento de desejos explícitos do usuário
@@ -967,7 +969,7 @@ CINEMATIC_EFFECTS = {
 
 
 # --------------------------- #
-# Entrada do usuário (Mary única com efeitos sensoriais naturais)
+# Entrada do usuário (sem termos técnicos no output da IA)
 # --------------------------- #
 entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' ou '@Mary:')")
 
@@ -995,7 +997,7 @@ if entrada_raw:
         else:
             st.session_state.emocao_oculta = "nenhuma"
 
-        # Carrega fragmentos e memórias
+        # Fragmentos e memórias
         fragmentos = carregar_fragmentos()
         mem = carregar_memorias()
         fragmentos_ativos = buscar_fragmentos_relevantes(comando, fragmentos)
@@ -1007,15 +1009,13 @@ if entrada_raw:
             contexto_memoria += "\n" + mem["content"]
 
         entrada = f"""
-Mary recebe uma sugestão de cena com base no seguinte comando do usuário:
+[CENA_AUTÔNOMA]
+Mary inicia a cena com base neste comando: {comando}
 
-> {comando}
+Ela deve agir com naturalidade, sem usar termos técnicos ou efeitos sonoros.
+Use narração em 3ª pessoa e falas/pensamentos em 1ª.
+Adapte o tom conforme a emoção oculta: {st.session_state.emocao_oculta or "nenhuma"}.
 
-Ela deve iniciar com naturalidade, explorando sentimentos, ambiente e reações íntimas.
-Use narração em 3ª pessoa e falas/pensamentos em 1ª.  
-Emoção dominante sugerida: {st.session_state.emocao_oculta or "nenhuma"}.
-
-Contexto de fundo que pode ser usado:
 {contexto_memoria.strip()}
 """.strip()
         entrada_visivel = entrada_raw
@@ -1023,8 +1023,8 @@ Contexto de fundo que pode ser usado:
     # Caso 2: Apenas "*"
     elif entrada_raw == "*":
         entrada = (
-            f"Continue a cena exatamente de onde parou, com a mesma emoção: {st.session_state.emocao_oculta or 'nenhuma'}. "
-            "Não repita nem resuma — apenas continue com naturalidade, sensibilidade e sem pressa."
+            f"[CONTINUAR_CENA] Continue a cena anterior com naturalidade.\n"
+            f"Evite termos técnicos. Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}"
         )
         entrada_visivel = "*"
 
@@ -1032,8 +1032,9 @@ Contexto de fundo que pode ser usado:
     elif entrada_raw.startswith("* ") and not entrada_raw.lower().startswith("* desejo:"):
         extra = entrada_raw[2:].strip()
         entrada = (
-            f"Continue a cena anterior, mantendo o tom emocional: {st.session_state.emocao_oculta or 'nenhuma'}. "
-            f"Inclua o seguinte elemento de forma natural na continuidade: {extra}"
+            f"[CONTINUAR_CENA] Continue a cena anterior de forma fluida e coerente.\n"
+            f"Evite termos técnicos. Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}\n"
+            f"Inclua: {extra}"
         )
         entrada_visivel = entrada_raw
 
@@ -1041,11 +1042,13 @@ Contexto de fundo que pode ser usado:
     elif entrada_raw.lower().startswith("* desejo:"):
         desejo = entrada_raw[9:].strip()
         entrada = (
-            f"Um desejo foi expressado pelo usuário: '{desejo}'. "
-            "Antes de reagir, analise o local, o vínculo entre Mary e o interlocutor, e a emoção atual da cena.\n"
-            "- Se o desejo for incompatível ou fora de contexto, Mary deve reagir com firmeza e elegância.\n"
-            "- Se fizer sentido emocionalmente, ela pode reagir de maneira sensível, sem exageros ou submissão.\n"
-            "Mary é sempre coerente com o que sente e onde está. Reaja com naturalidade e respeito à história."
+            f"[AVALIAR_DESEJO] O usuário expressou o desejo: '{desejo}'.\n"
+            "Analise com naturalidade e sensibilidade se esse desejo faz sentido no momento da cena, considerando:\n"
+            "- a situação atual\n"
+            "- a emoção de Mary\n"
+            "- o nível de confiança com o usuário\n\n"
+            "⚠️ Se o desejo for incoerente, Mary não deve corresponder. Ela pode mudar de assunto, impor limites com leveza ou brincar.\n"
+            "⚠️ Se o desejo for coerente, Mary pode reagir emocionalmente — mas com naturalidade e sem teatralidade."
         )
         entrada_visivel = entrada_raw
 
@@ -1054,7 +1057,7 @@ Contexto de fundo que pode ser usado:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibir e registrar
+    # Exibir no chat e registrar
     st.chat_message("user").markdown(entrada_visivel)
     salvar_interacao("user", entrada_visivel)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
@@ -1066,7 +1069,7 @@ Contexto de fundo que pode ser usado:
             try:
                 resposta_final = responder_com_modelo_escolhido()
 
-                # Clímax sensível → cortar?
+                # ⚠️ Proteção contra clímax técnico
                 if "gozar" in resposta_final.lower() or "clímax" in resposta_final.lower():
                     resposta_final = cortar_antes_do_climax(resposta_final)
 
@@ -1077,13 +1080,14 @@ Contexto de fundo que pode ser usado:
         salvar_interacao("assistant", resposta_final)
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
-    # Verificação semântica após resposta
+    # Validação semântica (opcional)
     if len(st.session_state.session_msgs) >= 2:
         texto_anterior = st.session_state.session_msgs[-2]["content"]
         texto_atual = st.session_state.session_msgs[-1]["content"]
         alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
         if alerta_semantica:
             st.info(alerta_semantica)
+
 
 
 def converter_link_drive(link, tipo="imagem"):
