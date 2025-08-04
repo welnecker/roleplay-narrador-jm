@@ -408,7 +408,12 @@ Evite reações exageradas ou submissas — mantenha sempre o equilíbrio narrat
 # OpenRouter - Streaming
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
-    prompt = construir_prompt_mary()
+    prompt = construir_prompt_mary().strip() + """
+
+⚠️ Nunca use termos técnicos como [SFX], (fade), (close-up), (cut), efeitos sonoros ou comandos cinematográficos.
+Escreva com naturalidade, com narração em terceira pessoa e falas/pensamentos em primeira pessoa.
+Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA nem descrever câmera ou edição.
+"""
 
     historico_base = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
@@ -420,13 +425,9 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
         for m in st.session_state.get("session_msgs", [])
         if isinstance(m, dict) and "content" in m
     ]
-    historico = historico_base + historico_sessao
+    mensagens = [{"role": "system", "content": prompt}] + historico_base + historico_sessao
 
-    mensagens = [{"role": "system", "content": prompt}] + historico
-
-    # Temperatura fixa para o modo "Mary"
     temperatura = 0.85
-
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
@@ -475,7 +476,12 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id):
 # Together - Streaming
 # --------------------------- #
 def gerar_resposta_together_stream(modelo_escolhido_id):
-    prompt = construir_prompt_mary()
+    prompt = construir_prompt_mary().strip() + """
+
+⚠️ Nunca use termos técnicos como [SFX], (fade), (close-up), (cut), efeitos sonoros ou comandos cinematográficos.
+Escreva com naturalidade, com narração em terceira pessoa e falas/pensamentos em primeira pessoa.
+Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA nem descrever câmera ou edição.
+"""
 
     historico_base = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
@@ -487,13 +493,9 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
         for m in st.session_state.get("session_msgs", [])
         if isinstance(m, dict) and "content" in m
     ]
-    historico = historico_base + historico_sessao
+    mensagens = [{"role": "system", "content": prompt}] + historico_base + historico_sessao
 
-    mensagens = [{"role": "system", "content": prompt}] + historico
-
-    # Temperatura fixa para o modo Mary
     temperatura = 0.85
-
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
@@ -539,6 +541,7 @@ def gerar_resposta_together_stream(modelo_escolhido_id):
         return "[ERRO STREAM]"
 
     return full_text.strip()
+
 
 
 
