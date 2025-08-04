@@ -356,10 +356,10 @@ def construir_prompt_mary():
 
 ⚠️ **CENA LONGA ATIVADA:**  
 Mary pode expandir livremente a cena com profundidade emocional e naturalidade.  
-- Explore seus pensamentos e sentimentos de forma sincera.  
-- **Evite efeitos técnicos como [SFX], (Plano Detalhe), (Corte para...), ou linguagem de roteiro.**  
-- **Não resuma a cena. Prossiga até um ponto natural de transição, pausa ou clímax emocional.**  
-- Reaja apenas ao que Jânio disser — sem inventar ações dele.
+- Use descrições sensoriais e envolventes — sons, toques, luzes, respiração, olhares.  
+- Evite linguagem de roteiro como [SFX], (Plano Detalhe), (Corte), (Fade).  
+- Prossiga até um ponto de transição emocional ou pausa — sem pressa ou resumos.  
+- Reaja apenas ao que Jânio disser — sem inventar ações ou pensamentos dele.
 """
     elif continuar_cena:
         prompt += f"""
@@ -395,7 +395,11 @@ Mary **nunca força intimidade**. Ela é inteligente, sensível e firme.
 Evite reações exageradas ou submissas — mantenha sempre o equilíbrio narrativo.
 """
 
+    # Orientação final
+    prompt += "\n\n📌 Ao descrever cenas, use apenas linguagem sensorial e natural. Evite qualquer marcação técnica de roteiro."
+
     return prompt.strip()
+
 
 
 # --------------------------- #
@@ -928,10 +932,38 @@ def responder_com_modelo_escolhido():
         st.session_state["provedor_ia"] = "openrouter"
         return gerar_resposta_openrouter_stream(modelo)
 
+
 # ---------------------------
-# 🎬 Efeitos Cinematográficos por Emoção Oculta
+# 🌙 Efeitos Sensorial-Narrativos por Emoção Oculta (sem termos técnicos)
 # ---------------------------
 CINEMATIC_EFFECTS = {
+    "tristeza": [
+        "O silêncio ao redor pesa, como se o mundo estivesse longe.",
+        "O ar parece mais frio, e cada gesto carrega hesitação.",
+        "As sombras parecem se alongar ao redor, como se absorvessem as palavras não ditas."
+    ],
+    "raiva": [
+        "O peito dela sobe e desce com força, cada respiração carregada de tensão.",
+        "As palavras vêm rápidas, como se o controle estivesse por um fio.",
+        "Tudo parece mais intenso — os sons, os olhares, até o calor na pele."
+    ],
+    "felicidade": [
+        "O riso dela ecoa como música, espontâneo e contagiante.",
+        "A luz entra suave, como se o dia fosse feito só para aquele momento.",
+        "Tudo ao redor parece vivo — os cheiros, as cores, os gestos pequenos."
+    ],
+    "tensão": [
+        "O olhar dela busca respostas, como se o tempo tivesse desacelerado.",
+        "Cada movimento é mais contido, como se o ar estivesse suspenso.",
+        "O toque que não acontece diz mais que mil palavras."
+    ],
+    "nenhuma": [
+        "O ambiente permanece neutro, sem nada de especial chamando atenção.",
+        "Mary age de forma serena, guiada apenas pelo que sente no momento.",
+        "Tudo parece comum, mas ainda assim... cheio de possibilidades."
+    ]
+}
+ = {
     "tristeza": [
         "Câmera lenta nos gestos de Mary.",
         "Som ambiente abafado, como se o mundo estivesse distante.",
@@ -961,7 +993,7 @@ CINEMATIC_EFFECTS = {
 
 
 # --------------------------- #
-# Entrada do usuário (Mary única com efeitos)
+# Entrada do usuário (Mary única com efeitos sensoriais naturais)
 # --------------------------- #
 entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' ou '@Mary:')")
 
@@ -1001,13 +1033,15 @@ if entrada_raw:
             contexto_memoria += "\n" + mem["content"]
 
         entrada = f"""
-[CENA_AUTÔNOMA]
-Mary inicia a cena com base no seguinte comando: {comando}
+Mary recebe uma sugestão de cena com base no seguinte comando do usuário:
 
-Ela deve agir de forma natural e espontânea, sem mencionar regras ou instruções técnicas.
-Use narração em 3ª pessoa, e falas e pensamentos em 1ª pessoa.
-Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or "nenhuma"}.
+> {comando}
 
+Ela deve iniciar com naturalidade, explorando sentimentos, ambiente e reações íntimas.
+Use narração em 3ª pessoa e falas/pensamentos em 1ª.  
+Emoção dominante sugerida: {st.session_state.emocao_oculta or "nenhuma"}.
+
+Contexto de fundo que pode ser usado:
 {contexto_memoria.strip()}
 """.strip()
         entrada_visivel = entrada_raw
@@ -1015,34 +1049,29 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
     # Caso 2: Apenas "*"
     elif entrada_raw == "*":
         entrada = (
-            f"[CONTINUAR_CENA] Prossiga a cena anterior com naturalidade.\n"
-            f"Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}"
+            f"Continue a cena exatamente de onde parou, com a mesma emoção: {st.session_state.emocao_oculta or 'nenhuma'}. "
+            "Não repita nem resuma — apenas continue com naturalidade, sensibilidade e sem pressa."
         )
         entrada_visivel = "*"
-    
+
     # Caso 3: "* algo"
     elif entrada_raw.startswith("* ") and not entrada_raw.lower().startswith("* desejo:"):
         extra = entrada_raw[2:].strip()
         entrada = (
-            f"[CONTINUAR_CENA] Prossiga a cena anterior com naturalidade.\n"
-            f"Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}\n"
-            f"Inclua: {extra}"
+            f"Continue a cena anterior, mantendo o tom emocional: {st.session_state.emocao_oculta or 'nenhuma'}. "
+            f"Inclua o seguinte elemento de forma natural na continuidade: {extra}"
         )
         entrada_visivel = entrada_raw
-
 
     # Caso 4: "* Desejo: ..."
     elif entrada_raw.lower().startswith("* desejo:"):
         desejo = entrada_raw[9:].strip()
         entrada = (
-            f"[AVALIAR_DESEJO] O usuário expressou o desejo: '{desejo}'. "
-            "Você deve **avaliar se esse desejo é compatível com o contexto atual**, considerando:\n"
-            "- o local e situação da cena atual\n"
-            "- a emoção oculta de Mary\n"
-            "- o vínculo com o interlocutor\n\n"
-            "⚠️ Se for **incoerente ou inadequado**, Mary **não executa o desejo**, mas reage com elegância, impõe limites, brinca ou desconversa.\n"
-            "⚠️ Se for **compatível**, Mary pode reagir emocionalmente, mas sem forçar intimidade.\n"
-            "💡 Mantenha sua personalidade fiel e reaja com naturalidade."
+            f"Um desejo foi expressado pelo usuário: '{desejo}'. "
+            "Antes de reagir, analise o local, o vínculo entre Mary e o interlocutor, e a emoção atual da cena.\n"
+            "- Se o desejo for incompatível ou fora de contexto, Mary deve reagir com firmeza e elegância.\n"
+            "- Se fizer sentido emocionalmente, ela pode reagir de maneira sensível, sem exageros ou submissão.\n"
+            "Mary é sempre coerente com o que sente e onde está. Reaja com naturalidade e respeito à história."
         )
         entrada_visivel = entrada_raw
 
@@ -1081,7 +1110,6 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
         alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
         if alerta_semantica:
             st.info(alerta_semantica)
-
 
 
 def converter_link_drive(link, tipo="imagem"):
