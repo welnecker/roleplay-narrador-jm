@@ -1057,36 +1057,36 @@ Adapte o tom conforme a emoção oculta: {st.session_state.emocao_oculta or "nen
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibir no chat e registrar
-    st.chat_message("user").markdown(entrada_visivel)
-    "user", entrada_visivel)
-    st.session_state.session_msgs.append({"role": "user", "content": entrada})
-    st.session_state.ultima_entrada_recebida = entrada
+   # Exibir no chat e registrar
+st.chat_message("user").markdown(entrada_visivel)
+salvar_interacao("user", entrada_visivel)
+st.session_state.session_msgs.append({"role": "user", "content": entrada})
+st.session_state.ultima_entrada_recebida = entrada
 
-    with st.chat_message("assistant"):
-        placeholder = st.empty()
-        with st.spinner("Mary está atuando na cena..."):
-            try:
-                resposta_final = responder_com_modelo_escolhido()
+with st.chat_message("assistant"):
+    placeholder = st.empty()
+    with st.spinner("Mary está atuando na cena..."):
+        try:
+            resposta_final = responder_com_modelo_escolhido()
 
-                # ⚠️ Proteção contra clímax técnico
-                if "gozar" in resposta_final.lower() or "clímax" in resposta_final.lower():
-                    resposta_final = cortar_antes_do_climax(resposta_final)
+            # ⚠️ Proteção contra clímax técnico
+            if "gozar" in resposta_final.lower() or "clímax" in resposta_final.lower():
+                resposta_final = cortar_antes_do_climax(resposta_final)
 
-            except Exception as e:
-                st.error(f"Erro: {e}")
-                resposta_final = "[Erro ao gerar resposta]"
+        except Exception as e:
+            st.error(f"Erro: {e}")
+            resposta_final = "[Erro ao gerar resposta]"
 
-        "assistant", resposta_final)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+    salvar_interacao("assistant", resposta_final)
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
-    # Validação semântica (opcional)
-    if len(st.session_state.session_msgs) >= 2:
-        texto_anterior = st.session_state.session_msgs[-2]["content"]
-        texto_atual = st.session_state.session_msgs[-1]["content"]
-        alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
-        if alerta_semantica:
-            st.info(alerta_semantica)
+# Validação semântica (opcional)
+if len(st.session_state.session_msgs) >= 2:
+    texto_anterior = st.session_state.session_msgs[-2]["content"]
+    texto_atual = st.session_state.session_msgs[-1]["content"]
+    alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
+    if alerta_semantica:
+        st.info(alerta_semantica)
 
 
 
