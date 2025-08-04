@@ -120,7 +120,7 @@ def salvar_interacao(role, content):
     try:
         aba = planilha.worksheet("interacoes_mary")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        aba.append_row([timestamp, role.strip(), content.strip()])
+        aba.append_row([timestamp, role.strip(), content.strip()], value_input_option="RAW")
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
@@ -584,7 +584,7 @@ if st.session_state.get("ultima_entrada_recebida"):
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
 
-    salvar_interacao("assistant", resposta_final)
+    "assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
     st.session_state.ultima_entrada_recebida = None
 
@@ -1059,7 +1059,7 @@ Adapte o tom conforme a emoção oculta: {st.session_state.emocao_oculta or "nen
 
     # Exibir no chat e registrar
     st.chat_message("user").markdown(entrada_visivel)
-    salvar_interacao("user", entrada_visivel)
+    "user", entrada_visivel)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
     st.session_state.ultima_entrada_recebida = entrada
 
@@ -1077,7 +1077,7 @@ Adapte o tom conforme a emoção oculta: {st.session_state.emocao_oculta or "nen
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
 
-        salvar_interacao("assistant", resposta_final)
+        "assistant", resposta_final)
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
     # Validação semântica (opcional)
