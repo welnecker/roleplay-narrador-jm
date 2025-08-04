@@ -1016,10 +1016,10 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
     elif entrada_raw == "*":
         entrada = (
             f"[CONTINUAR_CENA] Prossiga a cena anterior com naturalidade.\n"
-            f"Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}\n"
+            f"Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}"
         )
         entrada_visivel = "*"
-
+    
     # Caso 3: "* algo"
     elif entrada_raw.startswith("* ") and not entrada_raw.lower().startswith("* desejo:"):
         extra = entrada_raw[2:].strip()
@@ -1029,6 +1029,7 @@ Ajuste o tom de acordo com a emoção oculta: {st.session_state.emocao_oculta or
             f"Inclua: {extra}"
         )
         entrada_visivel = entrada_raw
+
 
     # Caso 4: "* Desejo: ..."
     elif entrada_raw.lower().startswith("* desejo:"):
