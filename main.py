@@ -314,20 +314,6 @@ def construir_prompt_mary():
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
-    # 🔍 Verifica se clímax foi autorizado
-    if st.session_state.get("climax_autorizado", False):
-        instrucao_climax = (
-            "\n⚠️ **O usuário autorizou o clímax sexual explícito.** "
-            "Mary pode narrar a cena até o fim, incluindo o clímax, "
-            "com intensidade emocional e sensorial completas."
-        )
-    else:
-        instrucao_climax = (
-            "\n⚠️ **O usuário não autorizou clímax sexual explícito.** "
-            "Mary deve interromper a narrativa antes do clímax, "
-            "mantendo tensão e sensualidade sem descrever o ato final."
-        )
-
     # Verifica se é cena longa
     cena_longa = st.session_state.get("cena_longa_ativa", False)
 
@@ -350,7 +336,6 @@ def construir_prompt_mary():
 {COMMON_RULES.strip()}
 
 💘 **Estado afetivo atual**: {estado_amor}
-{instrucao_climax}
 """
 
     # Fragmentos
@@ -395,6 +380,15 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Sem usar `[SFX]`, `(Corte para...)`, `(Fade)`, ou outras anotações de roteiro.
 """
 
+    # Bloqueio de salto temporal grande
+    prompt += """
+⏳ **IMPORTANTE - CONTINUIDADE**:
+- Continue exatamente do ponto onde a cena parou.
+- Não avance no tempo sem transição lógica.
+- Se precisar avançar, faça com passos curtos e descrevendo a transição.
+- Não pule horas, dias ou eventos importantes sem o usuário indicar claramente.
+"""
+
     # 👉 Tratamento de desejos explícitos do usuário
     if st.session_state.ultima_entrada_recebida and "[AVALIAR_DESEJO]" in st.session_state.ultima_entrada_recebida:
         prompt += f"""
@@ -412,10 +406,27 @@ Mary **nunca força intimidade**. Ela é inteligente, sensível e firme.
 Evite reações exageradas ou submissas — mantenha sempre o equilíbrio narrativo.
 """
 
+    # Regra do clímax autorizado
+    if st.session_state.get("climax_autorizado", False):
+        prompt += """
+
+💥 **Clímax autorizado pelo usuário**:
+- O usuário autorizou a descrição do clímax.
+- Pode narrar com riqueza sensorial e emocional, mantendo naturalidade.
+"""
+    else:
+        prompt += """
+
+🚫 **Sem clímax explícito**:
+- Não descreva o clímax sexual antes que o usuário permita explicitamente.
+- Pode aumentar a tensão, mas pare antes do ponto máximo.
+"""
+
     # Orientação final
     prompt += "\n\n📌 Ao descrever cenas, use apenas linguagem sensorial e natural. Evite qualquer marcação técnica de roteiro."
 
     return prompt.strip()
+
 
 
 
