@@ -149,7 +149,8 @@ def carregar_memorias():
             tipo = tipo.replace("[", "").replace("]", "")  # remove os colchetes
             texto = linha["texto"].strip()
 
-            if tipo == "all" or tipo == modo:
+            # Inclui memórias marcadas como 'all', 'mary' ou do modo atual
+            if tipo in ("all", "mary", modo):
                 textos.append(f"- {texto}")
 
         if textos:
@@ -159,6 +160,7 @@ def carregar_memorias():
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
         return None
+
 
 
 # --------------------------- #
@@ -327,7 +329,11 @@ def construir_prompt_mary():
 
     # Memórias
     mem = carregar_memorias() if not cena_longa else None
-    bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use quando fizer sentido):\n{mem['content']}\n" if mem else ""
+    if mem and mem.get("content"):
+        bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use quando fizer sentido):\n{mem['content']}\n"
+    else:
+        bloco_memorias = ""
+
 
     # Prompt base
     prompt = f"""{bloco_memorias}
