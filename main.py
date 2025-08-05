@@ -624,60 +624,63 @@ with st.sidebar:
                     })
                     st.success("✨ Desejo adicionado ao chat.")
 
-    modelos_disponiveis = {
-        # === OPENROUTER ===
-        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
-        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-        "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-        "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-        # === TOGETHER AI ===
-        "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
-        "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    }
+modelos_disponiveis = {
+    # === OPENROUTER ===
+    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+    # === TOGETHER AI ===
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
+}
 
-    modelo_selecionado = st.selectbox(
-        "🤖 Modelo de IA",
-        list(modelos_disponiveis.keys()),
-        key="modelo_ia",
-        index=0
-    )
-    modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+modelo_selecionado = st.selectbox(
+    "🤖 Modelo de IA",
+    list(modelos_disponiveis.keys()),
+    key="modelo_ia",
+    index=0
+)
+modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    # ------------------------------- #
-    # 🎭 Emoção Oculta de Mary
-    # ------------------------------- #
-    st.markdown("---")
-    st.subheader("🎭 Emoção Oculta de Mary")
+# 🔹 Garante que o valor fique disponível para todo o script
+st.session_state["modelo_escolhido_id"] = modelo_escolhido_id
 
-    emoes = ["nenhuma", "tristeza", "raiva", "felicidade", "tensão"]
-    escolhida = st.selectbox("Escolha a emoção dominante:", emoes, index=0)
+# ------------------------------- #
+# 🎭 Emoção Oculta de Mary
+# ------------------------------- #
+st.markdown("---")
+st.subheader("🎭 Emoção Oculta de Mary")
 
-    if st.button("Definir emoção"):
-        st.session_state.emocao_oculta = escolhida
-        st.success(f"Mary agora está sentindo: {escolhida}")
+emoes = ["nenhuma", "tristeza", "raiva", "felicidade", "tensão"]
+escolhida = st.selectbox("Escolha a emoção dominante:", emoes, index=0)
 
-    # ------------------------------- #
-    # 🎲 Emoção Aleatória
-    # ------------------------------- #
-    import random
-    if st.button("Sortear emoção aleatória"):
-        emocoes_possiveis = ["tristeza", "raiva", "felicidade", "tensão"]
-        sorteada = random.choice(emocoes_possiveis)
-        st.session_state.emocao_oculta = sorteada
-        st.success(f"✨ Emoção sorteada: {sorteada}")
+if st.button("Definir emoção"):
+    st.session_state.emocao_oculta = escolhida
+    st.success(f"Mary agora está sentindo: {escolhida}")
+
+# ------------------------------- #
+# 🎲 Emoção Aleatória
+# ------------------------------- #
+import random
+if st.button("Sortear emoção aleatória"):
+    emocoes_possiveis = ["tristeza", "raiva", "felicidade", "tensão"]
+    sorteada = random.choice(emocoes_possiveis)
+    st.session_state.emocao_oculta = sorteada
+    st.success(f"✨ Emoção sorteada: {sorteada}")
 
 # ------------------------------- #
 # 🎬 Cena Longa no Sidebar
@@ -701,18 +704,11 @@ st.markdown("---")
 st.subheader("📝 Cena Longa Especial")
 
 if st.button("Iniciar Cena Longa"):
-    # 🔄 Reset de sessão
     st.session_state.session_msgs = []
     st.session_state.memorias_usadas = set()
     st.session_state.contador_emocao = 0
-
-    # 🌡️ Força temperatura mais alta
     st.session_state["temperatura_forcada"] = 0.95
-
-    # 😮 Emoção oculta intensa
     st.session_state.emocao_oculta = "tensão"
-
-    # 🚫 Fragmentos e memórias desativados temporariamente
     st.session_state["cena_longa_ativa"] = True
 
     st.success("✨ Cena Longa iniciada! Mary terá liberdade máxima na próxima resposta.")
@@ -722,16 +718,12 @@ if st.button("Iniciar Cena Longa"):
 # ------------------------------- #
 # 🎮 Vídeo e resumo
 # ------------------------------- #
-
 if st.button("🎮 Ver vídeo atual"):
     st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
 
 if st.button("📝 Gerar resumo do capítulo"):
     try:
-        # Verifica se é uma cena longa
         cena_longa = st.session_state.get("cena_longa_ativa", False)
-
-        # Ajusta o número de interações a resumir
         n_resumo = 10 if cena_longa else 3
         ultimas = carregar_ultimas_interacoes(n=n_resumo)
         texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
@@ -759,21 +751,15 @@ if st.button("📝 Gerar resumo do capítulo"):
             resumo_gerado = response.json()["choices"][0]["message"]["content"]
             salvar_resumo(resumo_gerado)
             st.session_state.ultimo_resumo = resumo_gerado
-
             st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
             if cena_longa:
                 st.info("🎬 Resumo estendido gerado para a Cena Longa!")
-
             with st.expander("📖 Ver resumo gerado"):
                 st.markdown(f"```markdown\n{resumo_gerado}\n```")
         else:
             st.error("Erro ao gerar resumo automaticamente.")
-
     except Exception as e:
         st.error(f"Erro durante a geração do resumo: {e}")
-
-
-
 
 # --------------------------- #
 # 💘 Grande amor
@@ -812,6 +798,7 @@ if st.button("💾 Salvar memória"):
 # --------------------------- #
 if st.button("🗑️ Excluir última interação da planilha"):
     excluir_ultimas_interacoes("interacoes_mary")
+
 
 
 
