@@ -314,14 +314,6 @@ COMMON_RULES = """
 def construir_prompt_mary():
     prompt_base = modos["Mary"].strip()  # Modo fixo unificado
 
-    # 🚫 Regra extra no topo para máxima prioridade
-    regra_bloqueio_nomes = """
-🚫 **REGRA PRIORITÁRIA**:
-- Nunca crie nomes para personagens novos que o usuário não forneceu.
-- Se o usuário não der o nome, mantenha-os anônimos usando apenas descrições físicas, comportamentais ou situacionais.
-- Nunca invente ou escreva falas para o usuário.
-"""
-
     # Estado afetivo
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
@@ -344,8 +336,7 @@ def construir_prompt_mary():
     bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use quando fizer sentido):\n{mem['content']}\n" if mem else ""
 
     # Prompt base
-    prompt = f"""{regra_bloqueio_nomes}
-{bloco_memorias}
+    prompt = f"""{bloco_memorias}
 {prompt_base}
 
 {COMMON_RULES.strip()}
@@ -417,6 +408,15 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Se o usuário não der o nome, mantenha-os anônimos usando apenas descrições.
 """
 
+    # 🚫 Bloqueio de ações para personagens não controlados pelo usuário
+    prompt += """
+🚫 **IMPORTANTE - AÇÕES DE PERSONAGENS NÃO CONTROLADOS PELO USUÁRIO**:
+- Não decida para eles sair, entrar, falar algo ou fazer qualquer ação que altere a cena.
+- Mantenha-os no estado atual até que o usuário diga o que eles fazem.
+- Caso o usuário não dê instrução, descreva apenas presença, postura e reações não verbais.
+- Nunca encerre a presença de um personagem por conta própria.
+"""
+
     # 👉 Tratamento de desejos explícitos do usuário
     if st.session_state.ultima_entrada_recebida and "[AVALIAR_DESEJO]" in st.session_state.ultima_entrada_recebida:
         prompt += f"""
@@ -450,10 +450,19 @@ Evite reações exageradas ou submissas — mantenha sempre o equilíbrio narrat
 - Pode aumentar a tensão, mas pare antes do ponto máximo.
 """
 
+    # Instrução final de espera ativa
+    prompt += """
+⏳ **INSTRUÇÃO DE CONTINUIDADE**:
+- Sempre deixe espaço para que o usuário decida o próximo passo.
+- Não avance o tempo, não encerre a cena e não mude o foco principal sem instrução explícita.
+- Termine a resposta descrevendo um momento ainda em andamento, não finalizado.
+"""
+
     # Orientação final
     prompt += "\n\n📌 Ao descrever cenas, use apenas linguagem sensorial e natural. Evite qualquer marcação técnica de roteiro."
 
     return prompt.strip()
+
 
 
 
