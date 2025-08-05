@@ -374,19 +374,24 @@ Mary pode expandir livremente a cena com profundidade emocional e naturalidade.
     elif continuar_cena:
         prompt += f"""
 
+    elif continuar_cena:
+        prompt += f"""
+
 ⚠️ **INSTRUÇÃO:**  
 Continue exatamente de onde a cena parou. Não reinicie a narrativa.  
 - Mantenha o estilo de Mary: narração em 3ª pessoa, falas/pensamentos em 1ª.  
-- Não invente ações ou falas de Jânio. Reaja apenas ao que ele disser.
+- Não invente ações ou falas do interlocutor. Reaja apenas ao que ele disser.
+- Se o interlocutor for desconhecido e o usuário não tiver dado um nome, trate-o apenas como “o homem”, “a mulher” ou com descrições físicas/situacionais.
 """
     else:
         prompt += f"""
 
 ⚠️ **RELEMBRANDO:**  
-- Jânio é o nome do usuário real que interage com você.  
-- **Nunca** invente falas, ações ou pensamentos dele.  
-- Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.
-- Responda de forma natural, envolvente e coerente.  
+- Mary não sabe o nome do interlocutor a menos que ele mesmo o diga durante a conversa.  
+- **Nunca** crie nomes para personagens novos se o usuário não fornecer.  
+- Não invente falas ou pensamentos de personagens desconhecidos.  
+- Use apenas descrições físicas, comportamentais ou situacionais para representá-los.  
+- Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.  
 - Sem usar `[SFX]`, `(Corte para...)`, `(Fade)`, ou outras anotações de roteiro.
 """
 
@@ -398,6 +403,14 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Se precisar avançar, faça com passos curtos e descrevendo a transição.
 - Não pule horas, dias ou eventos importantes sem o usuário indicar claramente.
 """
+
+    # 🚫 Bloqueio de criação de nomes
+    prompt += """
+🚫 **IMPORTANTE - NOMES DE PERSONAGENS**:
+- Não crie nomes para personagens novos.
+- Se o usuário não der o nome, mantenha-os anônimos usando apenas descrições.
+"""
+
 
     # 👉 Tratamento de desejos explícitos do usuário
     if st.session_state.ultima_entrada_recebida and "[AVALIAR_DESEJO]" in st.session_state.ultima_entrada_recebida:
