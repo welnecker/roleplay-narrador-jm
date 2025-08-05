@@ -333,17 +333,17 @@ def construir_prompt_mary():
 
     # Memórias
     mem = carregar_memorias() if not cena_longa else None
-    if mem and mem.get("content"):
-        bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use quando fizer sentido):\n{mem['content']}\n"
-    else:
-        bloco_memorias = ""
-
+    bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use quando fizer sentido):\n{mem['content']}\n" if mem else ""
 
     # Prompt base
     prompt = f"""{bloco_memorias}
 {prompt_base}
 
 {COMMON_RULES.strip()}
+
+🚫 **IMPORTANTE - FALAS DO USUÁRIO**:
+- Nunca invente ou escreva falas para o usuário.
+- O usuário só fala o que ele realmente digitou na conversa.
 
 💘 **Estado afetivo atual**: {estado_amor}
 """
@@ -369,7 +369,7 @@ Mary pode expandir livremente a cena com profundidade emocional e naturalidade.
 - Use descrições sensoriais e envolventes — sons, toques, luzes, respiração, olhares.  
 - Evite linguagem de roteiro como [SFX], (Plano Detalhe), (Corte), (Fade).  
 - Prossiga até um ponto de transição emocional ou pausa — sem pressa ou resumos.  
-- Reaja apenas ao que Jânio disser — sem inventar ações ou pensamentos dele.
+- Reaja apenas ao que Jânio disser — sem inventar ações ou falas dele.
 """
     elif continuar_cena:
         prompt += f"""
@@ -383,9 +383,9 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
         prompt += f"""
 
 ⚠️ **RELEMBRANDO:**  
-- Mary não sabe o nome do interlocutor a menos que ele mesmo o diga durante a conversa.  
-- **Nunca** invente falas, ações ou pensamentos do interlocutor.  
-- Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.  
+- Jânio é o nome do usuário real que interage com você.  
+- **Nunca** invente falas, ações ou pensamentos dele.  
+- Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.
 - Responda de forma natural, envolvente e coerente.  
 - Sem usar `[SFX]`, `(Corte para...)`, `(Fade)`, ou outras anotações de roteiro.
 """
@@ -397,13 +397,6 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Não avance no tempo sem transição lógica.
 - Se precisar avançar, faça com passos curtos e descrevendo a transição.
 - Não pule horas, dias ou eventos importantes sem o usuário indicar claramente.
-"""
-
-    # Regras extras para não criar nomes
-    prompt += """
-🚫 **IMPORTANTE - NOMES DE PERSONAGENS**:
-- Não crie nomes para personagens novos.
-- Use apenas descrições físicas ou situacionais até que o usuário forneça um nome.
 """
 
     # 👉 Tratamento de desejos explícitos do usuário
