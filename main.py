@@ -561,7 +561,7 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 10000,
+        "max_tokens": 1000,
         "temperature": temperatura,
         "stream": True,
     }
