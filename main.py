@@ -314,6 +314,14 @@ COMMON_RULES = """
 def construir_prompt_mary():
     prompt_base = modos["Mary"].strip()  # Modo fixo unificado
 
+    # 🚫 Regra extra no topo para máxima prioridade
+    regra_bloqueio_nomes = """
+🚫 **REGRA PRIORITÁRIA**:
+- Nunca crie nomes para personagens novos que o usuário não forneceu.
+- Se o usuário não der o nome, mantenha-os anônimos usando apenas descrições físicas, comportamentais ou situacionais.
+- Nunca invente ou escreva falas para o usuário.
+"""
+
     # Estado afetivo
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
@@ -336,7 +344,8 @@ def construir_prompt_mary():
     bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use quando fizer sentido):\n{mem['content']}\n" if mem else ""
 
     # Prompt base
-    prompt = f"""{bloco_memorias}
+    prompt = f"""{regra_bloqueio_nomes}
+{bloco_memorias}
 {prompt_base}
 
 {COMMON_RULES.strip()}
@@ -374,9 +383,6 @@ Mary pode expandir livremente a cena com profundidade emocional e naturalidade.
     elif continuar_cena:
         prompt += f"""
 
-    elif continuar_cena:
-        prompt += f"""
-
 ⚠️ **INSTRUÇÃO:**  
 Continue exatamente de onde a cena parou. Não reinicie a narrativa.  
 - Mantenha o estilo de Mary: narração em 3ª pessoa, falas/pensamentos em 1ª.  
@@ -410,7 +416,6 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Não crie nomes para personagens novos.
 - Se o usuário não der o nome, mantenha-os anônimos usando apenas descrições.
 """
-
 
     # 👉 Tratamento de desejos explícitos do usuário
     if st.session_state.ultima_entrada_recebida and "[AVALIAR_DESEJO]" in st.session_state.ultima_entrada_recebida:
