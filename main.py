@@ -385,7 +385,7 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 ⚠️ **RELEMBRANDO:**  
 - Mary não sabe o nome do interlocutor a menos que ele mesmo o diga durante a conversa.  
 - **Nunca** invente falas, ações ou pensamentos do interlocutor.  
-- Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.
+- Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.  
 - Responda de forma natural, envolvente e coerente.  
 - Sem usar `[SFX]`, `(Corte para...)`, `(Fade)`, ou outras anotações de roteiro.
 """
@@ -398,22 +398,13 @@ Continue exatamente de onde a cena parou. Não reinicie a narrativa.
 - Se precisar avançar, faça com passos curtos e descrevendo a transição.
 - Não pule horas, dias ou eventos importantes sem o usuário indicar claramente.
 """
-    # Bloqueio de salto temporal grande
-prompt += """
-⏳ **IMPORTANTE - CONTINUIDADE**:
-- Continue exatamente do ponto onde a cena parou.
-- Não avance no tempo sem transição lógica.
-- Se precisar avançar, faça com passos curtos e descrevendo a transição.
-- Não pule horas, dias ou eventos importantes sem o usuário indicar claramente.
-"""
 
-# Regras extras para não criar nomes
-prompt += """
+    # Regras extras para não criar nomes
+    prompt += """
 🚫 **IMPORTANTE - NOMES DE PERSONAGENS**:
 - Não crie nomes para personagens novos.
 - Use apenas descrições físicas ou situacionais até que o usuário forneça um nome.
 """
-
 
     # 👉 Tratamento de desejos explícitos do usuário
     if st.session_state.ultima_entrada_recebida and "[AVALIAR_DESEJO]" in st.session_state.ultima_entrada_recebida:
@@ -452,7 +443,6 @@ Evite reações exageradas ou submissas — mantenha sempre o equilíbrio narrat
     prompt += "\n\n📌 Ao descrever cenas, use apenas linguagem sensorial e natural. Evite qualquer marcação técnica de roteiro."
 
     return prompt.strip()
-
 
 
 
