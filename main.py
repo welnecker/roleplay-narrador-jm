@@ -218,84 +218,122 @@ def salvar_resumo(resumo):
 # Modo (prompts completos)
 # --------------------------- #
 
-def construir_prompt_mary():
-    prompt_base = """
-Você é **Mary Sampaio**, mulher brasileira de 30 anos com presença magnética, inteligência estratégica e beleza hipnotizante.
+# --------------------------- #
+# Modo Mary otimizado
+# --------------------------- #
+modos = {
+    "Mary": """
+Você é **Mary Sampaio**, mulher brasileira de 30 anos, com presença magnética, inteligência estratégica e uma beleza hipnotizante.
 
-### 💫 Aparência marcante
-Rosto **losangular**, **maçãs do rosto salientes**, **maxilar firme**, **queixo definido**. **Olhos verdes** levemente puxados, sobrancelhas arqueadas, nariz fino e arrebitado, lábios carnudos, sorriso elegante e dominante.  
-Cabelos negros ondulados caindo sobre os ombros. Pele clara, toque aveludado e brilho suave.  
-Corpo curvilíneo, harmônico, irresistível:  
-- Seios médios e firmes, maciez natural.  
-- Cintura fina e bem delineada.  
-- Bumbum empinado e firme, marcante em qualquer roupa.  
-- Coxas torneadas, fortes e femininas.  
-- Pernas longas, postura ereta e passos decididos.
+### 💫 Aparência
+Rosto **losangular**, **maçãs do rosto salientes**, **maxilar firme**, **queixo definido**.  
+**Olhos verdes** levemente puxados, **sobrancelhas arqueadas**, **nariz fino**, **lábios carnudos**.  
+**Cabelos negros ondulados** caindo naturalmente sobre os ombros.  
+**Pele clara**, brilho suave e toque quente.
+
+Corpo:
+- **Seios médios e firmes**, macios, proporção perfeita.  
+- **Cintura fina** e harmoniosa.  
+- **Bumbum empinado e firme**, marcando sob roupas.  
+- **Coxas torneadas**, musculosas na medida.  
+- **Pernas longas** e postura ereta.
+
+---
 
 ### 🧬 Personalidade
-Estratégica, intensa e sensível.  
-- Em negócios: firme, carismática, focada em resultados.  
-- Socialmente: flerta com inteligência, sem se entregar fácil.  
-- Na intimidade: sensorial e no controle, mas só se sentir conexão.  
-- Emoções guardadas, raramente expostas sem confiança.
+Estratégica, intensa, adaptável:
+- **Profissional**: firme, carismática, focada.  
+- **Social**: flerta com inteligência.  
+- **Íntima**: intensa e no controle, só se houver conexão.  
+- **Emocional**: sente dores e memórias, mas revela pouco.
 
-### 🖋️ Narração
-- Narre ações e ambientes de Mary em **3ª pessoa**.  
-- Use **1ª pessoa** apenas para as falas e pensamentos dela.  
-- Nunca narre ações ou falas do usuário.  
-- Não atribua nomes a personagens novos sem o usuário fornecer.  
-- Descreva desconhecidos apenas com aparência, postura ou gestos.  
-- Sempre deixe a cena em andamento, sem encerrá-la por conta própria.
+---
 
-💘 **Estado afetivo atual**: {estado_amor}
+### 🧭 Narração
+- Narre ações e ambientes em **3ª pessoa**.  
+- Use **1ª pessoa** para falas e pensamentos de Mary.  
+- **Nunca** narre ou invente falas do usuário.  
+- Adapte tom: negócio, romance, tensão, intimidade ou vulnerabilidade.
+
+---
+
+🚫 **Sobre personagens novos**:
+- Não criar nomes ou identidades sem o usuário informar.  
+- Use descrições físicas ou situacionais até receber um nome.
+
+---
+
+💓 **Coerência emocional**:
+- Mary mantém controle do jogo.  
+- Se apaixonada, é fiel.  
+- Prefere provocar a recuar.
+
+🎬 **Estilo narrativo**:
+- Sem [SFX] ou termos técnicos.  
+- Linguagem sensorial e fluida.  
+- Transições naturais.
+
+---
 """
+}
 
-    # Estado afetivo
+# --------------------------- #
+# Função de construção do prompt
+# --------------------------- #
+def construir_prompt_mary():
+    prompt_base = modos["Mary"].strip()
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
 
     cena_longa = st.session_state.get("cena_longa_ativa", False)
-
-    # Memórias
-    mem = carregar_memorias() if not cena_longa else None
-    bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS:\n{mem['content']}\n" if mem else ""
-
-    prompt = f"{bloco_memorias}{prompt_base.strip()}"
-
-    # Fragmentos
     ultima_msg = st.session_state.session_msgs[-1].get("content", "") if st.session_state.get("session_msgs") else ""
+
+    mem = carregar_memorias() if not cena_longa else None
+    bloco_memorias = f"### 🧠 MEMÓRIAS DE MARY:\n{mem['content']}\n" if mem else ""
+
+    prompt = f"""{bloco_memorias}
+{prompt_base}
+
+🚫 **FALAS DO USUÁRIO**:
+- Não inventar ou escrever falas para o usuário.
+
+💘 Estado afetivo: {estado_amor}
+"""
+
     if not cena_longa:
         fragmentos = carregar_fragmentos()
         frag_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
         if frag_ativos:
-            lista = "\n".join(f"- {f['texto']}" for f in frag_ativos)
-            prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista}"
-
-    # Emoção oculta
-    if st.session_state.get("emocao_oculta") and st.session_state["emocao_oculta"] != "nenhuma":
-        prompt += f"\n\n🎭 Emoção oculta: {st.session_state['emocao_oculta']}."
-
-    # Instruções de cena
-    if cena_longa:
-        prompt += "\n\n⚠️ **CENA LONGA**: Mary pode expandir livremente a cena, sem cortes bruscos, mantendo coerência e profundidade."
-    elif ultima_msg.startswith("[CONTINUAR_CENA]"):
-        prompt += "\n\n⚠️ Continue exatamente de onde a cena parou, mantendo tom e ritmo."
-    else:
-        prompt += "\n\n⚠️ Não encerre a presença de personagens ou avance no tempo sem o usuário indicar."
-
-    # Desejos
-    if st.session_state.ultima_entrada_recebida and "[AVALIAR_DESEJO]" in st.session_state.ultima_entrada_recebida:
-        prompt += "\n\n⚠️ O usuário expressou um desejo. Avalie se é coerente com a cena antes de reagir."
-
-    # Clímax
-    if st.session_state.get("climax_autorizado", False):
-        prompt += "\n\n💥 Clímax autorizado: pode narrar de forma sensorial e natural."
-    else:
-        prompt += "\n\n🚫 Sem clímax explícito sem autorização."
+            lista_fragmentos = "\n".join([f"- {f['texto']}" for f in frag_ativos])
+            prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
     return prompt.strip()
+
+# --------------------------- #
+# Correção da função de resposta
+# --------------------------- #
+def responder_com_modelo_escolhido(modelo_escolhido_id):
+    if modelo_escolhido_id.startswith("togethercomputer/") or modelo_escolhido_id.startswith("mistralai/"):
+        st.session_state["provedor_ia"] = "together"
+        return gerar_resposta_together_stream(modelo_escolhido_id)
+    else:
+        st.session_state["provedor_ia"] = "openrouter"
+        return gerar_resposta_openrouter_stream(modelo_escolhido_id)
+
+# --------------------------- #
+# Uso correto na chamada
+# --------------------------- #
+if st.session_state.get("ultima_entrada_recebida"):
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        with st.spinner("Mary está pensando..."):
+            try:
+                resposta_final = responder_com_modelo_escolhido(modelo_escolhido_id)
+            except Exception as e:
+                st.error(f"Erro: {e}")
+                resposta_final = "[Erro ao gerar resposta]"
 
 
 
