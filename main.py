@@ -149,8 +149,8 @@ def carregar_memorias():
             tipo = tipo.replace("[", "").replace("]", "")  # remove os colchetes
             texto = linha["texto"].strip()
 
-            # Inclui memórias marcadas como 'all', 'mary' ou do modo atual
-            if tipo in ("all", "mary", modo):
+            # Inclui memórias marcadas como 'all' ou do modo atual
+            if tipo in ("all", modo):
                 textos.append(f"- {texto}")
 
         if textos:
