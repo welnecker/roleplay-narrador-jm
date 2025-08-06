@@ -1256,7 +1256,7 @@ with col3:
         st.session_state.mostrar_imagem = None
         st.success("Mídia fechada.")
 
-# --------------------------- #
+# --------------------------- ##
 # Exibição da mídia
 # --------------------------- #
 
