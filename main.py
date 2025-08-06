@@ -782,7 +782,57 @@ with st.sidebar:
         key="modelo_ia",
         index=0
     )
-    modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+   # No sidebar, após selecionar o modelo:
+modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+st.session_state["modelo_escolhido_id"] = modelo_escolhido_id
+
+
+# --------------------------- #
+# Função ÚNICA de resposta
+# --------------------------- #
+def responder_com_modelo_escolhido():
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+
+    # Detecta provedor automaticamente
+    if modelo.startswith(("togethercomputer/", "mistralai/")):
+        st.session_state["provedor_ia"] = "together"
+        return gerar_resposta_together_stream(modelo)
+    else:
+        st.session_state["provedor_ia"] = "openrouter"
+        return gerar_resposta_openrouter_stream(modelo)
+
+
+# --------------------------- #
+# Resposta da IA só se houver entrada
+# --------------------------- #
+if st.session_state.get("ultima_entrada_recebida"):
+    resposta_final = ""
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        with st.spinner("Mary está pensando..."):
+            try:
+                resposta_final = responder_com_modelo_escolhido()
+
+                # Validação semântica / sintática
+                if not resposta_valida(resposta_final):
+                    st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
+                    resposta_final = responder_com_modelo_escolhido()
+
+                    if not resposta_valida(resposta_final):
+                        resposta_final = "[⚠️ A resposta da IA veio corrompida. Tente reformular sua entrada ou reenviar.]"
+
+                # Interrompe antes do clímax se necessário
+                if not st.session_state.get("cena_longa_ativa"):
+                    resposta_final = cortar_antes_do_climax(resposta_final)
+
+            except Exception as e:
+                st.error(f"Erro: {e}")
+                resposta_final = "[Erro ao gerar resposta]"
+
+    salvar_interacao("assistant", resposta_final)
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+    st.session_state.ultima_entrada_recebida = None
+
 
     # ------------------------------- #
     # 🎭 Emoção Oculta de Mary
