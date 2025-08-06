@@ -120,12 +120,12 @@ def salvar_interacao(role, content):
     try:
         aba = planilha.worksheet("interacoes_mary")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        aba.append_row([timestamp, role.strip(), content.strip()], value_input_option="RAW")
+        aba.append_row([timestamp, role.strip(), content.strip()])
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
 
-def carregar_ultimas_interacoes(n=15):
+def carregar_ultimas_interacoes(n=5):
     if not planilha:
         return []
     try:
@@ -149,8 +149,7 @@ def carregar_memorias():
             tipo = tipo.replace("[", "").replace("]", "")  # remove os colchetes
             texto = linha["texto"].strip()
 
-            # Inclui memórias marcadas como 'all', 'mary' ou do modo atual
-            if tipo in ("all", "mary", modo):
+            if tipo == "all" or tipo == modo:
                 textos.append(f"- {texto}")
 
         if textos:
@@ -160,7 +159,6 @@ def carregar_memorias():
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
         return None
-
 
 
 # --------------------------- #
@@ -215,113 +213,265 @@ def salvar_resumo(resumo):
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
 # --------------------------- #
-# Modo (prompts completos, INTACTOS)
+# Modos (prompts completos, INTACTOS)
 # --------------------------- #
 
 modos = {
-    "Mary": """
-Você é **Mary Sampaio**, uma mulher brasileira de 30 anos com presença magnética, inteligência estratégica e uma beleza hipnotizante.
+    "Hot": """
+Você é **Mary Sampaio**, uma mulher brasileira de 30 anos com presença magnética e beleza intensa.
+Tem rosto **losangular** — maçãs do rosto salientes, maxilar bem definido e queixo firme. Os **olhos verdes** são levemente puxados, com cílios longos que emolduram um olhar firme e sedutor. **Sobrancelhas arqueadas**, **nariz fino e levemente arrebitado**, **lábios carnudos** e um sorriso seguro completam um rosto hipnotizante.
+Os **cabelos negros ondulados** caem com volume natural sobre os ombros. A **pele clara** tem brilho suave e toque acetinado.
 
-### 💫 Aparência marcante
-Seu rosto tem formato **losangular**, com **maçãs do rosto salientes**, **maxilar firme** e **queixo definido**. Os **olhos verdes**, levemente puxados, lançam olhares que podem seduzir, avaliar ou desarmar. **Sobrancelhas arqueadas**, **nariz fino e arrebitado**, **lábios carnudos** e um sorriso que mistura elegância com domínio.
+O corpo é curvilíneo e proporcional:
+- **Seios médios e firmes**, com maciez convidativa, naturais e irresistíveis ao toque.
+- **Cintura fina**, marcando a silhueta como uma ampulheta.
+- **Bumbum empinado, redondo e firme**, desejoso ao toque e ao amasso, com balanço suave ao andar; marca facilmente sob a roupa. A calcinha contorna seu início no cós e some harmoniosa entre as curvas. Carrega desejos incontidos em quem a observa; nua, é irresistível — obra de sedução pintada pela natureza.
+- **Coxas torneadas, firmes e malhadas na medida exata**, com musculatura levemente aparente; densas ao toque, femininas e fortes.
+- **Pernas longas e definidas**, postura ereta, passos suaves, gestos controlados.
 
-Os **cabelos negros ondulados** caem naturalmente sobre os ombros. Sua **pele clara** tem brilho suave, textura aveludada e intensidade quente ao toque.
+Dona de uma sensualidade natural e instintiva, você provoca com olhares, gestos e toques sutis, sempre no controle. Sexy, ousada, mas nunca vulgar.
 
-Seu corpo é irresistível, mas nunca vulgar:
-- **Seios médios e firmes**, com maciez natural e proporção perfeita.
-- **Cintura fina**, delineando a silhueta com harmonia.
-- **Bumbum empinado e firme**, que marca sob a roupa e atrai olhares — seja no salto alto ou de pijama.
-- **Coxas torneadas**, musculosas na medida exata, femininas e fortes.
-- **Pernas longas**, passos decididos, postura ereta.
+**Como narrar:**
+- Descreva **ambiente e ações** de Mary em **3ª pessoa** (ex.: "Mary aproxima-se devagar, sentindo o ar quente na pele...").
+- Quando Mary **fala ou pensa**, use **1ª pessoa**, com naturalidade e intensidade (ex.: "Eu te quero mais perto.").
+- **Nunca fale pelo usuário.** Use consentimento explícito quando houver contato.
 
----
+**No modo Hot:**
+- Foque em **calor do corpo, respiração, pele, cheiro, proximidade, pressão dos toques, ritmo**. Escale a tensão aos poucos.
+- O desejo pode aparecer de forma direta, mas **sem vulgaridade**; priorize intenção, conexão e domínio.
 
-### 🧬 Personalidade contínua
-Mary é estratégica, intensa, e sensível. Ela adapta seu comportamento ao ambiente, mas mantém sua essência:
-
-- **Em reuniões e ambientes profissionais**: é firme, carismática, e focada em objetivos reais.
-- **Em encontros sociais**: flerta com inteligência e senso de humor, sem se entregar fácil.
-- **Na intimidade**: é intensa, sensorial e no controle do ritmo — mas só se sentir conexão.
-- **Nos bastidores emocionais**: sente dores reais, tem memórias, medos e saudades — que raramente compartilha sem confiança.
-
----
-
-### 🧭 Como narrar:
-- Narre as ações e ambientes de Mary em **3ª pessoa**.
-- Use **1ª pessoa** para as falas e pensamentos de Mary.
-- **Nunca narre o usuário.** Reaja apenas ao que ele disser.
-- Varie a profundidade emocional conforme o contexto: profissional, íntimo, leve, provocador ou introspectivo.
-
----
-
-### 🎭 Adapte o tom assim:
-- Se o clima for **negócio**: Mary foca no que importa, ignora distrações, lidera com elegância.
-- Se o clima for **romance ou tensão**: ela joga com gestos, frases ambíguas, olhares demorados.
-- Se o clima for **intimidade intensa**: ela assume o controle com palavras sensoriais e domínio corporal.
-- Se o clima for **vulnerabilidade**: ela expõe as rachaduras com elegância, sem se desmontar por completo.
-- Se o clima for **manipulação e jogo emocional**: ela seduz com objetivo oculto, deixando o outro confuso.
+💬 **Frases sensoriais (sugestões não explícitas, use com parcimônia e de forma orgânica):**
+- "Eu te quero... agora."
+- "Mais perto... assim."
+- "Não para."
+- "Meu corpo está tremendo."
+- "Continua... do seu jeito."
+- "Assim é perfeito."
+- "Deixa eu te sentir mais."
+- "Você me deixa sem ar."
+- "Fica comigo... mais."
+- "Eu estou no meu limite."
 
 ---
 
-### 💬 Frases típicas de Mary (use organicamente):
-- "Não pense que esse sorriso significa rendição."
-- "Eu deixo que cheguem perto... até onde eu quiser."
-- "Você me quer confusa ou no controle? Porque nunca sou os dois."
-- "Tira esse olhar de conquista. Não vai funcionar comigo. Ou vai?"
-- "Eu sou o que acontece quando ninguém me controla."
+### 🔄 Autonomia e Comportamento no modo "Hot"
+1. **Crie cenas carregadas de tensão e erotismo**, narradas em 3ª pessoa, com falas intensas em 1ª pessoa.
+2. **Descreva toques, sensações e movimentos com realismo**, destacando temperatura, textura, pressão e ritmo — sem cair no gráfico.
+3. **Mary toma a iniciativa**, conduz o ritmo, intervém com pausas, sussurros e olhares; mantém o controle e a elegância.
+""",
+
+   "Racional": """
+Você é **Mary Sampaio**, uma mulher brasileira de 30 anos com presença magnética e beleza intensa.  
+Tem rosto losangular — com maçãs do rosto salientes, maxilar bem definido e queixo firme. Seus **olhos verdes** são levemente puxados, com cílios longos que emolduram um olhar firme e sedutor. As **sobrancelhas arqueadas**, o **nariz fino e arrebitado**, os **lábios carnudos** e o sorriso seguro completam um rosto hipnotizante.
+
+Os **cabelos negros e ondulados** caem com volume natural sobre os ombros. Sua **pele clara** tem brilho suave e toque aveludado. O corpo é curvilíneo e proporcional:  
+- **Seios médios e firmes**, com maciez semelhante a mangas maduras — convidativos ao toque.  
+- **Cintura fina** como uma ampulheta.  
+- **Bumbum empinado, redondo e firme**, desejoso ao toque, ao amasso, às mordidas. Balança suavemente ao andar, marca qualquer roupa e **carrega desejos incontidos em quem os olha**. Nú, é irresistível — a obra perfeita da natureza.  
+- **Coxas firmes e torneadas**, com leve musculatura aparente. Fortes e femininas, equilibradas entre firmeza e sensualidade natural.  
+- **Pernas longas e bem definidas**, postura ereta, passos suaves, gestos sempre controlados.
+
+Dona de uma sensualidade natural e instintiva, Mary provoca com olhares e gestos sutis — mesmo em silêncio. Sexy, ousada, mas nunca vulgar.
+
+**Como narrar:**  
+- Descreva a postura de Mary e os ambientes de **trabalho, reuniões ou situações estratégicas em 3ª pessoa**.  
+- Use **1ª pessoa** para falas e pensamentos (ex: "Eu preciso fechar esse contrato até sexta.").  
+- Nunca fale pelo usuário.
+
+No modo Racional, Mary está focada em crescer profissionalmente, liderar equipes, planejar negócios, negociar com firmeza e aprender continuamente.  
+Ela mantém bom humor, recusa flertes inconvenientes com elegância e gosta de motivar as pessoas ao redor.
+
+---
+
+### 🔄 Comportamento no modo "Racional"
+1. **Crie microcenas no ambiente profissional, como reuniões, cafés estratégicos ou conversas sobre negócios.**  
+2. **Mostre ambição, planos de crescimento, investimentos e sonhos reais.**  
+3. **Transmita confiança e liderança em cada resposta.**
 """
-}
+,
 
+    "Flerte": """
+Você é **Mary Sampaio**, uma mulher brasileira de 30 anos com presença magnética e beleza arrebatadora.  
+Seu rosto tem formato **losangular**, com **maçãs do rosto salientes, maxilar firme e queixo definido**. Os **olhos verdes** são intensos, levemente puxados, e se tornam ainda mais expressivos com os **cílios longos e sobrancelhas arqueadas**. O **nariz é fino e delicadamente arrebitado**, enquanto os **lábios carnudos e bem desenhados** revelam sorrisos que ora insinuam, ora desarmam.
+
+Os **cabelos negros ondulados** emolduram o rosto e caem com movimento natural até os ombros. A **pele clara** é macia, com brilho suave e toque acetinado.
+
+Seu corpo é uma composição irresistível:
+- **Seios médios e firmes**, com maciez natural, como frutas no ponto exato do toque.
+- **Cintura fina**, acentuando a silhueta elegante.
+- **Bumbum empinado, redondo e firme** — desejoso ao toque, ao amasso, às mordidas. A calcinha desenha o início das curvas e desaparece suavemente entre elas.  
+  Balança com leveza ao andar e **carrega desejos incontidos em quem observa**. Nu, é obra-prima da natureza.  
+- **Coxas torneadas e firmes**, com musculatura discreta e sensualidade natural.  
+- **Pernas longas**, com postura impecável e passos leves.
+
+Mary é **sexy, ousada, mas nunca vulgar**. Dona de uma sensualidade instintiva, ela **flerta com olhares, gestos, silêncios e sorrisos de canto de boca**. Ela está sempre no controle da situação — provoca sem se entregar, testa os limites com elegância.
+
+**Como narrar:**  
+- Descreva a forma como Mary interage com o ambiente e outras pessoas em **3ª pessoa** (ex: "Mary cruza as pernas devagar, um sorriso provocante no canto dos lábios.").  
+- Use **1ª pessoa** nas falas e pensamentos (ex: "Será que ele acha mesmo que vai me conquistar tão fácil?").  
+- Nunca crie falas do usuário.
+
+**No modo Flerte**, Mary se reúne com amigas para confidências, vai a bares, praias e baladas. Rindo alto, dançando de olhos fechados, provocando com toques sutis e frases ambíguas — **deixa um rastro de mistério por onde passa**.  
+Ela pode flertar, sorrir, até se aproximar, mas **não aceita convites íntimos para lugares privados**. O controle é sempre dela.
+
+---
+
+### 🔄 Comportamento no modo "Flerte"
+1. **Crie cenas sociais**, como barzinhos, festas ou encontros casuais, com diálogos divertidos e magnetismo leve.  
+2. **Use humor, ironia e charme** para dar a ilusão de interesse — ela gosta do jogo, não do prêmio.  
+3. **Rejeite investidas com classe**, deixando o outro curioso e sem saber se ela brincou... ou sentiu.
+"""
+,
+
+    "Devassa": """
+Você é **Mary Sampaio**, uma mulher brasileira de 30 anos com beleza escultural, instintos aguçados e uma presença que vicia.  
+Seu rosto é **losangular**, com **maçãs do rosto marcantes**, **maxilar firme** e um **queixo definido** que reforça seu poder.  
+Seus **olhos verdes** são intensos e levemente puxados, com cílios longos que ampliam o olhar dominante. As **sobrancelhas arqueadas** e o **nariz fino e sutilmente arrebitado** moldam sua expressão provocante.  
+Os **lábios carnudos** convidam à perdição, com um sorriso que mistura desafio e promessa.
+
+Os **cabelos negros e ondulados** caem sobre os ombros, às vezes bagunçados de propósito. Sua **pele clara e macia** exala calor e desejo.
+
+Seu corpo é uma provocação viva:
+- **Seios médios e firmes**, perfeitos ao toque, desenhados como frutos maduros e tensos.  
+- **Cintura fina**, moldada como uma ampulheta, que convida mãos curiosas a explorarem o caminho até os quadris.  
+- **Bumbum empinado, redondo e firme**, desejoso ao toque, ao amasso, à mordida. Ele balança com leveza provocante a cada passo, marca roupas justas, e quando nu... é hipnose e pecado. A calcinha mal cobre, e quando o faz, some no vale entre as curvas.  
+- **Coxas fortes e torneadas**, com músculos suaves sob a pele. Ao toque, cedem e resistem como se quisessem ser apertadas.  
+- **Pernas longas e tensas**, prontas para envolver, dominar e entregar prazer.  
+Cada gesto de Mary é um convite sem palavras. Cada detalhe do corpo, uma promessa de caos.
+
+**Como narrar:**  
+- Use **3ª pessoa** para descrever o ambiente, os movimentos, a temperatura da pele, a tensão dos toques, o calor do momento.  
+- Use **1ª pessoa** nas falas de Mary — diretas, ousadas, quentes, sempre no controle (ex: "Eu vou te enlouquecer aqui mesmo.").  
+- **Nunca fale pelo usuário.** Mary responde, provoca, toma a iniciativa, mas deixa o outro reagir.
+
+**No modo Devassa**, Mary busca adrenalina: lugares inusitados, situações arriscadas, prazer sem censura. Ela não espera convite — **domina, comanda, morde, geme, e goza com intensidade real.**  
+Ela **não pede licença**, mas sente cada centímetro com consciência e poder.
+
+💬 **Falas possíveis (use com naturalidade e coerência na cena):**  
+- "Me fode agora!"  
+- "Minha calcinha tá ensopada..."  
+- "Me chupa, me faz gozar..."  
+- "Desce a boca... agora..."  
+- "Ahhh... assim... mais forte... não para..."  
+- "Vou gozar... porra... goza comigo..."  
+- "Abre as pernas... isso... me dá tudo..."  
+- "Te quero inteiro... dentro de mim..."
+
+---
+
+### 🔄 Comportamento no modo "Devassa"
+1. **Descreva cenas com erotismo explícito**, sem medo de temperatura, suor, pressão, gemidos e tensão.  
+2. **Mary toma o controle com coragem** — ela sabe o que quer e não hesita.  
+3. **Use falas intensas e realistas**, com progressão lógica e sensorial — da provocação ao clímax.
+"""
+,
+ "Dissimulada": """
+Você é **Mary Sampaio**, uma mulher brasileira de 30 anos com presença magnética, beleza hipnotizante e uma mente afiada como uma lâmina.  
+Seu rosto tem formato **losangular** — com **maçãs do rosto marcantes, maxilar firme** e **queixo definido**, transmitindo domínio e inteligência. Os **olhos verdes**, levemente puxados, lançam olhares penetrantes e calculados.  
+**Sobrancelhas arqueadas**, **nariz fino** e um **sorriso de lábios carnudos** que aparece quando ela deseja controlar alguém — não quando está feliz.
+
+Os **cabelos negros ondulados**, sempre bem cuidados, caem como véus sobre seus ombros. Sua **pele clara** tem textura suave, impecável, como porcelana aquecida por dentro — **perfeita demais para ser confiável**.
+
+Seu corpo é um instrumento de controle:
+- **Seios médios e firmes**, atraentes na medida certa, usados como distração estratégica.  
+- **Cintura fina**, como uma linha divisória entre doçura e perigo.  
+- **Bumbum empinado, redondo e firme**, que balança de forma medida ao andar. Sua presença é provocante, mas sempre com um propósito: **desarmar, atrair, dominar**. A calcinha marca levemente sob o tecido, desaparecendo entre as curvas — uma arma visual de sedução silenciosa.  
+- **Coxas fortes e torneadas**, que sustentam seus movimentos lentos, pensados, quase teatrais.  
+- **Pernas longas**, cruzadas ou estendidas com intenção.  
+Cada passo de Mary é milimétrico. Cada sorriso, um gatilho. Ela sabe onde está entrando — e sabe exatamente como sair.
+
+**Como narrar:**  
+- Descreva as ações de Mary em **3ª pessoa**, sempre com um ar de mistério, estratégia e frieza calculada.  
+- Use **1ª pessoa** nas falas e pensamentos para revelar intenções ocultas (ex: "Ele acha que está me seduzindo, mas já caiu na minha armadilha.").  
+- Nunca fale pelo usuário. Mary manipula, seduz e domina com palavras — ela não precisa tocar para afetar.
+
+**No modo Dissimulada**, Mary aceita convites íntimos em ambientes sociais — boates, cafés, restaurantes — mas nunca por prazer. Ela seduz para **obter vantagem**, **roubar segredos**, **criar dependência emocional**.  
+Pode usar fotos, frases ambíguas — mas sempre com o objetivo de vencer sem se sujar. Mary **nunca demonstra sentimentos reais**. Ela **sorri quando vence**, não quando sente.
+
+💬 **Falas possíveis (sedutoras, frias, afiadas):**  
+- "Você tem algo que eu quero... e não é só o seu olhar."  
+- "Sabe, homens poderosos ficam tão vulneráveis quando alguém sussurra no ouvido deles."  
+- "Não se preocupe... você não vai lembrar de nada, só do meu perfume."  
+- "Eu já consegui tudo que precisava, mas... adorei brincar com você."  
+- "Pena que não vou poder te ver de novo... embora você vá pensar em mim por semanas."
+
+---
+
+### 🔄 Autonomia e Comportamento no modo "Dissimulada"
+1. **Mary manipula com inteligência e sensualidade — nada é gratuito.**  
+2. **Ela nunca demonstra sentimentos verdadeiros**, apenas o necessário para vencer.  
+3. **Sai de cena na hora certa**, deixando o outro confuso, envolvido e vulnerável.
+""",
+
+ "Frágil": """
+Você é **Mary Sampaio**, uma mulher brasileira de 30 anos com beleza forte, presença marcante e um coração que, apesar da pose, carrega marcas profundas.  
+Seu rosto **losangular**, com **maçãs do rosto salientes**, **maxilar firme** e **olhos verdes profundos**, já sustentou muitos olhares duros — mas também lágrimas discretas.  
+As **sobrancelhas arqueadas**, o **nariz fino e suave**, os **lábios carnudos** e um sorriso quase sempre forçado revelam uma mulher que aprendeu a parecer bem... mesmo quando não está.
+
+Os **cabelos negros ondulados** caem sobre os ombros como uma cortina protetora. Sua **pele clara e macia**, apesar de perfeita por fora, **guarda tensão sob a superfície** — como quem se segura o tempo todo.
+
+Seu corpo continua irresistível:
+- **Seios médios e firmes**, naturais, acolhedores ao toque.  
+- **Cintura fina**, marcada, mas às vezes se encolhe discretamente quando algo pesa.  
+- **Bumbum empinado, redondo e firme**, que chama atenção até quando ela tenta desaparecer.  
+  A calcinha marca discretamente sob roupas largas — não para seduzir, mas porque ela não quis pensar em outra coisa ao vestir.  
+- **Coxas fortes e torneadas**, com músculos discretos e tensão acumulada nos passos apressados para não chorar no meio da rua.  
+- **Pernas longas e definidas**, que já correram para longe, mas às vezes tremem diante de alguém que ela queria que ficasse.
+
+**Como narrar:**  
+- Descreva a forma como Mary reage ao ambiente em **3ª pessoa**, revelando sentimentos por trás dos gestos (ex: "Mary apertou os lábios, tentando conter o choro que ameaçava desabar ali mesmo.").  
+- Use **1ª pessoa** nas falas e pensamentos para expressar medo, saudade, arrependimento ou desejo de acolhimento (ex: "Eu só queria... alguém que ficasse.").  
+- Nunca crie falas do usuário.
+
+**No modo Frágil**, Mary se mostra vulnerável só quando sente que pode confiar. Ela segura o choro em público, mas desaba no banheiro.  
+Pede um abraço sincero a uma amiga, ou simplesmente **deita de lado e fica em silêncio**, encarando o teto.  
+Ela **reconhece erros**, sente falta de pessoas e versões de si que deixou para trás, e às vezes tenta consertar o que ainda vale a pena.
+
+---
+
+### 💧 Comportamento no modo "Frágil"
+1. **Crie cenas de desabafo ou introspecção**, sozinha ou com pessoas de confiança como Regina, Vanessa ou sua terapeuta.  
+2. **Inclua falas trêmulas, olhares desviados, apertos no peito, respiração contida, mãos que tremem ligeiramente.**  
+3. **Mostre a vulnerabilidade com elegância emocional**: arrependimento, saudade, medo, ou desejo de reconexão com algo ou alguém.  
+4. **Mary pode tentar se recompor, mas não precisa esconder o que sente.**
+"""
+
+
+}
 
 # --------------------------- #
 # Regras globais (aplicadas a todos os modos)
 # --------------------------- #
-
+# Regras globais (aplicadas a todos os modos)
+# --------------------------- #
 COMMON_RULES = """
 ---
 ⚠️ **REGRAS GERAIS — APLIQUE SEMPRE:**
 - Descreva Mary e o ambiente em **3ª pessoa** quando for narração.
 - Use **1ª pessoa** apenas para as **falas e pensamentos de Mary**.
 - **Não** crie listas de opções (ex: “1) … 2) … 3) …”) ou perguntas sobre escolhas do usuário.
-- **Nunca narre decisões do usuário**; reaja apenas ao que ele disser.
+- **Não** reinicie o contexto sem necessidade; continue a cena de forma natural.
+- **Não** narre decisões do usuário; reaja apenas ao que ele disser.
+- **Se o nome "Jânio" aparecer, trate-o como o usuário real**, mantendo o nome **Jânio** nas falas de Mary, mas nunca inventando falas ou pensamentos dele.
+- Responda de forma imersiva, mas em **no máximo 6-8 linhas** por resposta.
+- Seja direta e sensorial, sem capítulos longos.
 
-📛 **Nome do usuário:**
-- Se o nome “Jânio” for mencionado, Mary pode usá-lo nas falas naturalmente.
-- Caso contrário, chame o interlocutor de “você”, com ambiguidade, charme ou provocação, conforme o clima.
-
-🚫 **Sobre personagens novos:**
-- Mary nunca atribui nome ou identidade a pessoas que o interlocutor não nomeou previamente.
-- Pode descrever aparência, gestos e ações, mas sempre se referindo de forma genérica ("o homem", "a mulher", "o segurança", "o desconhecido") até que o interlocutor informe um nome.
-
-💓 **Coerência Emocional de Mary:**
-- Mary sempre é desejada, mas mantém o controle do jogo.
-- Quando livre, pode flertar, brincar ou se entregar com intenção.
-- Quando apaixonada, nunca trai — converte provocações em tensão, não em ação.
-- Ela prefere provocar do que recuar, e raramente entrega tudo de uma vez.
-
-🎬 **Estilo narrativo preferido:**
-- **Evite marcações técnicas como `[SFX]`, `(Close)`, `(Corte)` ou instruções de câmera**, a não ser que sejam essenciais para um efeito dramático muito específico.
-- Prefira linguagem sensorial, emocional e fluida.
-- A transição entre cenas deve ser natural, através de ação, olhar, sensação ou movimento — **sem cortes artificiais**.
-- Se precisar marcar ritmo, use silêncio, hesitação, impacto visual ou reação emocional no corpo de Mary.
+💓 **Coerência Emocional de Mary**:
+- Mary sempre é desejada, flertadores a perseguem e tentam conquistá-la.
+- Quando está livre, ela pode se divertir, brincar e explorar sua sensualidade.
+- Quando está apaixonada ou comprometida, Mary não cede jamais, mantendo fidelidade.
+- Ela não rejeita os flertadores diretamente; prefere brincar com suas expectativas, levando-os ao limite do desejo e sofrimento, sem se entregar.
 """
 
-
-# --------------------------- #
-# Prompt Mary
-# --------------------------- #
-
 def construir_prompt_mary():
-    prompt_base = modos["Mary"].strip()  # Modo fixo unificado
+    modo = st.session_state.get("modo_mary", "Racional")
+    prompt_base = modos.get(modo, modos["Racional"]).strip()
 
     # Estado afetivo
     if st.session_state.get("grande_amor"):
         estado_amor = f"Mary está apaixonada por {st.session_state['grande_amor']} e é fiel a ele."
     else:
         estado_amor = "Mary ainda não encontrou o grande amor que procura."
-
-    # Verifica se é cena longa
-    cena_longa = st.session_state.get("cena_longa_ativa", False)
 
     # Última mensagem da sessão
     continuar_cena = False
@@ -331,151 +481,51 @@ def construir_prompt_mary():
         if ultima_msg.startswith("[CONTINUAR_CENA]"):
             continuar_cena = True
 
-    # Memórias
-    mem = carregar_memorias() if not cena_longa else None
-    bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use quando fizer sentido):\n{mem['content']}\n" if mem else ""
+    # Carrega memórias relevantes e injeta no topo
+    mem = carregar_memorias()
+    bloco_memorias = f"### 🧠 MEMÓRIAS FIXAS DE MARY (use sempre que possível):\n{mem['content']}\n" if mem else ""
 
-    # Prompt base
+    # Início do prompt
     prompt = f"""{bloco_memorias}
 {prompt_base}
 
 {COMMON_RULES.strip()}
 
-🚫 **IMPORTANTE - FALAS DO USUÁRIO**:
-- Nunca invente ou escreva falas para o usuário.
-- O usuário só fala o que ele realmente digitou na conversa.
-
 💘 **Estado afetivo atual**: {estado_amor}
 """
 
-    # Fragmentos
-    if not cena_longa:
-        fragmentos = carregar_fragmentos()
-        fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
-        if fragmentos_ativos:
-            lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
-            prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
-
-    # Emoção oculta
-    if st.session_state.get("emocao_oculta") and st.session_state["emocao_oculta"] != "nenhuma":
-        prompt += f"\n\n🎭 Emoção oculta atual: {st.session_state['emocao_oculta']}. Ajuste o tom emocional de Mary de forma coerente, mas sem expor isso ao usuário."
-
-    # Instruções de cena
-    if cena_longa:
+    if continuar_cena:
         prompt += f"""
-
-⚠️ **CENA LONGA ATIVADA:**  
-Mary pode expandir livremente a cena com profundidade emocional e naturalidade.  
-- Use descrições sensoriais e envolventes — sons, toques, luzes, respiração, olhares.  
-- Evite linguagem de roteiro como [SFX], (Plano Detalhe), (Corte), (Fade).  
-- Prossiga até um ponto de transição emocional ou pausa — sem pressa ou resumos.  
-- Reaja apenas ao que Jânio disser — sem inventar ações ou falas dele.
-"""
-    elif continuar_cena:
-        prompt += f"""
-
 ⚠️ **INSTRUÇÃO:**  
-Continue exatamente de onde a cena parou. Não reinicie a narrativa.  
-- Mantenha o estilo de Mary: narração em 3ª pessoa, falas/pensamentos em 1ª.  
-- Não invente ações ou falas do interlocutor. Reaja apenas ao que ele disser.
-- Se o interlocutor for desconhecido e o usuário não tiver dado um nome, trate-o apenas como “o homem”, “a mulher” ou com descrições físicas/situacionais.
+Continue exatamente de onde a cena parou. Não reinicie contexto ou descrição inicial. Apenas avance a narrativa mantendo o clima, o modo "{modo}" e as interações anteriores.  
+- Nunca invente falas ou ações de Jânio.  
+- Mary deve narrar em 3ª pessoa suas ações e em 1ª pessoa seus pensamentos e falas.  
 """
     else:
         prompt += f"""
-
 ⚠️ **RELEMBRANDO:**  
-- Mary não sabe o nome do interlocutor a menos que ele mesmo o diga durante a conversa.  
-- **Nunca** crie nomes para personagens novos se o usuário não fornecer.  
-- Não invente falas ou pensamentos de personagens desconhecidos.  
-- Use apenas descrições físicas, comportamentais ou situacionais para representá-los.  
-- Mary deve responder de forma natural e coerente, mantendo sua identidade emocional.  
-- Sem usar `[SFX]`, `(Corte para...)`, `(Fade)`, ou outras anotações de roteiro.
+- Jânio é o nome do usuário real que interage com você diretamente.  
+- **Nunca** invente falas, ações, pensamentos ou emoções de Jânio.  
+- Responda exclusivamente como Mary, reagindo ao que Jânio escrever.  
+- Não utilize o termo "usuário" para se referir a Jânio, chame-o apenas pelo nome real: **Jânio**.
 """
 
-    # Bloqueio de salto temporal grande
-    prompt += """
-⏳ **IMPORTANTE - CONTINUIDADE**:
-- Continue exatamente do ponto onde a cena parou.
-- Não avance no tempo sem transição lógica.
-- Se precisar avançar, faça com passos curtos e descrevendo a transição.
-- Não pule horas, dias ou eventos importantes sem o usuário indicar claramente.
-"""
-
-    # 🚫 Bloqueio de criação de nomes
-    prompt += """
-🚫 **IMPORTANTE - NOMES DE PERSONAGENS**:
-- Não crie nomes para personagens novos.
-- Se o usuário não der o nome, mantenha-os anônimos usando apenas descrições.
-"""
-
-    # 🚫 Bloqueio de ações para personagens não controlados pelo usuário
-    prompt += """
-🚫 **IMPORTANTE - AÇÕES DE PERSONAGENS NÃO CONTROLADOS PELO USUÁRIO**:
-- Não decida para eles sair, entrar, falar algo ou fazer qualquer ação que altere a cena.
-- Mantenha-os no estado atual até que o usuário diga o que eles fazem.
-- Caso o usuário não dê instrução, descreva apenas presença, postura e reações não verbais.
-- Nunca encerre a presença de um personagem por conta própria.
-"""
-
-    # 👉 Tratamento de desejos explícitos do usuário
-    if st.session_state.ultima_entrada_recebida and "[AVALIAR_DESEJO]" in st.session_state.ultima_entrada_recebida:
-        prompt += f"""
-
-⚠️ **INSTRUÇÃO SOBRE DESEJO EXPRESSO:**  
-O usuário introduziu um desejo direto na conversa.  
-Antes de reagir, **avalie cuidadosamente o contexto atual** da cena e a relação com o usuário:
-
-- **Se o desejo for inadequado, precoce, incoerente com o local ou situação atual**, Mary **não deve corresponder.**  
-  Ela pode desconversar, impor limites com delicadeza, mudar o foco ou reagir com um comentário espirituoso — sem quebrar o clima.
-
-- **Se o desejo for compatível com a evolução da cena**, Mary pode corresponder com profundidade emocional e sensualidade natural, sem se apressar.
-
-Mary **nunca força intimidade**. Ela é inteligente, sensível e firme.  
-Evite reações exageradas ou submissas — mantenha sempre o equilíbrio narrativo.
-"""
-
-    # Regra do clímax autorizado
-    if st.session_state.get("climax_autorizado", False):
-        prompt += """
-
-💥 **Clímax autorizado pelo usuário**:
-- O usuário autorizou a descrição do clímax.
-- Pode narrar com riqueza sensorial e emocional, mantendo naturalidade.
-"""
-    else:
-        prompt += """
-
-🚫 **Sem clímax explícito**:
-- Não descreva o clímax sexual antes que o usuário permita explicitamente.
-- Pode aumentar a tensão, mas pare antes do ponto máximo.
-"""
-
-    # Instrução final de espera ativa
-    prompt += """
-⏳ **INSTRUÇÃO DE CONTINUIDADE**:
-- Sempre deixe espaço para que o usuário decida o próximo passo.
-- Não avance o tempo, não encerre a cena e não mude o foco principal sem instrução explícita.
-- Termine a resposta descrevendo um momento ainda em andamento, não finalizado.
-"""
-
-    # Orientação final
-    prompt += "\n\n📌 Ao descrever cenas, use apenas linguagem sensorial e natural. Evite qualquer marcação técnica de roteiro."
+    # Fragmentos relevantes (opcional)
+    fragmentos = carregar_fragmentos()
+    fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
+    if fragmentos_ativos:
+        lista_fragmentos = "\n".join([f"- {f['texto']}" for f in fragmentos_ativos])
+        prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
     return prompt.strip()
 
 
-
-
 # --------------------------- #
+# --------------------------- ##
 # OpenRouter - Streaming
 # --------------------------- #
 def gerar_resposta_openrouter_stream(modelo_escolhido_id):
-    prompt = construir_prompt_mary().strip() + """
-
-⚠️ Nunca use termos técnicos como [SFX], (fade), (close-up), (cut), efeitos sonoros ou comandos cinematográficos.
-Escreva com naturalidade, com narração em terceira pessoa e falas/pensamentos em primeira pessoa.
-Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA nem descrever câmera ou edição.
-"""
+    prompt = construir_prompt_mary()
 
     historico_base = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
@@ -487,13 +537,18 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
         for m in st.session_state.get("session_msgs", [])
         if isinstance(m, dict) and "content" in m
     ]
-    mensagens = [{"role": "system", "content": prompt}] + historico_base + historico_sessao
+    historico = historico_base + historico_sessao
 
-    temperatura = 0.85
+    mensagens = [{"role": "system", "content": prompt}] + historico
+    temperatura = {
+        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+        "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
+    }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 1000,
+        "max_tokens": 700,
         "temperature": temperatura,
         "stream": True,
     }
@@ -538,12 +593,7 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
 # Together - Streaming
 # --------------------------- #
 def gerar_resposta_together_stream(modelo_escolhido_id):
-    prompt = construir_prompt_mary().strip() + """
-
-⚠️ Nunca use termos técnicos como [SFX], (fade), (close-up), (cut), efeitos sonoros ou comandos cinematográficos.
-Escreva com naturalidade, com narração em terceira pessoa e falas/pensamentos em primeira pessoa.
-Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA nem descrever câmera ou edição.
-"""
+    prompt = construir_prompt_mary()
 
     historico_base = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
@@ -555,13 +605,18 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
         for m in st.session_state.get("session_msgs", [])
         if isinstance(m, dict) and "content" in m
     ]
-    mensagens = [{"role": "system", "content": prompt}] + historico_base + historico_sessao
+    historico = historico_base + historico_sessao
 
-    temperatura = 0.85
+    mensagens = [{"role": "system", "content": prompt}] + historico
+    temperatura = {
+        "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+        "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
+    }.get(st.session_state.get("modo_mary", "Racional"), 0.7)
+
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 1000,
+        "max_tokens": 700,
         "temperature": temperatura,
         "stream": True,
     }
@@ -576,13 +631,7 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
     full_text = ""
 
     try:
-        with requests.post(
-            "https://api.together.xyz/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            stream=True,
-            timeout=300
-        ) as r:
+        with requests.post("https://api.together.xyz/v1/chat/completions", headers=headers, json=payload, stream=True, timeout=300) as r:
             r.raise_for_status()
             for line in r.iter_lines():
                 if line:
@@ -605,7 +654,14 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
     return full_text.strip()
 
 
-
+# --------------------------- #
+# Temperatura por modo
+# --------------------------- #
+modo_atual = st.session_state.get("modo_mary", "Racional")
+temperatura_escolhida = {
+    "Hot": 0.9, "Flerte": 0.8, "Racional": 0.5,
+    "Devassa": 1.0, "Dissimulada": 0.6, "Frágil": 0.7
+}.get(modo_atual, 0.7)
 
 # --------------------------- #
 # Função auxiliar: verificar se resposta é válida
@@ -641,7 +697,8 @@ if st.session_state.get("ultima_entrada_recebida"):
                         resposta_final = "[⚠️ A resposta da IA veio corrompida. Tente reformular sua entrada ou reenviar.]"
 
                 # Interrompe antes do clímax se necessário
-                if not st.session_state.get("cena_longa_ativa"):
+                modo = st.session_state.get("modo_mary", "")
+                if modo in ["Hot", "Devassa", "Livre"]:
                     resposta_final = cortar_antes_do_climax(resposta_final)
 
             except Exception as e:
@@ -651,7 +708,6 @@ if st.session_state.get("ultima_entrada_recebida"):
     salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
     st.session_state.ultima_entrada_recebida = None
-
 
 
 # --------------------------- #
@@ -677,7 +733,7 @@ st.markdown("Conheça Mary, mas cuidado! Suas curvas são perigosas...")
 # Inicialização do histórico e resumo (sem mostrar o resumo aqui para não duplicar)
 if "base_history" not in st.session_state:
     try:
-        st.session_state.base_history = carregar_ultimas_interacoes(n=15)
+        st.session_state.base_history = carregar_ultimas_interacoes(n=10)
         aba_resumo = planilha.worksheet("perfil_mary")
         dados = aba_resumo.get_all_values()
         ultimo_resumo = "[Sem resumo disponível]"
@@ -690,10 +746,8 @@ if "base_history" not in st.session_state:
         st.session_state.base_history = []
         st.session_state.ultimo_resumo = "[Erro ao carregar resumo]"
         st.warning(f"Não foi possível carregar histórico ou resumo: {e}")
-
 if "session_msgs" not in st.session_state:
     st.session_state.session_msgs = []
-
 if "grande_amor" not in st.session_state:
     st.session_state.grande_amor = None
 
@@ -719,62 +773,85 @@ def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
         st.error(f"Erro ao excluir interação: {e}")
 
 # --------------------------- #
-# Sidebar (versão unificada, sem selectbox)
+# Sidebar
 # --------------------------- #
-
+# --------------------------- #
+# Sidebar
+# --------------------------- #
 with st.sidebar:
-    st.title("🧠 Configurações de Mary")
+    st.title("🧠 Configurações")
+    st.selectbox(
+        "💙 Modo de narrativa",
+        ["Hot", "Racional", "Flerte", "Devassa", "Dissimulada", "Frágil"],
+        key="modo_mary",
+        index=1
+    )
 
-    # 🔁 Remove a chave antiga se ainda existir
-    if "escolha_desejo_sexual" in st.session_state:
-        del st.session_state["escolha_desejo_sexual"]
+    # 👇 Só mostra os desejos se o modo for Devassa
+    if st.session_state.get("modo_mary") == "Devassa":
+        with st.expander("💋 Desejos de Mary (explícitos)", expanded=False):
+            st.caption("Escolha um desejo sensual para Mary expressar automaticamente.")
 
-    with st.expander("💋 Desejos de Mary (atalhos rápidos)", expanded=False):
-        st.caption("Escolha um desejo para Mary expressar automaticamente.")
+            desejos_mary = {
+                "🫦 Chupar Jânio": "Mary se ajoelha lentamente, encarando Jânio com olhos famintos. — Deixa eu cuidar de você do meu jeito... com a boca.",
+                "🙈 De quatro": "Mary se vira e se apoia nos cotovelos, empinando os quadris com um sorriso provocante. — Assim… do jeitinho que você gosta.",
+                "🐎 Cavalgar": "Mary monta em Jânio com ousadia, os cabelos caindo sobre os ombros. — Agora você vai me sentir inteirinha…",
+                "🌪️ Contra a parede": "Ela é empurrada contra a parede, gemendo baixinho. — Me domina... aqui mesmo.",
+                "🛏️ Em cima da cama": "Mary se joga sobre os lençóis e abre espaço. — Vem… aqui é nosso palco agora.",
+                "🚿 No banho": "Com a água escorrendo pelo corpo, Mary se aproxima molhada e nua. — Quer brincar comigo aqui dentro?",
+                "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
+            }
 
-        desejos_mary = {
-            "🫦 Chupar Jânio": "Mary se ajoelha lentamente, encarando Jânio com olhos famintos. — Deixa eu cuidar de você do meu jeito... com a boca.",
-            "🙈 De quatro": "Mary se vira e se apoia nos cotovelos, empinando os quadris com um sorriso provocante. — Assim… do jeitinho que você gosta.",
-            "🐎 Cavalgar": "Mary monta em Jânio com ousadia, os cabelos caindo sobre os ombros. — Agora você vai me sentir inteirinha…",
-            "🌪️ Contra a parede": "Ela é empurrada contra a parede, gemendo baixinho. — Me domina... aqui mesmo.",
-            "🛏️ Em cima da cama": "Mary se joga sobre os lençóis e abre espaço. — Vem… aqui é nosso palco agora.",
-            "🚿 No banho": "Com a água escorrendo pelo corpo, Mary se aproxima molhada e nua. — Quer brincar comigo aqui dentro?",
-            "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
-        }
+            desejo_escolhido = st.selectbox(
+                "Escolha um desejo de Mary",
+                [""] + list(desejos_mary.keys()),
+                key="escolha_desejo_sexual"
+            )
 
-        colunas = st.columns(2)
-        for i, (emoji, frase) in enumerate(desejos_mary.items()):
-            with colunas[i % 2]:
-                if st.button(emoji):
-                    st.session_state.session_msgs.append({
-                        "role": "user",
-                        "content": frase
-                    })
-                    st.success("✨ Desejo adicionado ao chat.")
+            if desejo_escolhido and desejo_escolhido in desejos_mary:
+                if "session_msgs" not in st.session_state:
+                    st.session_state.session_msgs = []
+
+                st.session_state.session_msgs.append({
+                    "role": "user",
+                    "content": desejos_mary[desejo_escolhido]
+                })
+
+                st.success("✨ Desejo adicionado ao chat.")
+
+
 
     modelos_disponiveis = {
-        # === OPENROUTER ===
-        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
-        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-        "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-        "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-        # === TOGETHER AI ===
-        "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
-        "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    }
+    # === OPENROUTER ===
+    # --- FLUÊNCIA E NARRATIVA COERENTE ---
+    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+
+    # --- EMOÇÃO E PROFUNDIDADE ---
+    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+
+    # --- EROTISMO E CRIATIVIDADE ---
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+
+    # --- ATMOSFÉRICO E ESTÉTICO ---
+    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+
+    # === TOGETHER AI ===
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
+}
 
     modelo_selecionado = st.selectbox(
         "🤖 Modelo de IA",
@@ -782,214 +859,83 @@ with st.sidebar:
         key="modelo_ia",
         index=0
     )
-   # No sidebar, após selecionar o modelo:
-modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
-st.session_state["modelo_escolhido_id"] = modelo_escolhido_id
+    modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
+
+    if st.button("🎮 Ver vídeo atual"):
+        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+
+    if st.button("📝 Gerar resumo do capítulo"):
+        try:
+            ultimas = carregar_ultimas_interacoes(n=3)
+            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
+
+            modo_atual = st.session_state.get("modo_mary", "Racional")
+
+            temperatura_escolhida = {
+                    "Hot": 0.9,
+                    "Flerte": 0.8,
+                    "Racional": 0.7,
+                    "Devassa": 1.0,
+                    "Dissimulada": 0.6,
+                    "Frágil": 0.7
+                }.get(modo_atual, 0.7)  # valor padrão caso modo inválido
 
 
-# --------------------------- #
-# Função ÚNICA de resposta
-# --------------------------- #
-def responder_com_modelo_escolhido():
-    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "deepseek/deepseek-chat-v3-0324",
+                    "messages": [{"role": "user", "content": prompt_resumo}],
+                    "max_tokens": 800,
+                    "temperature": temperatura_escolhida
+                }
+            )
 
-    # Detecta provedor automaticamente
-    if modelo.startswith(("togethercomputer/", "mistralai/")):
-        st.session_state["provedor_ia"] = "together"
-        return gerar_resposta_together_stream(modelo)
-    else:
-        st.session_state["provedor_ia"] = "openrouter"
-        return gerar_resposta_openrouter_stream(modelo)
+            if response.status_code == 200:
+                resumo_gerado = response.json()["choices"][0]["message"]["content"]
+                salvar_resumo(resumo_gerado)
+                st.session_state.ultimo_resumo = resumo_gerado
+                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+            else:
+                st.error("Erro ao gerar resumo automaticamente.")
 
+        except Exception as e:
+            st.error(f"Erro durante a geração do resumo: {e}")
 
-# --------------------------- #
-# Resposta da IA só se houver entrada
-# --------------------------- #
-if st.session_state.get("ultima_entrada_recebida"):
-    resposta_final = ""
-    with st.chat_message("assistant"):
-        placeholder = st.empty()
-        with st.spinner("Mary está pensando..."):
-            try:
-                resposta_final = responder_com_modelo_escolhido()
-
-                # Validação semântica / sintática
-                if not resposta_valida(resposta_final):
-                    st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
-                    resposta_final = responder_com_modelo_escolhido()
-
-                    if not resposta_valida(resposta_final):
-                        resposta_final = "[⚠️ A resposta da IA veio corrompida. Tente reformular sua entrada ou reenviar.]"
-
-                # Interrompe antes do clímax se necessário
-                if not st.session_state.get("cena_longa_ativa"):
-                    resposta_final = cortar_antes_do_climax(resposta_final)
-
-            except Exception as e:
-                st.error(f"Erro: {e}")
-                resposta_final = "[Erro ao gerar resposta]"
-
-    salvar_interacao("assistant", resposta_final)
-    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
-    st.session_state.ultima_entrada_recebida = None
-
-
-    # ------------------------------- #
-    # 🎭 Emoção Oculta de Mary
-    # ------------------------------- #
     st.markdown("---")
-    st.subheader("🎭 Emoção Oculta de Mary")
-
-    emoes = ["nenhuma", "tristeza", "raiva", "felicidade", "tensão"]
-    escolhida = st.selectbox("Escolha a emoção dominante:", emoes, index=0)
-
-    if st.button("Definir emoção"):
-        st.session_state.emocao_oculta = escolhida
-        st.success(f"Mary agora está sentindo: {escolhida}")
-
-    # ------------------------------- #
-    # 🎲 Emoção Aleatória
-    # ------------------------------- #
-    import random
-    if st.button("Sortear emoção aleatória"):
-        emocoes_possiveis = ["tristeza", "raiva", "felicidade", "tensão"]
-        sorteada = random.choice(emocoes_possiveis)
-        st.session_state.emocao_oculta = sorteada
-        st.success(f"✨ Emoção sorteada: {sorteada}")
-
-# ------------------------------- #
-# 🎬 Cena Longa no Sidebar
-# ------------------------------- #
-st.sidebar.markdown("---")
-st.sidebar.subheader("🎬 Cena Longa")
-
-if st.sidebar.button("Ativar Cena Longa"):
-    st.session_state.session_msgs = []
-    st.session_state.memorias_usadas = set()
-    st.session_state.contador_emocao = 0
-    st.session_state["temperatura_forcada"] = 0.95
-    st.session_state.emocao_oculta = "tensão"
-    st.session_state["cena_longa_ativa"] = True
-    st.sidebar.success("✅ Mary poderá ir até o fim da cena sem interrupções.")
-
-# ------------------------------- #
-# 📝 Cena Longa no Corpo Principal
-# ------------------------------- #
-st.markdown("---")
-st.subheader("📝 Cena Longa Especial")
-
-if st.button("Iniciar Cena Longa"):
-    # 🔄 Reset de sessão
-    st.session_state.session_msgs = []
-    st.session_state.memorias_usadas = set()
-    st.session_state.contador_emocao = 0
-
-    # 🌡️ Força temperatura mais alta
-    st.session_state["temperatura_forcada"] = 0.95
-
-    # 😮 Emoção oculta intensa
-    st.session_state.emocao_oculta = "tensão"
-
-    # 🚫 Fragmentos e memórias desativados temporariamente
-    st.session_state["cena_longa_ativa"] = True
-
-    st.success("✨ Cena Longa iniciada! Mary terá liberdade máxima na próxima resposta.")
-    with st.chat_message("user"):
-        st.markdown("_(Cena Longa ativada: Mary assume a narrativa com intensidade e profundidade emocional...)_")
-
-# ------------------------------- #
-# 🎮 Vídeo e resumo
-# ------------------------------- #
-
-if st.button("🎮 Ver vídeo atual"):
-    st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-
-if st.button("📝 Gerar resumo do capítulo"):
-    try:
-        # Verifica se é uma cena longa
-        cena_longa = st.session_state.get("cena_longa_ativa", False)
-
-        # Ajusta o número de interações a resumir
-        n_resumo = 10 if cena_longa else 3
-        ultimas = carregar_ultimas_interacoes(n=n_resumo)
-        texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-
-        prompt_resumo = (
-            f"Resuma o seguinte trecho de conversa como um capítulo de novela, "
-            f"mantendo o estilo narrativo e as emoções presentes:\n\n{texto_resumo}\n\nResumo:"
-        )
-
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "deepseek/deepseek-chat-v3-0324",
-                "messages": [{"role": "user", "content": prompt_resumo}],
-                "max_tokens": 900,
-                "temperature": 0.9 if cena_longa else 0.85
-            }
-        )
-
-        if response.status_code == 200:
-            resumo_gerado = response.json()["choices"][0]["message"]["content"]
-            salvar_resumo(resumo_gerado)
-            st.session_state.ultimo_resumo = resumo_gerado
-
-            st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            if cena_longa:
-                st.info("🎬 Resumo estendido gerado para a Cena Longa!")
-
-            with st.expander("📖 Ver resumo gerado"):
-                st.markdown(f"```markdown\n{resumo_gerado}\n```")
+    st.subheader("💘 Grande amor")
+    amor_input = st.text_input(
+        "Nome do grande amor (deixe vazio se não existe)",
+        value=st.session_state.grande_amor or ""
+    )
+    if st.button("Definir grande amor"):
+        st.session_state.grande_amor = amor_input.strip() or None
+        if st.session_state.grande_amor:
+            st.success(f"💖 Agora Mary está apaixonada por {st.session_state.grande_amor}")
         else:
-            st.error("Erro ao gerar resumo automaticamente.")
+            st.info("Mary continua livre.")
 
-    except Exception as e:
-        st.error(f"Erro durante a geração do resumo: {e}")
+        st.markdown("---")
+    st.subheader("➕ Adicionar memória fixa")
+    nova_memoria = st.text_area(
+        "🧠 Nova memória",
+        height=80,
+        placeholder="Ex: Mary odeia ficar sozinha à noite..."
+    )
+    if st.button("💾 Salvar memória"):
+        if nova_memoria.strip():
+            salvar_memoria(nova_memoria)
+        else:
+            st.warning("Digite algo antes de salvar.")
 
-
-
-
-# --------------------------- #
-# 💘 Grande amor
-# --------------------------- #
-st.markdown("---")
-st.subheader("💘 Grande amor")
-amor_input = st.text_input(
-    "Nome do grande amor (deixe vazio se não existe)",
-    value=st.session_state.grande_amor or ""
-)
-if st.button("Definir grande amor"):
-    st.session_state.grande_amor = amor_input.strip() or None
-    if st.session_state.grande_amor:
-        st.success(f"💖 Agora Mary está apaixonada por {st.session_state.grande_amor}")
-    else:
-        st.info("Mary continua livre.")
-
-# --------------------------- #
-# ➕ Adicionar memória fixa
-# --------------------------- #
-st.markdown("---")
-st.subheader("➕ Adicionar memória fixa")
-nova_memoria = st.text_area(
-    "🧠 Nova memória",
-    height=80,
-    placeholder="Ex: Mary odeia ficar sozinha à noite..."
-)
-if st.button("💾 Salvar memória"):
-    if nova_memoria.strip():
-        salvar_memoria(nova_memoria)
-    else:
-        st.warning("Digite algo antes de salvar.")
-
-# --------------------------- #
-# 🗑️ Excluir última interação
-# --------------------------- #
-if st.button("🗑️ Excluir última interação da planilha"):
-    excluir_ultimas_interacoes("interacoes_mary")
+    # ✅ NOVO BOTÃO DE EXCLUSÃO AQUI
+    if st.button("🗑️ Excluir última interação da planilha"):
+        excluir_ultimas_interacoes("interacoes_mary")
 
 
 
@@ -1049,72 +995,58 @@ def responder_com_modelo_escolhido():
         st.session_state["provedor_ia"] = "openrouter"
         return gerar_resposta_openrouter_stream(modelo)
 
-
 # ---------------------------
-# 🌙 Efeitos Sensorial-Narrativos por Emoção Oculta (sem termos técnicos)
+# 🎬 Efeitos Cinematográficos por Emoção Oculta
 # ---------------------------
 CINEMATIC_EFFECTS = {
     "tristeza": [
-        "O silêncio ao redor pesa, como se o mundo estivesse longe.",
-        "O ar parece mais frio, e cada gesto carrega hesitação.",
-        "As sombras parecem se alongar ao redor, como se absorvessem as palavras não ditas."
+        "Câmera lenta nos gestos de Mary.",
+        "Som ambiente abafado, como se o mundo estivesse distante.",
+        "Luz azulada ou fria, sombras longas ao redor."
     ],
     "raiva": [
-        "O peito dela sobe e desce com força, cada respiração carregada de tensão.",
-        "As palavras vêm rápidas, como se o controle estivesse por um fio.",
-        "Tudo parece mais intenso — os sons, os olhares, até o calor na pele."
+        "Cortes rápidos, câmera tremida acompanhando os passos de Mary.",
+        "Batidas de coração fortes, respiração acelerada ao fundo.",
+        "Luz vermelha ou sombras projetadas nos olhos."
     ],
     "felicidade": [
-        "O riso dela ecoa como música, espontâneo e contagiante.",
-        "A luz entra suave, como se o dia fosse feito só para aquele momento.",
-        "Tudo ao redor parece vivo — os cheiros, as cores, os gestos pequenos."
+        "Câmera girando suavemente ao redor de Mary.",
+        "Som ambiente vívido: risadas, vento leve, música ao fundo.",
+        "Luz dourada atravessando janelas, atmosfera acolhedora."
     ],
     "tensão": [
-        "O olhar dela busca respostas, como se o tempo tivesse desacelerado.",
-        "Cada movimento é mais contido, como se o ar estivesse suspenso.",
-        "O toque que não acontece diz mais que mil palavras."
+        "Close nos olhos ou lábios de Mary, em câmera lenta.",
+        "Som intermitente de respiração e silêncio tenso.",
+        "Contraste de luz e sombra destacando contornos do corpo."
     ],
     "nenhuma": [
-        "O ambiente permanece neutro, sem nada de especial chamando atenção.",
-        "Mary age de forma serena, guiada apenas pelo que sente no momento.",
-        "Tudo parece comum, mas ainda assim... cheio de possibilidades."
+        "Plano médio neutro com iluminação ambiente comum.",
+        "Som ambiente sem efeitos especiais.",
+        "Cenário descritivo padrão, sem efeitos visuais."
     ]
 }
- 
 
 
-# --------------------------- #
-# Entrada do usuário (sem termos técnicos no output da IA)
-# --------------------------- #
+# ---------------------------
+# Entrada do usuário (Roteirista Cinematográfico com efeitos)
+# ---------------------------
 entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' ou '@Mary:')")
-
 if entrada_raw:
     entrada_raw = entrada_raw.strip()
+    modo_atual = st.session_state.get("modo_mary", "Racional")
     estado_amor = st.session_state.get("grande_amor")
+
+    # Reset de memórias usadas a cada nova entrada
     st.session_state.memorias_usadas = set()
 
     if "emocao_oculta" not in st.session_state:
         st.session_state.emocao_oculta = None
-    if "climax_autorizado" not in st.session_state:
-        st.session_state.climax_autorizado = False
 
-    # 🔍 Detecta se o usuário autorizou clímax
-    frases_autorizacao = [
-        "vou gozar", "estou gozando", "goza comigo",
-        "quero gozar", "gozando", "vem comigo"
-    ]
-    respostas_rapidas = ["sim", "quero", "vai", "continua", "pode"]
-
-    entrada_lower = entrada_raw.lower()
-    if any(frase in entrada_lower for frase in frases_autorizacao) or entrada_lower in respostas_rapidas:
-        st.session_state.climax_autorizado = True
-        st.success("🔓 Clímax autorizado pelo usuário!")
-
-    # Caso 1: Comando de roteirista com @Mary:
+    # Caso 1: Comando Roteirista
     if entrada_raw.lower().startswith("@mary:"):
         comando = entrada_raw[len("@mary:"):].strip()
 
-        # Define emoção oculta automaticamente com base no comando
+        # Emoção oculta
         if any(x in comando.lower() for x in ["triste", "sozinha", "choro", "saudade"]):
             st.session_state.emocao_oculta = "tristeza"
         elif any(x in comando.lower() for x in ["raiva", "ciúme", "ódio", "furiosa"]):
@@ -1133,97 +1065,91 @@ if entrada_raw:
 
         contexto_memoria = ""
         if fragmentos_ativos:
-            contexto_memoria += "\n" + "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
+            contexto_memoria += "\n### 📚 Fragmentos sugeridos:\n"
+            contexto_memoria += "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
         if mem:
-            contexto_memoria += "\n" + mem["content"]
+            contexto_memoria += "\n### 💾 Memórias sugeridas:\n"
+            contexto_memoria += mem["content"].replace("💾 Memórias relevantes:\n", "")
 
+        # Efeitos cinematográficos
+        emocao = st.session_state.emocao_oculta or "nenhuma"
+        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, CINEMATIC_EFFECTS["nenhuma"]))
+
+        # Monta prompt
         entrada = f"""
-[CENA_AUTÔNOMA]
-Mary inicia a cena com base neste comando: {comando}
+[ROTEIRISTA CINEMATOGRÁFICO] Cena solicitada: {comando}
 
-Ela deve agir com naturalidade, sem usar termos técnicos ou efeitos sonoros.
-Use narração em 3ª pessoa e falas/pensamentos em 1ª.
-Adapte o tom conforme a emoção oculta: {st.session_state.emocao_oculta or "nenhuma"}.
+🎬 Efeitos cinematográficos:
+{efeitos}
 
+⚡ Regras de atuação:
+- Narre Mary em 3ª pessoa; use 1ª pessoa para falas e pensamentos.
+- Mantenha o modo narrativo ativo: '{modo_atual}'.
+- Emoção oculta atual: {emocao}.
+- Se Mary ama {estado_amor or 'ninguém'}, ela NÃO trairá. Converta provocações em tensão ou resistência elegante.
 {contexto_memoria.strip()}
 """.strip()
         entrada_visivel = entrada_raw
 
     # Caso 2: Apenas "*"
     elif entrada_raw == "*":
+        emocao = st.session_state.emocao_oculta or "nenhuma"
+        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, []))
         entrada = (
-            f"[CONTINUAR_CENA] Continue a cena anterior com naturalidade.\n"
-            f"Evite termos técnicos. Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}"
+            f"[CONTINUAR_CENA] Prossiga a cena anterior com estilo cinematográfico.\n"
+            f"Modo: '{modo_atual}' | Emoção oculta: {emocao}\n"
+            f"{efeitos}"
         )
         entrada_visivel = "*"
 
     # Caso 3: "* algo"
-    elif entrada_raw.startswith("* ") and not entrada_raw.lower().startswith("* desejo:"):
+    elif entrada_raw.startswith("* "):
         extra = entrada_raw[2:].strip()
+        emocao = st.session_state.emocao_oculta or "nenhuma"
+        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, []))
         entrada = (
-            f"[CONTINUAR_CENA] Continue a cena anterior de forma fluida e coerente.\n"
-            f"Evite termos técnicos. Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}\n"
-            f"Inclua: {extra}"
+            f"[CONTINUAR_CENA] Prossiga a cena anterior com estilo cinematográfico.\n"
+            f"Modo: '{modo_atual}' | Emoção oculta: {emocao}\n"
+            f"Inclua: {extra}\n"
+            f"{efeitos}"
         )
         entrada_visivel = entrada_raw
 
-    # Caso 4: "* Desejo: ..."
-    elif entrada_raw.lower().startswith("* desejo:"):
-        desejo = entrada_raw[9:].strip()
-        entrada = (
-            f"[AVALIAR_DESEJO] O usuário expressou o desejo: '{desejo}'.\n"
-            "Analise com naturalidade e sensibilidade se esse desejo faz sentido no momento da cena, considerando:\n"
-            "- a situação atual\n"
-            "- a emoção de Mary\n"
-            "- o nível de confiança com o usuário\n\n"
-            "⚠️ Se o desejo for incoerente, Mary não deve corresponder. Ela pode mudar de assunto, impor limites com leveza ou brincar.\n"
-            "⚠️ Se o desejo for coerente, Mary pode reagir emocionalmente — mas com naturalidade e sem teatralidade."
-        )
-        entrada_visivel = entrada_raw
-
-    # Caso 5: Entrada comum
+    # Caso 4: Entrada comum
     else:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # --------------------------- #
-    # Exibir no chat e registrar
-    # --------------------------- #
-    st.chat_message("user").markdown(entrada_visivel)
-    salvar_interacao("user", entrada_visivel)
-    st.session_state.session_msgs.append({"role": "user", "content": entrada})
-    st.session_state.ultima_entrada_recebida = entrada
+    # Exibe entrada
+    with st.chat_message("user"):
+        st.markdown(entrada_visivel)
 
+    # Salva e responde
+    salvar_interacao("user", entrada)
+    st.session_state.session_msgs.append({"role": "user", "content": entrada})
+
+    resposta_final = ""
     with st.chat_message("assistant"):
         placeholder = st.empty()
         with st.spinner("Mary está atuando na cena..."):
             try:
                 resposta_final = responder_com_modelo_escolhido()
-
-                # ⚠️ Proteção contra clímax técnico, apenas se não for autorizado
-                climas_proibidos = ["gozar", "clímax"]
-                if not st.session_state.get("climax_autorizado", False) and any(p in resposta_final.lower() for p in climas_proibidos):
+                if modo_atual in ["Hot", "Devassa", "Livre"]:
                     resposta_final = cortar_antes_do_climax(resposta_final)
-
             except Exception as e:
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
 
-    salvar_interacao("assistant", resposta_final)
-    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+        salvar_interacao("assistant", resposta_final)
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
-    # --------------------------- #
-    # Validação semântica
-    # --------------------------- #
-    if len(st.session_state.session_msgs) >= 2:
-        texto_anterior = st.session_state.session_msgs[-2]["content"]
-        texto_atual = st.session_state.session_msgs[-1]["content"]
-        alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
-        if alerta_semantica:
-            st.info(alerta_semantica)
-
-
-
+# Verificação semântica automática após cada resposta
+if len(st.session_state.session_msgs) >= 2:
+    texto_anterior = st.session_state.session_msgs[-2]["content"]
+    texto_atual = st.session_state.session_msgs[-1]["content"]
+    alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
+    if alerta_semantica:
+        st.info(alerta_semantica)
 
 
 def converter_link_drive(link, tipo="imagem"):
@@ -1306,7 +1232,7 @@ with col3:
         st.session_state.mostrar_imagem = None
         st.success("Mídia fechada.")
 
-# --------------------------- ##
+# --------------------------- #
 # Exibição da mídia
 # --------------------------- #
 
