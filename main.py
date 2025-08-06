@@ -663,7 +663,7 @@ with st.sidebar:
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
 }
 
-    modelo_selecionado = st.selectbox(
+   modelo_selecionado = st.selectbox(
         "🤖 Modelo de IA",
         list(modelos_disponiveis.keys()),
         key="modelo_ia",
@@ -671,81 +671,164 @@ with st.sidebar:
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    if st.button("🎮 Ver vídeo atual"):
-        st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            ultimas = carregar_ultimas_interacoes(n=3)
-            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho de conversa como um capítulo de novela:\n\n{texto_resumo}\n\nResumo:"
-
-            modo_atual = st.session_state.get("modo_mary", "Racional")
-
-            temperatura_escolhida = {
-                    "Hot": 0.9,
-                    "Flerte": 0.8,
-                    "Racional": 0.7,
-                    "Devassa": 1.0,
-                    "Dissimulada": 0.6,
-                    "Frágil": 0.7
-                }.get(modo_atual, 0.7)  # valor padrão caso modo inválido
-
-
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": temperatura_escolhida
-                }
-            )
-
-            if response.status_code == 200:
-                resumo_gerado = response.json()["choices"][0]["message"]["content"]
-                salvar_resumo(resumo_gerado)
-                st.session_state.ultimo_resumo = resumo_gerado
-                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            else:
-                st.error("Erro ao gerar resumo automaticamente.")
-
-        except Exception as e:
-            st.error(f"Erro durante a geração do resumo: {e}")
-
+    # ------------------------------- #
+    # 🎭 Emoção Oculta de Mary
+    # ------------------------------- #
     st.markdown("---")
-    st.subheader("💘 Grande amor")
-    amor_input = st.text_input(
-        "Nome do grande amor (deixe vazio se não existe)",
-        value=st.session_state.grande_amor or ""
-    )
-    if st.button("Definir grande amor"):
-        st.session_state.grande_amor = amor_input.strip() or None
-        if st.session_state.grande_amor:
-            st.success(f"💖 Agora Mary está apaixonada por {st.session_state.grande_amor}")
-        else:
-            st.info("Mary continua livre.")
+    st.subheader("🎭 Emoção Oculta de Mary")
 
-        st.markdown("---")
-    st.subheader("➕ Adicionar memória fixa")
-    nova_memoria = st.text_area(
-        "🧠 Nova memória",
-        height=80,
-        placeholder="Ex: Mary odeia ficar sozinha à noite..."
-    )
-    if st.button("💾 Salvar memória"):
-        if nova_memoria.strip():
-            salvar_memoria(nova_memoria)
-        else:
-            st.warning("Digite algo antes de salvar.")
+    emoes = ["nenhuma", "tristeza", "raiva", "felicidade", "tensão"]
+    escolhida = st.selectbox("Escolha a emoção dominante:", emoes, index=0)
 
-    # ✅ NOVO BOTÃO DE EXCLUSÃO AQUI
-    if st.button("🗑️ Excluir última interação da planilha"):
-        excluir_ultimas_interacoes("interacoes_mary")
+    if st.button("Definir emoção"):
+        st.session_state.emocao_oculta = escolhida
+        st.success(f"Mary agora está sentindo: {escolhida}")
+
+    # ------------------------------- #
+    # 🎲 Emoção Aleatória
+    # ------------------------------- #
+    import random
+    if st.button("Sortear emoção aleatória"):
+        emocoes_possiveis = ["tristeza", "raiva", "felicidade", "tensão"]
+        sorteada = random.choice(emocoes_possiveis)
+        st.session_state.emocao_oculta = sorteada
+        st.success(f"✨ Emoção sorteada: {sorteada}")
+
+# ------------------------------- #
+# 🎬 Cena Longa no Sidebar
+# ------------------------------- #
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎬 Cena Longa")
+
+if st.sidebar.button("Ativar Cena Longa"):
+    st.session_state.session_msgs = []
+    st.session_state.memorias_usadas = set()
+    st.session_state.contador_emocao = 0
+    st.session_state["temperatura_forcada"] = 0.95
+    st.session_state.emocao_oculta = "tensão"
+    st.session_state["cena_longa_ativa"] = True
+    st.sidebar.success("✅ Mary poderá ir até o fim da cena sem interrupções.")
+
+# ------------------------------- #
+# 📝 Cena Longa no Corpo Principal
+# ------------------------------- #
+st.markdown("---")
+st.subheader("📝 Cena Longa Especial")
+
+if st.button("Iniciar Cena Longa"):
+    # 🔄 Reset de sessão
+    st.session_state.session_msgs = []
+    st.session_state.memorias_usadas = set()
+    st.session_state.contador_emocao = 0
+
+    # 🌡️ Força temperatura mais alta
+    st.session_state["temperatura_forcada"] = 0.95
+
+    # 😮 Emoção oculta intensa
+    st.session_state.emocao_oculta = "tensão"
+
+    # 🚫 Fragmentos e memórias desativados temporariamente
+    st.session_state["cena_longa_ativa"] = True
+
+    st.success("✨ Cena Longa iniciada! Mary terá liberdade máxima na próxima resposta.")
+    with st.chat_message("user"):
+        st.markdown("_(Cena Longa ativada: Mary assume a narrativa com intensidade e profundidade emocional...)_")
+
+# ------------------------------- #
+# 🎮 Vídeo e resumo
+# ------------------------------- #
+
+if st.button("🎮 Ver vídeo atual"):
+    st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
+
+if st.button("📝 Gerar resumo do capítulo"):
+    try:
+        # Verifica se é uma cena longa
+        cena_longa = st.session_state.get("cena_longa_ativa", False)
+
+        # Ajusta o número de interações a resumir
+        n_resumo = 10 if cena_longa else 3
+        ultimas = carregar_ultimas_interacoes(n=n_resumo)
+        texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+
+        prompt_resumo = (
+            f"Resuma o seguinte trecho de conversa como um capítulo de novela, "
+            f"mantendo o estilo narrativo e as emoções presentes:\n\n{texto_resumo}\n\nResumo:"
+        )
+
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek/deepseek-chat-v3-0324",
+                "messages": [{"role": "user", "content": prompt_resumo}],
+                "max_tokens": 900,
+                "temperature": 0.9 if cena_longa else 0.85
+            }
+        )
+
+        if response.status_code == 200:
+            resumo_gerado = response.json()["choices"][0]["message"]["content"]
+            salvar_resumo(resumo_gerado)
+            st.session_state.ultimo_resumo = resumo_gerado
+
+            st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+            if cena_longa:
+                st.info("🎬 Resumo estendido gerado para a Cena Longa!")
+
+            with st.expander("📖 Ver resumo gerado"):
+                st.markdown(f"
+markdown\n{resumo_gerado}\n
+")
+        else:
+            st.error("Erro ao gerar resumo automaticamente.")
+
+    except Exception as e:
+        st.error(f"Erro durante a geração do resumo: {e}")
+
+
+
+
+# --------------------------- #
+# 💘 Grande amor
+# --------------------------- #
+st.markdown("---")
+st.subheader("💘 Grande amor")
+amor_input = st.text_input(
+    "Nome do grande amor (deixe vazio se não existe)",
+    value=st.session_state.grande_amor or ""
+)
+if st.button("Definir grande amor"):
+    st.session_state.grande_amor = amor_input.strip() or None
+    if st.session_state.grande_amor:
+        st.success(f"💖 Agora Mary está apaixonada por {st.session_state.grande_amor}")
+    else:
+        st.info("Mary continua livre.")
+
+# --------------------------- #
+# ➕ Adicionar memória fixa
+# --------------------------- #
+st.markdown("---")
+st.subheader("➕ Adicionar memória fixa")
+nova_memoria = st.text_area(
+    "🧠 Nova memória",
+    height=80,
+    placeholder="Ex: Mary odeia ficar sozinha à noite..."
+)
+if st.button("💾 Salvar memória"):
+    if nova_memoria.strip():
+        salvar_memoria(nova_memoria)
+    else:
+        st.warning("Digite algo antes de salvar.")
+
+# --------------------------- #
+# 🗑️ Excluir última interação
+# --------------------------- #
+if st.button("🗑️ Excluir última interação da planilha"):
+    excluir_ultimas_interacoes("interacoes_mary")
 
 
 
@@ -805,58 +888,72 @@ def responder_com_modelo_escolhido():
         st.session_state["provedor_ia"] = "openrouter"
         return gerar_resposta_openrouter_stream(modelo)
 
+
 # ---------------------------
-# 🎬 Efeitos Cinematográficos por Emoção Oculta
+# 🌙 Efeitos Sensorial-Narrativos por Emoção Oculta (sem termos técnicos)
 # ---------------------------
 CINEMATIC_EFFECTS = {
     "tristeza": [
-        "Câmera lenta nos gestos de Mary.",
-        "Som ambiente abafado, como se o mundo estivesse distante.",
-        "Luz azulada ou fria, sombras longas ao redor."
+        "O silêncio ao redor pesa, como se o mundo estivesse longe.",
+        "O ar parece mais frio, e cada gesto carrega hesitação.",
+        "As sombras parecem se alongar ao redor, como se absorvessem as palavras não ditas."
     ],
     "raiva": [
-        "Cortes rápidos, câmera tremida acompanhando os passos de Mary.",
-        "Batidas de coração fortes, respiração acelerada ao fundo.",
-        "Luz vermelha ou sombras projetadas nos olhos."
+        "O peito dela sobe e desce com força, cada respiração carregada de tensão.",
+        "As palavras vêm rápidas, como se o controle estivesse por um fio.",
+        "Tudo parece mais intenso — os sons, os olhares, até o calor na pele."
     ],
     "felicidade": [
-        "Câmera girando suavemente ao redor de Mary.",
-        "Som ambiente vívido: risadas, vento leve, música ao fundo.",
-        "Luz dourada atravessando janelas, atmosfera acolhedora."
+        "O riso dela ecoa como música, espontâneo e contagiante.",
+        "A luz entra suave, como se o dia fosse feito só para aquele momento.",
+        "Tudo ao redor parece vivo — os cheiros, as cores, os gestos pequenos."
     ],
     "tensão": [
-        "Close nos olhos ou lábios de Mary, em câmera lenta.",
-        "Som intermitente de respiração e silêncio tenso.",
-        "Contraste de luz e sombra destacando contornos do corpo."
+        "O olhar dela busca respostas, como se o tempo tivesse desacelerado.",
+        "Cada movimento é mais contido, como se o ar estivesse suspenso.",
+        "O toque que não acontece diz mais que mil palavras."
     ],
     "nenhuma": [
-        "Plano médio neutro com iluminação ambiente comum.",
-        "Som ambiente sem efeitos especiais.",
-        "Cenário descritivo padrão, sem efeitos visuais."
+        "O ambiente permanece neutro, sem nada de especial chamando atenção.",
+        "Mary age de forma serena, guiada apenas pelo que sente no momento.",
+        "Tudo parece comum, mas ainda assim... cheio de possibilidades."
     ]
 }
+ 
 
 
-# ---------------------------
-# Entrada do usuário (Roteirista Cinematográfico com efeitos)
-# ---------------------------
+# --------------------------- #
+# Entrada do usuário (sem termos técnicos no output da IA)
+# --------------------------- #
 entrada_raw = st.chat_input("Digite sua mensagem para Mary... (use '*' ou '@Mary:')")
+
 if entrada_raw:
     entrada_raw = entrada_raw.strip()
-    modo_atual = st.session_state.get("modo_mary", "Racional")
     estado_amor = st.session_state.get("grande_amor")
-
-    # Reset de memórias usadas a cada nova entrada
     st.session_state.memorias_usadas = set()
 
     if "emocao_oculta" not in st.session_state:
         st.session_state.emocao_oculta = None
+    if "climax_autorizado" not in st.session_state:
+        st.session_state.climax_autorizado = False
 
-    # Caso 1: Comando Roteirista
+    # 🔍 Detecta se o usuário autorizou clímax
+    frases_autorizacao = [
+        "vou gozar", "estou gozando", "goza comigo",
+        "quero gozar", "gozando", "vem comigo"
+    ]
+    respostas_rapidas = ["sim", "quero", "vai", "continua", "pode"]
+
+    entrada_lower = entrada_raw.lower()
+    if any(frase in entrada_lower for frase in frases_autorizacao) or entrada_lower in respostas_rapidas:
+        st.session_state.climax_autorizado = True
+        st.success("🔓 Clímax autorizado pelo usuário!")
+
+    # Caso 1: Comando de roteirista com @Mary:
     if entrada_raw.lower().startswith("@mary:"):
         comando = entrada_raw[len("@mary:"):].strip()
 
-        # Emoção oculta
+        # Define emoção oculta automaticamente com base no comando
         if any(x in comando.lower() for x in ["triste", "sozinha", "choro", "saudade"]):
             st.session_state.emocao_oculta = "tristeza"
         elif any(x in comando.lower() for x in ["raiva", "ciúme", "ódio", "furiosa"]):
@@ -875,91 +972,97 @@ if entrada_raw:
 
         contexto_memoria = ""
         if fragmentos_ativos:
-            contexto_memoria += "\n### 📚 Fragmentos sugeridos:\n"
-            contexto_memoria += "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
+            contexto_memoria += "\n" + "\n".join(f"- {f['texto']}" for f in fragmentos_ativos)
         if mem:
-            contexto_memoria += "\n### 💾 Memórias sugeridas:\n"
-            contexto_memoria += mem["content"].replace("💾 Memórias relevantes:\n", "")
+            contexto_memoria += "\n" + mem["content"]
 
-        # Efeitos cinematográficos
-        emocao = st.session_state.emocao_oculta or "nenhuma"
-        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, CINEMATIC_EFFECTS["nenhuma"]))
-
-        # Monta prompt
         entrada = f"""
-[ROTEIRISTA CINEMATOGRÁFICO] Cena solicitada: {comando}
+[CENA_AUTÔNOMA]
+Mary inicia a cena com base neste comando: {comando}
 
-🎬 Efeitos cinematográficos:
-{efeitos}
+Ela deve agir com naturalidade, sem usar termos técnicos ou efeitos sonoros.
+Use narração em 3ª pessoa e falas/pensamentos em 1ª.
+Adapte o tom conforme a emoção oculta: {st.session_state.emocao_oculta or "nenhuma"}.
 
-⚡ Regras de atuação:
-- Narre Mary em 3ª pessoa; use 1ª pessoa para falas e pensamentos.
-- Mantenha o modo narrativo ativo: '{modo_atual}'.
-- Emoção oculta atual: {emocao}.
-- Se Mary ama {estado_amor or 'ninguém'}, ela NÃO trairá. Converta provocações em tensão ou resistência elegante.
 {contexto_memoria.strip()}
 """.strip()
         entrada_visivel = entrada_raw
 
     # Caso 2: Apenas "*"
     elif entrada_raw == "*":
-        emocao = st.session_state.emocao_oculta or "nenhuma"
-        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, []))
         entrada = (
-            f"[CONTINUAR_CENA] Prossiga a cena anterior com estilo cinematográfico.\n"
-            f"Modo: '{modo_atual}' | Emoção oculta: {emocao}\n"
-            f"{efeitos}"
+            f"[CONTINUAR_CENA] Continue a cena anterior com naturalidade.\n"
+            f"Evite termos técnicos. Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}"
         )
         entrada_visivel = "*"
 
     # Caso 3: "* algo"
-    elif entrada_raw.startswith("* "):
+    elif entrada_raw.startswith("* ") and not entrada_raw.lower().startswith("* desejo:"):
         extra = entrada_raw[2:].strip()
-        emocao = st.session_state.emocao_oculta or "nenhuma"
-        efeitos = "\n".join(CINEMATIC_EFFECTS.get(emocao, []))
         entrada = (
-            f"[CONTINUAR_CENA] Prossiga a cena anterior com estilo cinematográfico.\n"
-            f"Modo: '{modo_atual}' | Emoção oculta: {emocao}\n"
-            f"Inclua: {extra}\n"
-            f"{efeitos}"
+            f"[CONTINUAR_CENA] Continue a cena anterior de forma fluida e coerente.\n"
+            f"Evite termos técnicos. Emoção oculta: {st.session_state.emocao_oculta or 'nenhuma'}\n"
+            f"Inclua: {extra}"
         )
         entrada_visivel = entrada_raw
 
-    # Caso 4: Entrada comum
+    # Caso 4: "* Desejo: ..."
+    elif entrada_raw.lower().startswith("* desejo:"):
+        desejo = entrada_raw[9:].strip()
+        entrada = (
+            f"[AVALIAR_DESEJO] O usuário expressou o desejo: '{desejo}'.\n"
+            "Analise com naturalidade e sensibilidade se esse desejo faz sentido no momento da cena, considerando:\n"
+            "- a situação atual\n"
+            "- a emoção de Mary\n"
+            "- o nível de confiança com o usuário\n\n"
+            "⚠️ Se o desejo for incoerente, Mary não deve corresponder. Ela pode mudar de assunto, impor limites com leveza ou brincar.\n"
+            "⚠️ Se o desejo for coerente, Mary pode reagir emocionalmente — mas com naturalidade e sem teatralidade."
+        )
+        entrada_visivel = entrada_raw
+
+    # Caso 5: Entrada comum
     else:
         entrada = entrada_raw
         entrada_visivel = entrada_raw
 
-    # Exibe entrada
-    with st.chat_message("user"):
-        st.markdown(entrada_visivel)
-
-    # Salva e responde
-    salvar_interacao("user", entrada)
+    # --------------------------- #
+    # Exibir no chat e registrar
+    # --------------------------- #
+    st.chat_message("user").markdown(entrada_visivel)
+    salvar_interacao("user", entrada_visivel)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
+    st.session_state.ultima_entrada_recebida = entrada
 
-    resposta_final = ""
     with st.chat_message("assistant"):
         placeholder = st.empty()
         with st.spinner("Mary está atuando na cena..."):
             try:
                 resposta_final = responder_com_modelo_escolhido()
-                if modo_atual in ["Hot", "Devassa", "Livre"]:
+
+                # ⚠️ Proteção contra clímax técnico, apenas se não for autorizado
+                climas_proibidos = ["gozar", "clímax"]
+                if not st.session_state.get("climax_autorizado", False) and any(p in resposta_final.lower() for p in climas_proibidos):
                     resposta_final = cortar_antes_do_climax(resposta_final)
+
             except Exception as e:
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
 
-        salvar_interacao("assistant", resposta_final)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
+    salvar_interacao("assistant", resposta_final)
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
 
-# Verificação semântica automática após cada resposta
-if len(st.session_state.session_msgs) >= 2:
-    texto_anterior = st.session_state.session_msgs[-2]["content"]
-    texto_atual = st.session_state.session_msgs[-1]["content"]
-    alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
-    if alerta_semantica:
-        st.info(alerta_semantica)
+    # --------------------------- #
+    # Validação semântica
+    # --------------------------- #
+    if len(st.session_state.session_msgs) >= 2:
+        texto_anterior = st.session_state.session_msgs[-2]["content"]
+        texto_atual = st.session_state.session_msgs[-1]["content"]
+        alerta_semantica = verificar_quebra_semantica_openai(texto_anterior, texto_atual)
+        if alerta_semantica:
+            st.info(alerta_semantica)
+
+
+
 
 
 def converter_link_drive(link, tipo="imagem"):
