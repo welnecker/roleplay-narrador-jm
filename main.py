@@ -588,19 +588,18 @@ def excluir_ultimas_interacoes(aba_nome="interacoes_mary"):
         st.error(f"Erro ao excluir interação: {e}")
 
 # --------------------------- #
-# Sidebar (versão unificada, sem selectbox)
+# Sidebar (versão unificada, com tudo no lugar certo)
 # --------------------------- #
-
 with st.sidebar:
     st.title("🧠 Configurações de Mary")
 
-    # 🔁 Remove a chave antiga se ainda existir
+    # 🔁 Remove chave antiga se ainda existir
     if "escolha_desejo_sexual" in st.session_state:
         del st.session_state["escolha_desejo_sexual"]
 
+    # 💋 Desejos rápidos
     with st.expander("💋 Desejos de Mary (atalhos rápidos)", expanded=False):
         st.caption("Escolha um desejo para Mary expressar automaticamente.")
-
         desejos_mary = {
             "🫦 Chupar Jânio": "Mary se ajoelha lentamente, encarando Jânio com olhos famintos. — Deixa eu cuidar de você do meu jeito... com a boca.",
             "🙈 De quatro": "Mary se vira e se apoia nos cotovelos, empinando os quadris com um sorriso provocante. — Assim… do jeitinho que você gosta.",
@@ -610,17 +609,14 @@ with st.sidebar:
             "🚿 No banho": "Com a água escorrendo pelo corpo, Mary se aproxima molhada e nua. — Quer brincar comigo aqui dentro?",
             "🚗 No carro": "No banco de trás do Porsche, Mary o puxa com força. — Essa noite ninguém vai dirigir… a não ser meu desejo."
         }
-
         colunas = st.columns(2)
         for i, (emoji, frase) in enumerate(desejos_mary.items()):
             with colunas[i % 2]:
                 if st.button(emoji):
-                    st.session_state.session_msgs.append({
-                        "role": "user",
-                        "content": frase
-                    })
+                    st.session_state.session_msgs.append({"role": "user", "content": frase})
                     st.success("✨ Desejo adicionado ao chat.")
 
+    # 🤖 Seleção de modelo
     modelos_disponiveis = {
         # === OPENROUTER ===
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
@@ -644,7 +640,6 @@ with st.sidebar:
         "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
         "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
     }
-
     modelo_selecionado = st.selectbox(
         "🤖 Modelo de IA",
         list(modelos_disponiveis.keys()),
@@ -653,22 +648,16 @@ with st.sidebar:
     )
     modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-    # ------------------------------- #
-    # 🎭 Emoção Oculta de Mary
-    # ------------------------------- #
+    # 🎭 Emoção oculta
     st.markdown("---")
     st.subheader("🎭 Emoção Oculta de Mary")
-
     emoes = ["nenhuma", "tristeza", "raiva", "felicidade", "tensão"]
     escolhida = st.selectbox("Escolha a emoção dominante:", emoes, index=0)
-
     if st.button("Definir emoção"):
         st.session_state.emocao_oculta = escolhida
         st.success(f"Mary agora está sentindo: {escolhida}")
 
-    # ------------------------------- #
-    # 🎲 Emoção Aleatória
-    # ------------------------------- #
+    # 🎲 Emoção aleatória
     import random
     if st.button("Sortear emoção aleatória"):
         emocoes_possiveis = ["tristeza", "raiva", "felicidade", "tensão"]
@@ -676,168 +665,104 @@ with st.sidebar:
         st.session_state.emocao_oculta = sorteada
         st.success(f"✨ Emoção sorteada: {sorteada}")
 
-# ------------------------------- #
-# 🎬 Cena Longa no Sidebar
-# ------------------------------- #
-st.sidebar.markdown("---")
-st.sidebar.subheader("🎬 Cena Longa")
-
-if st.sidebar.button("Ativar Cena Longa"):
-    st.session_state.session_msgs = []
-    st.session_state.memorias_usadas = set()
-    st.session_state.contador_emocao = 0
-    st.session_state["temperatura_forcada"] = 0.95
-    st.session_state.emocao_oculta = "tensão"
-    st.session_state["cena_longa_ativa"] = True
-    st.sidebar.success("✅ Mary poderá ir até o fim da cena sem interrupções.")
-
-# ------------------------------- #
-# 📝 Cena Longa no Corpo Principal
-# ------------------------------- #
-st.markdown("---")
-st.subheader("📝 Cena Longa Especial")
-
-if st.button("Iniciar Cena Longa"):
-    # 🔄 Reset de sessão
-    st.session_state.session_msgs = []
-    st.session_state.memorias_usadas = set()
-    st.session_state.contador_emocao = 0
-
-    # 🌡️ Força temperatura mais alta
-    st.session_state["temperatura_forcada"] = 0.95
-
-    # 😮 Emoção oculta intensa
-    st.session_state.emocao_oculta = "tensão"
-
-    # 🚫 Fragmentos e memórias desativados temporariamente
-    st.session_state["cena_longa_ativa"] = True
-
-    st.success("✨ Cena Longa iniciada! Mary terá liberdade máxima na próxima resposta.")
-    with st.chat_message("user"):
-        st.markdown("_(Cena Longa ativada: Mary assume a narrativa com intensidade e profundidade emocional...)_")
-
-# ------------------------------- #
-# 🎮 Vídeo e resumo
-# ------------------------------- #
-
-if st.button("🎮 Ver vídeo atual"):
-    st.video(f"https://github.com/welnecker/roleplay_imagens/raw/main/{fundo_video}")
-
-if st.button("📝 Gerar resumo do capítulo"):
-    try:
-        # Verifica se é uma cena longa
-        cena_longa = st.session_state.get("cena_longa_ativa", False)
-
-        # Ajusta o número de interações a resumir
-        n_resumo = 10 if cena_longa else 3
-        ultimas = carregar_ultimas_interacoes(n=n_resumo)
-        texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
-
-        prompt_resumo = (
-            f"Resuma o seguinte trecho de conversa como um capítulo de novela, "
-            f"mantendo o estilo narrativo e as emoções presentes:\n\n{texto_resumo}\n\nResumo:"
-        )
-
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "deepseek/deepseek-chat-v3-0324",
-                "messages": [{"role": "user", "content": prompt_resumo}],
-                "max_tokens": 900,
-                "temperature": 0.9 if cena_longa else 0.85
-            }
-        )
-
-        if response.status_code == 200:
-            resumo_gerado = response.json()["choices"][0]["message"]["content"]
-            salvar_resumo(resumo_gerado)
-            st.session_state.ultimo_resumo = resumo_gerado
-
-            st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
-            if cena_longa:
-                st.info("🎬 Resumo estendido gerado para a Cena Longa!")
-
-            with st.expander("📖 Ver resumo gerado"):
-                st.markdown(f"```markdown\n{resumo_gerado}\n```")
-        else:
-            st.error("Erro ao gerar resumo automaticamente.")
-
-    except Exception as e:
-        st.error(f"Erro durante a geração do resumo: {e}")
-
-
-
-
-# --------------------------- #
-# 💘 Grande amor
-# --------------------------- #
-st.markdown("---")
-st.subheader("💘 Grande amor")
-amor_input = st.text_input(
-    "Nome do grande amor (deixe vazio se não existe)",
-    value=st.session_state.grande_amor or ""
-)
-if st.button("Definir grande amor"):
-    st.session_state.grande_amor = amor_input.strip() or None
-    if st.session_state.grande_amor:
-        st.success(f"💖 Agora Mary está apaixonada por {st.session_state.grande_amor}")
-    else:
-        st.info("Mary continua livre.")
-
-# --------------------------- #
-# ➕ Adicionar memória fixa
-# --------------------------- #
-st.markdown("---")
-st.subheader("➕ Adicionar memória fixa")
-nova_memoria = st.text_area(
-    "🧠 Nova memória",
-    height=80,
-    placeholder="Ex: Mary odeia ficar sozinha à noite..."
-)
-if st.button("💾 Salvar memória"):
-    if nova_memoria.strip():
-        salvar_memoria(nova_memoria)
-    else:
-        st.warning("Digite algo antes de salvar.")
-
-# --------------------------- #
-# 🗑️ Excluir última interação
-# --------------------------- #
-if st.button("🗑️ Excluir última interação da planilha"):
-    excluir_ultimas_interacoes("interacoes_mary")
-
-
-
-    # --------------------------- #
-    # Memórias com filtro de busca
-    # --------------------------- #
+    # 🎬 Cena Longa (único botão)
     st.markdown("---")
-    st.subheader("💾 Memórias (busca)")
-    try:
-        aba_memorias = planilha.worksheet("memorias")
-        dados_mem = aba_memorias.col_values(1)
-        busca = st.text_input("🔍 Buscar memória...", key="filtro_memoria").strip().lower()
-        filtradas = [m for m in dados_mem if busca in m.lower()] if busca else dados_mem
-        st.caption(f"{len(filtradas)} memórias encontradas")
-        st.markdown("\n".join(f"* {m}" for m in filtradas if m.strip()))
-    except Exception as e:
-        st.error(f"Erro ao carregar memórias: {e}")
+    st.subheader("🎬 Cena Longa")
+    if st.button("Ativar Cena Longa"):
+        st.session_state.session_msgs = []
+        st.session_state.memorias_usadas = set()
+        st.session_state.contador_emocao = 0
+        st.session_state["temperatura_forcada"] = 0.95
+        st.session_state.emocao_oculta = "tensão"
+        st.session_state["cena_longa_ativa"] = True
+        st.success("✨ Cena Longa iniciada! Mary terá liberdade máxima na próxima resposta.")
+        with st.chat_message("user"):
+            st.markdown("_(Cena Longa ativada: Mary assume a narrativa com intensidade e profundidade emocional...)_")
 
-    # --------------------------- #
-    # Fragmentos Ativos
-    # --------------------------- #
-    if st.session_state.get("session_msgs"):
-        ultima_msg = st.session_state.session_msgs[-1].get("content", "")
-        fragmentos = carregar_fragmentos()
-        fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
-        if fragmentos_ativos:
-            st.subheader("📚 Fragmentos Ativos")
-            for f in fragmentos_ativos:
-                st.markdown(f"- {f['texto']}")
+    # 📝 Gerar resumo
+    st.markdown("---")
+    if st.button("📝 Gerar resumo do capítulo"):
+        try:
+            cena_longa = st.session_state.get("cena_longa_ativa", False)
+            n_resumo = 10 if cena_longa else 3
+            ultimas = carregar_ultimas_interacoes(n=n_resumo)
+            texto_resumo = "\n".join(f"{m['role']}: {m['content']}" for m in ultimas)
+            prompt_resumo = (
+                f"Resuma o seguinte trecho de conversa como um capítulo de novela, "
+                f"mantendo o estilo narrativo e as emoções presentes:\n\n{texto_resumo}\n\nResumo:"
+            )
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "deepseek/deepseek-chat-v3-0324",
+                    "messages": [{"role": "user", "content": prompt_resumo}],
+                    "max_tokens": 900,
+                    "temperature": 0.9 if cena_longa else 0.85
+                }
+            )
+            if response.status_code == 200:
+                resumo_gerado = response.json()["choices"][0]["message"]["content"]
+                salvar_resumo(resumo_gerado)
+                st.session_state.ultimo_resumo = resumo_gerado
+                st.success("✅ Resumo colado na aba 'perfil_mary' com sucesso!")
+                if cena_longa:
+                    st.info("🎬 Resumo estendido gerado para a Cena Longa!")
+                with st.expander("📖 Ver resumo gerado"):
+                    st.markdown(f"```markdown\n{resumo_gerado}\n```")
+            else:
+                st.error("Erro ao gerar resumo automaticamente.")
+        except Exception as e:
+            st.error(f"Erro durante a geração do resumo: {e}")
+
+    # 💘 Grande amor
+    st.markdown("---")
+    st.subheader("💘 Grande amor")
+    amor_input = st.text_input("Nome do grande amor", value=st.session_state.grande_amor or "")
+    if st.button("Definir grande amor"):
+        st.session_state.grande_amor = amor_input.strip() or None
+        if st.session_state.grande_amor:
+            st.success(f"💖 Agora Mary está apaixonada por {st.session_state.grande_amor}")
+        else:
+            st.info("Mary continua livre.")
+
+    # ➕ Adicionar memória fixa
+    st.markdown("---")
+    st.subheader("➕ Adicionar memória fixa")
+    nova_memoria = st.text_area("🧠 Nova memória", height=80, placeholder="Ex: Mary odeia ficar sozinha à noite...")
+    if st.button("💾 Salvar memória"):
+        if nova_memoria.strip():
+            salvar_memoria(nova_memoria)
+        else:
+            st.warning("Digite algo antes de salvar.")
+
+    # 🗑️ Excluir última interação
+    if st.button("🗑️ Excluir última interação da planilha"):
+        excluir_ultimas_interacoes("interacoes_mary")
+        # Memórias com filtro de busca
+        st.markdown("---")
+        st.subheader("💾 Memórias (busca)")
+        try:
+            aba_memorias = planilha.worksheet("memorias")
+            dados_mem = aba_memorias.col_values(1)
+            busca = st.text_input("🔍 Buscar memória...", key="filtro_memoria").strip().lower()
+            filtradas = [m for m in dados_mem if busca in m.lower()] if busca else dados_mem
+            st.caption(f"{len(filtradas)} memórias encontradas")
+            st.markdown("\n".join(f"* {m}" for m in filtradas if m.strip()))
+        except Exception as e:
+            st.error(f"Erro ao carregar memórias: {e}")
+        # Fragmentos ativos
+        if st.session_state.get("session_msgs"):
+            ultima_msg = st.session_state.session_msgs[-1].get("content", "")
+            fragmentos = carregar_fragmentos()
+            fragmentos_ativos = buscar_fragmentos_relevantes(ultima_msg, fragmentos)
+            if fragmentos_ativos:
+                st.subheader("📚 Fragmentos Ativos")
+                for f in fragmentos_ativos:
+                    st.markdown(f"- {f['texto']}")
 
 
 
