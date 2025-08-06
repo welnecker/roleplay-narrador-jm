@@ -520,7 +520,7 @@ if st.session_state.get("ultima_entrada_recebida"):
                 st.error(f"Erro: {e}")
                 resposta_final = "[Erro ao gerar resposta]"
 
-    salvar_interacao("assistant", resposta_final)
+   # salvar_interacao("assistant", resposta_final)
     st.session_state.session_msgs.append({"role": "assistant", "content": resposta_final})
     st.session_state.ultima_entrada_recebida = None
 
