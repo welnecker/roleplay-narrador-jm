@@ -657,10 +657,10 @@ modelo_selecionado = st.selectbox(
     key="modelo_ia",
     index=0
 )
+modelo_escolhido_id = modelos_disponiveis[modelo_selecionado]
 
-# Salva no session_state
-st.session_state["modelo_escolhido_id"] = modelos_disponiveis[modelo_selecionado]
-
+# 🔹 Garante que o valor fique disponível para todo o script
+st.session_state["modelo_escolhido_id"] = modelo_escolhido_id
 
 # ------------------------------- #
 # 🎭 Emoção Oculta de Mary
@@ -851,27 +851,15 @@ if st.session_state.get("ultimo_resumo"):
 # Função de resposta (OpenRouter + Together) - Blindada
 # --------------------------- #
 def responder_com_modelo_escolhido():
-    try:
-        modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
 
-        if modelo.startswith(("togethercomputer/", "mistralai/")):
-            st.session_state["provedor_ia"] = "together"
-            resposta = gerar_resposta_together_stream(modelo)
-        else:
-            st.session_state["provedor_ia"] = "openrouter"
-            resposta = gerar_resposta_openrouter_stream(modelo)
-
-        if not resposta or not isinstance(resposta, str):
-            st.error("❌ O modelo não retornou resposta válida.")
-            return "[Sem resposta do modelo]"
-
-        return resposta
-
-    except Exception as e:
-        st.error(f"Erro interno ao gerar resposta: {e}")
-        import traceback
-        st.code(traceback.format_exc())
-        return "[Erro ao gerar resposta]"
+    # Detecta provedor com base no ID do modelo
+    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+        st.session_state["provedor_ia"] = "together"
+        return gerar_resposta_together_stream(modelo)
+    else:
+        st.session_state["provedor_ia"] = "openrouter"
+        return gerar_resposta_openrouter_stream(modelo)]"
 
 
 # ---------------------------
