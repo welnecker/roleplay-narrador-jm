@@ -449,7 +449,7 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
 
     try:
         with requests.post(
-            "https://api.together.xyz/v1/chat/completions",
+            "https://api.together.ai/v1/chat/completions",  # <-- URL corrigida
             headers=headers,
             json=payload,
             stream=True,
