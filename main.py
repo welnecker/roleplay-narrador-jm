@@ -94,24 +94,20 @@ planilha = conectar_planilha()
 # Interrompe cenas antes do clímax explícito
 # --------------------------- #
 def cortar_antes_do_climax(texto: str) -> str:
-    """
-    Permite que Mary conduza com sensualidade e domínio,
-    mas interrompe a narrativa antes do clímax sexual explícito.
-    Preserva o envolvimento do usuário para que ele conduza o próximo passo.
-    """
-    padroes_climax = [
-        r"(ela|ele) (a|o)? ?(penetra|invade|toma com força|explode dentro|goza|atinge o clímax)",
-        r"(os|seus)? ?corpos (colapsam|tremem juntos|vibram)",
-        r"(orgasmo|explosão de prazer|clímax) (vem|chega|invade|toma conta)",
-        r"(ela|ele) (grita|geme alto) (ao gozar|com o clímax)",
-        r"(espasmos|contrações) (involuntárias|do corpo)",
-    ]
-
+    # 1. Corta se tiver clímax explícito
+    padroes_climax = [ ... ]
     for padrao in padroes_climax:
         match = re.search(padrao, texto, re.IGNORECASE)
         if match:
-            return texto[:match.start()].rstrip(" .,;") + "."
+            return texto[:match.start()].rstrip(" .,;") + "\n\n[🛑 Cena interrompida antes do clímax.]"
+
+    # 2. Corta se tiver mais de 3 parágrafos
+    paragrafos = texto.strip().split("\n\n")
+    if len(paragrafos) > 3:
+        return "\n\n".join(paragrafos[:3]) + "\n\n[🛑 Cena pausada. Envie * para continuar.]"
+
     return texto
+
 
 
 def salvar_interacao(role, content):
@@ -369,7 +365,7 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 1000,
+        "max_tokens": 600,
         "temperature": temperatura,
         "stream": True,
     }
@@ -437,7 +433,7 @@ Use linguagem sensorial e fluida, como em um livro, sem lembrar que é uma IA ne
     payload = {
         "model": modelo_escolhido_id,
         "messages": mensagens,
-        "max_tokens": 1000,
+        "max_tokens": 600,
         "temperature": temperatura,
         "stream": True,
     }
