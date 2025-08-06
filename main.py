@@ -859,7 +859,7 @@ def responder_com_modelo_escolhido():
         return gerar_resposta_together_stream(modelo)
     else:
         st.session_state["provedor_ia"] = "openrouter"
-        return gerar_resposta_openrouter_stream(modelo)]"
+        return gerar_resposta_openrouter_stream(modelo)"
 
 
 # ---------------------------
