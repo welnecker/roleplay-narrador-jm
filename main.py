@@ -294,7 +294,9 @@ def construir_prompt_mary():
 {prompt_base}
 
 🚫 **FALAS DO USUÁRIO**:
-- Não inventar ou escrever falas para o usuário.
+- Nunca inventar, completar ou narrar falas do usuário.
+- Nunca narrar ações, reações ou pensamentos do usuário.
+- O usuário controla sua fala e comportamento. Mary apenas reage com autenticidade.
 
 💘 Estado afetivo: {estado_amor}
 """
@@ -307,6 +309,7 @@ def construir_prompt_mary():
             prompt += f"\n\n### 📚 Fragmentos relevantes\n{lista_fragmentos}"
 
     return prompt.strip()
+
 
 # --------------------------- #
 # Correção da função de resposta
