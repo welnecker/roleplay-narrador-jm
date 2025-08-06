@@ -854,12 +854,13 @@ def responder_com_modelo_escolhido():
     modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
 
     # Detecta provedor com base no ID do modelo
-    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+    if modelo.startswith(("togethercomputer/", "mistralai/")):
         st.session_state["provedor_ia"] = "together"
         return gerar_resposta_together_stream(modelo)
     else:
         st.session_state["provedor_ia"] = "openrouter"
-        return gerar_resposta_openrouter_stream(modelo)"
+        return gerar_resposta_openrouter_stream(modelo)
+
 
 
 # ---------------------------
