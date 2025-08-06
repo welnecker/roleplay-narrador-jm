@@ -663,7 +663,7 @@ with st.sidebar:
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
 }
 
-       modelo_selecionado = st.selectbox(
+    modelo_selecionado = st.selectbox(
         "🤖 Modelo de IA",
         list(modelos_disponiveis.keys()),
         key="modelo_ia",
