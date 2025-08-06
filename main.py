@@ -311,26 +311,30 @@ def construir_prompt_mary():
 # --------------------------- #
 # Correção da função de resposta
 # --------------------------- #
-def responder_com_modelo_escolhido(modelo_escolhido_id):
-    if modelo_escolhido_id.startswith("togethercomputer/") or modelo_escolhido_id.startswith("mistralai/"):
-        st.session_state["provedor_ia"] = "together"
-        return gerar_resposta_together_stream(modelo_escolhido_id)
-    else:
-        st.session_state["provedor_ia"] = "openrouter"
-        return gerar_resposta_openrouter_stream(modelo_escolhido_id)
+# --------------------------- #
+# Correção da função de resposta
+# --------------------------- #
+# def responder_com_modelo_escolhido(modelo_escolhido_id):
+#     if modelo_escolhido_id.startswith("togethercomputer/") or modelo_escolhido_id.startswith("mistralai/"):
+#         st.session_state["provedor_ia"] = "together"
+#         return gerar_resposta_together_stream(modelo_escolhido_id)
+#     else:
+#         st.session_state["provedor_ia"] = "openrouter"
+#         return gerar_resposta_openrouter_stream(modelo_escolhido_id)
 
 # --------------------------- #
 # Uso correto na chamada
 # --------------------------- #
-if st.session_state.get("ultima_entrada_recebida"):
-    with st.chat_message("assistant"):
-        placeholder = st.empty()
-        with st.spinner("Mary está pensando..."):
-            try:
-                resposta_final = responder_com_modelo_escolhido(modelo_escolhido_id)
-            except Exception as e:
-                st.error(f"Erro: {e}")
-                resposta_final = "[Erro ao gerar resposta]"
+# if st.session_state.get("ultima_entrada_recebida"):
+#     with st.chat_message("assistant"):
+#         placeholder = st.empty()
+#         with st.spinner("Mary está pensando..."):
+#             try:
+#                 resposta_final = responder_com_modelo_escolhido(modelo_escolhido_id)
+#             except Exception as e:
+#                 st.error(f"Erro: {e}")
+#                 resposta_final = "[Erro ao gerar resposta]"
+
 
 
 
