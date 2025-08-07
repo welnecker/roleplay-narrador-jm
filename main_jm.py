@@ -29,23 +29,8 @@ def conectar_planilha():
 planilha = conectar_planilha()
 
 # --------------------------- #
-# Carregar perfis e memórias
+# Carregar memórias
 # --------------------------- #
-def carregar_perfis():
-    try:
-        aba = planilha.worksheet("perfil_jm")
-        dados = aba.get_all_values()
-        resumo_mary, resumo_janio = "", ""
-        for linha in dados[1:]:
-            if linha[0].strip().lower() == "mary" and len(linha) >= 7:
-                resumo_mary = linha[6].strip()
-            if linha[0].strip().lower() == "jânio" and len(linha) >= 7:
-                resumo_janio = linha[6].strip()
-        return resumo_mary, resumo_janio
-    except Exception as e:
-        st.error(f"Erro ao carregar perfis: {e}")
-        return "", ""
-
 def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias_jm")
@@ -59,24 +44,59 @@ def carregar_memorias():
         return [], [], []
 
 # --------------------------- #
+# Carregar resumo salvo
+# --------------------------- #
+def carregar_resumo_salvo():
+    try:
+        aba = planilha.worksheet("perfil_jm")
+        valores = aba.col_values(7)
+        for val in reversed(valores[1:]):  # ignora o cabeçalho
+            if val.strip():
+                return val.strip()
+        return ""
+    except Exception as e:
+        st.warning(f"Erro ao carregar resumo salvo: {e}")
+        return ""
+
+# --------------------------- #
+# Salvar resumo na planilha
+# --------------------------- #
+def salvar_resumo(resumo):
+    try:
+        aba = planilha.worksheet("perfil_jm")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        linha = ["", "", "", "", "", timestamp, resumo]
+        aba.append_row(linha, value_input_option="RAW")
+    except Exception as e:
+        st.error(f"Erro ao salvar resumo: {e}")
+
+# --------------------------- #
 # Construir prompt narrativo
 # --------------------------- #
 def construir_prompt_com_narrador():
-    resumo_mary, resumo_janio = carregar_perfis()
     mem_mary, mem_janio, mem_all = carregar_memorias()
     emocao = st.session_state.get("emocao_oculta", "nenhuma")
+    resumo = st.session_state.get("resumo_capitulo", "")
+
+    try:
+        aba = planilha.worksheet("interacoes_jm")
+        registros = aba.get_all_records()
+        ultimas = registros[-15:] if len(registros) > 15 else registros
+        texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
+    except:
+        texto_ultimas = ""
 
     prompt = f"""
-Você é o narrador de uma história em construção. Os protagonistas são:
-
-🔴 Mary — {resumo_mary}
-🔵 Jânio — {resumo_janio}
+Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
 
 Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
 
 ⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.
 
 🎭 Emoção oculta da cena: {emocao}
+
+📖 Capítulo anterior:
+{resumo if resumo else 'Nenhum resumo salvo.'}
 
 ### 🧠 Memórias:
 Mary:
@@ -87,6 +107,9 @@ Jânio:
 
 Compartilhadas:
 - {'\n- '.join(mem_all) if mem_all else 'Nenhuma.'}
+
+### 📖 Últimas interações:
+{texto_ultimas}
 """
     return prompt.strip()
 
@@ -142,7 +165,9 @@ with st.sidebar:
             )
             if resposta.status_code == 200:
                 resumo = resposta.json()["choices"][0]["message"]["content"]
-                st.success("Resumo gerado com sucesso!")
+                st.session_state.resumo_capitulo = resumo
+                salvar_resumo(resumo)
+                st.success("Resumo gerado e salvo com sucesso!")
                 st.text_area("📖 Capítulo anterior", resumo, height=200)
             else:
                 st.error("Erro ao gerar resumo.")
@@ -154,6 +179,10 @@ with st.sidebar:
 # --------------------------- #
 st.title("🎬 Narrador JM")
 st.markdown("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
+
+# Carrega o último resumo salvo da aba perfil_jm
+if "resumo_capitulo" not in st.session_state:
+    st.session_state.resumo_capitulo = carregar_resumo_salvo()
 
 entrada = st.chat_input("Ex: Mary acorda atrasada. Jânio está malhando na academia...")
 if "historico" not in st.session_state:
