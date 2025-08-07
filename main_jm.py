@@ -180,6 +180,11 @@ with st.sidebar:
 st.title("🎬 Narrador JM")
 st.markdown("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 
+# Exibir o último resumo carregado, se houver
+if st.session_state.get("resumo_capitulo"):
+    st.markdown("### 📖 Capítulo anterior")
+    st.text_area("Resumo", st.session_state["resumo_capitulo"], height=200)
+
 # Carrega o último resumo salvo da aba perfil_jm
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
@@ -226,3 +231,4 @@ if entrada:
 for msg in st.session_state.historico:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+
