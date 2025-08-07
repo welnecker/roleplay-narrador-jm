@@ -22,7 +22,7 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
+        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
         return None
@@ -203,3 +203,4 @@ with st.sidebar:
                 st.success("Resumo gerado e salvo com sucesso!")
         except Exception as e:
             st.error(f"Erro ao resumir: {e}")
+
