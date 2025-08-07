@@ -5,6 +5,7 @@ import re
 import requests
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
+import time
 
 st.set_page_config(page_title="Narrador JM", page_icon="🎬")
 
@@ -180,11 +181,6 @@ with st.sidebar:
 st.title("🎬 Narrador JM")
 st.markdown("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 
-# Exibir o último resumo carregado, se houver
-if st.session_state.get("resumo_capitulo"):
-    st.markdown("### 📖 Capítulo anterior")
-    st.text_area("Resumo", st.session_state["resumo_capitulo"], height=200)
-
 # Carrega o último resumo salvo da aba perfil_jm
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
@@ -213,15 +209,28 @@ if entrada:
                 "model": st.session_state.modelo_escolhido,
                 "messages": mensagens,
                 "max_tokens": 800,
-                "temperature": 0.85
+                "temperature": 0.85,
+                "stream": True
             },
-            timeout=120
+            timeout=120,
+            stream=True
         )
         if resposta.status_code == 200:
-            conteudo = resposta.json()["choices"][0]["message"]["content"]
+            conteudo = ""
+            placeholder = st.empty()
+            for linha in resposta.iter_lines():
+                if linha:
+                    try:
+                        linha_decodificada = linha.decode("utf-8").replace("data: ", "")
+                        if linha_decodificada == "[DONE]":
+                            break
+                        parte = json.loads(linha_decodificada)["choices"][0]["delta"].get("content", "")
+                        conteudo += parte
+                        placeholder.markdown(conteudo)
+                    except:
+                        continue
             salvar_interacao("assistant", conteudo)
             st.session_state.historico.append({"role": "assistant", "content": conteudo})
-            st.chat_message("assistant").markdown(conteudo)
         else:
             st.error("Erro ao gerar resposta da IA.")
     except Exception as e:
@@ -231,5 +240,3 @@ if entrada:
 for msg in st.session_state.historico:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-
-
