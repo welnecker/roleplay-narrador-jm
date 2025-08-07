@@ -169,9 +169,6 @@ with st.sidebar:
                 st.session_state.resumo_capitulo = resumo
                 salvar_resumo(resumo)
                 st.success("Resumo gerado e salvo com sucesso!")
-                st.text_area("📖 Capítulo anterior", resumo, height=200)
-            else:
-                st.error("Erro ao gerar resumo.")
         except Exception as e:
             st.error(f"Erro ao resumir: {e}")
 
@@ -183,6 +180,11 @@ st.markdown("Você é o roteirista. Digite uma direção de cena. A IA narrará 
 
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
+
+# Exibir o resumo no corpo principal
+if st.session_state.resumo_capitulo:
+    st.markdown("### 📖 Capítulo anterior")
+    st.markdown(st.session_state.resumo_capitulo)
 
 if "historico" not in st.session_state:
     st.session_state.historico = []
