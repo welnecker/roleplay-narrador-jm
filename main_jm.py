@@ -133,12 +133,27 @@ def salvar_interacao(role, content):
 with st.sidebar:
     st.title("🎛️ Controle do Roteirista")
 
-    modelos = {
-        "💬 DeepSeek V3 (OpenRouter)": "deepseek/deepseek-chat-v3-0324",
-        "🧠 GPT-4.1 (OpenRouter)": "openai/gpt-4.1"
-    }
+    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0)
+
+    if provedor == "OpenRouter":
+        modelos = {
+            "💬 DeepSeek V3 (OpenRouter)": "deepseek/deepseek-chat-v3-0324",
+            "🧠 GPT-4.1 (OpenRouter)": "openai/gpt-4.1"
+        }
+        chave_api = st.secrets["OPENROUTER_API_KEY"]
+        url_api = "https://openrouter.ai/api/v1/chat/completions"
+    else:
+        modelos = {
+            "🧠 Mixtral (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+            "🧠 Qwen (Together)": "qwen3-coder-480b-a35b-instruct"
+        }
+        chave_api = st.secrets["TOGETHER_API_KEY"]
+        url_api = "https://api.together.xyz/v1/chat/completions"
+
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos.keys()), index=0)
     st.session_state.modelo_escolhido = modelos[modelo_nome]
+    st.session_state.url_api = url_api
+    st.session_state.chave_api = chave_api
 
     emocao = st.selectbox("🎭 Emoção oculta da cena", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0)
     st.session_state.emocao_oculta = emocao
@@ -152,13 +167,13 @@ with st.sidebar:
             prompt_resumo = f"Resuma o seguinte trecho como um capítulo de novela:\n\n{texto}\n\nResumo:"
 
             resposta = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                url_api,
                 headers={
-                    "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY']}",
+                    "Authorization": f"Bearer {chave_api}",
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "deepseek/deepseek-chat-v3-0324",
+                    "model": modelos[modelo_nome],
                     "messages": [{"role": "user", "content": prompt_resumo}],
                     "max_tokens": 800,
                     "temperature": 0.85
@@ -171,76 +186,3 @@ with st.sidebar:
                 st.success("Resumo gerado e salvo com sucesso!")
         except Exception as e:
             st.error(f"Erro ao resumir: {e}")
-
-# --------------------------- #
-# Interface principal
-# --------------------------- #
-st.title("🎬 Narrador JM")
-st.markdown("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
-
-if "resumo_capitulo" not in st.session_state:
-    st.session_state.resumo_capitulo = carregar_resumo_salvo()
-
-# Exibir o resumo no corpo principal
-if st.session_state.resumo_capitulo:
-    st.markdown("### 📖 Capítulo anterior")
-    st.markdown(st.session_state.resumo_capitulo)
-
-if "historico" not in st.session_state:
-    st.session_state.historico = []
-
-entrada = st.chat_input("Ex: Mary acorda atrasada. Jânio está malhando na academia...")
-
-if entrada:
-    st.chat_message("user").markdown(entrada)
-    salvar_interacao("user", entrada)
-    st.session_state.historico.append({"role": "user", "content": entrada})
-
-    prompt = construir_prompt_com_narrador()
-    mensagens = [{"role": "system", "content": prompt}] + st.session_state.historico
-
-    try:
-        resposta = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY']}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": st.session_state.modelo_escolhido,
-                "messages": mensagens,
-                "max_tokens": 800,
-                "temperature": 0.85,
-                "stream": True
-            },
-            timeout=120,
-            stream=True
-        )
-        if resposta.status_code == 200:
-            conteudo = ""
-            with st.chat_message("assistant"):
-                placeholder = st.empty()
-                for linha in resposta.iter_lines():
-                    if linha:
-                        try:
-                            linha_decodificada = linha.decode("utf-8").replace("data: ", "")
-                            if linha_decodificada == "[DONE]":
-                                break
-                            parte = json.loads(linha_decodificada)["choices"][0]["delta"].get("content", "")
-                            conteudo += parte
-                            placeholder.markdown(conteudo)
-                        except:
-                            continue
-            salvar_interacao("assistant", conteudo)
-            st.session_state.historico.append({"role": "assistant", "content": conteudo})
-
-            # Exibir apenas as mensagens anteriores (exceto a última que já foi exibida com stream)
-            for i, msg in enumerate(st.session_state.historico[:-1]):
-                if msg["role"] == "user":
-                    with st.chat_message("user"):
-                        st.markdown(msg["content"])
-                elif msg["role"] == "assistant":
-                    with st.chat_message("assistant"):
-                        st.markdown(msg["content"])
-    except Exception as e:
-        st.error(f"Erro de conexão: {e}")
