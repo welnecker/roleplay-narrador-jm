@@ -242,4 +242,3 @@ for msg in st.session_state.historico:
     elif msg["role"] == "assistant" and msg != st.session_state.historico[-1]:
         with st.chat_message("assistant"):
             st.markdown(msg["content"])
-
