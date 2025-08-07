@@ -22,7 +22,7 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
         return None
@@ -36,9 +36,9 @@ def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
-        mem_mary = [r["conteudo"] for r in registros if r["tipo"].strip().lower() == "[mary]"]
-        mem_janio = [r["conteudo"] for r in registros if r["tipo"].strip().lower() == "[jânio]"]
-        mem_all = [r["conteudo"] for r in registros if r["tipo"].strip().lower() == "[all]"]
+        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[mary]"]
+        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[jânio]"]
+        mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[all]"]
         return mem_mary, mem_janio, mem_all
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
@@ -51,7 +51,7 @@ def carregar_resumo_salvo():
     try:
         aba = planilha.worksheet("perfil_jm")
         valores = aba.col_values(7)
-        for val in reversed(valores[1:]):  # ignora o cabeçalho
+        for val in reversed(valores[1:]):
             if val.strip():
                 return val.strip()
         return ""
@@ -128,7 +128,7 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 # --------------------------- #
-# Sidebar (modelos, emoção)
+# Sidebar
 # --------------------------- #
 with st.sidebar:
     st.title("🎛️ Controle do Roteirista")
@@ -181,13 +181,13 @@ with st.sidebar:
 st.title("🎬 Narrador JM")
 st.markdown("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 
-# Carrega o último resumo salvo da aba perfil_jm
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
 
-entrada = st.chat_input("Ex: Mary acorda atrasada. Jânio está malhando na academia...")
 if "historico" not in st.session_state:
     st.session_state.historico = []
+
+entrada = st.chat_input("Ex: Mary acorda atrasada. Jânio está malhando na academia...")
 
 if entrada:
     st.chat_message("user").markdown(entrada)
@@ -231,8 +231,6 @@ if entrada:
                             continue
             salvar_interacao("assistant", conteudo)
             st.session_state.historico.append({"role": "assistant", "content": conteudo})
-        else:
-            st.error("Erro ao gerar resposta da IA.")
     except Exception as e:
         st.error(f"Erro de conexão: {e}")
 
@@ -240,4 +238,7 @@ if entrada:
 for msg in st.session_state.historico:
     if msg["role"] == "user":
         with st.chat_message("user"):
+            st.markdown(msg["content"])
+    elif msg["role"] == "assistant" and msg != st.session_state.historico[-1]:
+        with st.chat_message("assistant"):
             st.markdown(msg["content"])
