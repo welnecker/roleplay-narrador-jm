@@ -234,11 +234,11 @@ if entrada:
     except Exception as e:
         st.error(f"Erro de conexão: {e}")
 
-# Exibir histórico
-for msg in st.session_state.historico:
+# Exibir histórico sem duplicar a última resposta
+for i, msg in enumerate(st.session_state.historico):
     if msg["role"] == "user":
         with st.chat_message("user"):
             st.markdown(msg["content"])
-    elif msg["role"] == "assistant" and msg != st.session_state.historico[-1]:
+    elif msg["role"] == "assistant" and i != len(st.session_state.historico) - 1:
         with st.chat_message("assistant"):
             st.markdown(msg["content"])
