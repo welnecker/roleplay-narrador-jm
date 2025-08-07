@@ -232,3 +232,4 @@ for msg in st.session_state.historico:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+
