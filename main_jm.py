@@ -231,14 +231,14 @@ if entrada:
                             continue
             salvar_interacao("assistant", conteudo)
             st.session_state.historico.append({"role": "assistant", "content": conteudo})
+
+            # Exibir apenas as mensagens anteriores (exceto a última que já foi exibida com stream)
+            for i, msg in enumerate(st.session_state.historico[:-1]):
+                if msg["role"] == "user":
+                    with st.chat_message("user"):
+                        st.markdown(msg["content"])
+                elif msg["role"] == "assistant":
+                    with st.chat_message("assistant"):
+                        st.markdown(msg["content"])
     except Exception as e:
         st.error(f"Erro de conexão: {e}")
-
-# Exibir histórico sem duplicar a última resposta
-for i, msg in enumerate(st.session_state.historico):
-    if msg["role"] == "user":
-        with st.chat_message("user"):
-            st.markdown(msg["content"])
-    elif msg["role"] == "assistant" and i != len(st.session_state.historico) - 1:
-        with st.chat_message("assistant"):
-            st.markdown(msg["content"])
