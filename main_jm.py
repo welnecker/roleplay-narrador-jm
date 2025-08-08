@@ -196,6 +196,17 @@ with st.sidebar:
 
 
 # --------------------------- #
+# Função para exibir resposta digitando
+# --------------------------- #
+def exibir_resposta_digitando(resposta):
+    container = st.empty()
+    texto = ""
+    for char in resposta:
+        texto += char
+        container.markdown(texto)
+        time.sleep(0.02)
+
+# --------------------------- #
 # Envio para API
 # --------------------------- #
 if entrada_usuario:
@@ -222,4 +233,5 @@ if entrada_usuario:
             st.error(f"Erro {resposta.status_code} - {resposta.text}")
     except Exception as e:
         st.error(f"Erro ao gerar resposta: {e}")
+
 
