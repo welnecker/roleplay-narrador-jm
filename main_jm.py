@@ -70,11 +70,12 @@ def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
-        mem_mary = [r["memoria"] for r in registros if r.get("tipo", "").lower().strip() == "mary"]
-        mem_janio = [r["memoria"] for r in registros if r.get("tipo", "").lower().strip() == "janio"]
-        mem_all = [r["memoria"] for r in registros if r.get("tipo", "").lower().strip() == "all"]
+        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[mary]"]
+        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[jânio]" or r.get("tipo", "").strip().lower() == "[janio]"]
+        mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[all]"]
         return mem_mary, mem_janio, mem_all
-    except:
+    except Exception as e:
+        st.warning(f"Erro ao carregar memórias: {e}")
         return [], [], []
 
 # --------------------------- #
@@ -226,6 +227,7 @@ if entrada_usuario:
         mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
 
 
 
