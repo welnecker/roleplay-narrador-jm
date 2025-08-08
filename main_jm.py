@@ -220,6 +220,25 @@ st.markdown("#### 📖 Último resumo salvo:")
 st.session_state.resumo_capitulo = carregar_resumo()
 st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
 
+# Mostrar histórico recente de interações
+with st.container():
+    try:
+        aba = planilha.worksheet("interacoes_jm")
+        registros = aba.get_all_records()
+        ultimas = registros[-20:] if len(registros) > 20 else registros
+
+        for r in ultimas:
+            role = r["role"]
+            content = r["content"]
+            if role == "user":
+                with st.chat_message("user"):
+                    st.markdown(content)
+            else:
+                with st.chat_message("assistant"):
+                    st.markdown(content)
+    except Exception as e:
+        st.warning(f"Erro ao carregar interações: {e}")
+
 entrada_usuario = st.chat_input("Digite sua direção de cena...")
 if entrada_usuario:
     salvar_interacao("user", entrada_usuario)
@@ -259,9 +278,10 @@ if entrada_usuario:
                 except:
                     continue
 
-       # mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
+
 
 
 
