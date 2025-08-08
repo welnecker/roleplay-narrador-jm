@@ -128,6 +128,33 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 # --------------------------- #
+# Função para enviar à IA
+# --------------------------- #
+def gerar_resposta_ia(prompt):
+    try:
+        resposta = requests.post(
+            st.session_state.api_url,
+            headers={
+                "Authorization": f"Bearer {st.session_state.api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": st.session_state.modelo_escolhido,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1000,
+                "temperature": 0.85
+            }
+        )
+        if resposta.status_code == 200:
+            return resposta.json()["choices"][0]["message"]["content"]
+        else:
+            st.error(f"Erro na API: {resposta.status_code} - {resposta.text}")
+            return ""
+    except Exception as e:
+        st.error(f"Erro ao gerar resposta: {e}")
+        return ""
+
+# --------------------------- #
 # Carregar resumo ao iniciar
 # --------------------------- #
 if "resumo_capitulo" not in st.session_state:
@@ -146,6 +173,11 @@ entrada_usuario = st.chat_input("Digite sua direção de cena...")
 if entrada_usuario:
     salvar_interacao("user", entrada_usuario)
     st.session_state.entrada_atual = entrada_usuario
+    prompt = construir_prompt_com_narrador() + f"\n\n📜 Direção do roteirista: {entrada_usuario}"
+    resposta_ia = gerar_resposta_ia(prompt)
+    if resposta_ia:
+        salvar_interacao("assistant", resposta_ia)
+        st.markdown(f"**IA:** {resposta_ia}")
 
 # --------------------------- #
 # Sidebar - Seleção de provedor e modelos
@@ -192,8 +224,6 @@ with st.sidebar:
     st.session_state.api_url = api_url
     st.session_state.api_key = api_key
 
-
-
     emocao = st.selectbox("🎭 Emoção oculta da cena", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0)
     st.session_state.emocao_oculta = emocao
 
@@ -205,25 +235,10 @@ with st.sidebar:
             texto = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
             prompt_resumo = f"Resuma o seguinte trecho como um capítulo de novela:\n\n{texto}\n\nResumo:"
 
-            resposta = requests.post(
-                url_api,
-                headers={
-                    "Authorization": f"Bearer {chave_api}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": modelos[modelo_nome],
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": 0.85
-                }
-            )
-            if resposta.status_code == 200:
-                resumo = resposta.json()["choices"][0]["message"]["content"]
+            resumo = gerar_resposta_ia(prompt_resumo)
+            if resumo:
                 st.session_state.resumo_capitulo = resumo
                 salvar_resumo(resumo)
                 st.success("Resumo gerado e salvo com sucesso!")
         except Exception as e:
             st.error(f"Erro ao resumir: {e}")
-
-
