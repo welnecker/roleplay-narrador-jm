@@ -55,9 +55,12 @@ def salvar_resumo(resumo):
 def carregar_resumo():
     try:
         aba = planilha.worksheet("perfil_jm")
-        return aba.cell(2, 7).value
+        col = aba.col_values(7)
+        col = [r.strip() for r in col if r.strip()]
+        return col[-1] if len(col) > 1 else ""
     except:
         return ""
+
 
 # --------------------------- #
 # Carregar memórias
@@ -216,3 +219,4 @@ if entrada_usuario:
         mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
