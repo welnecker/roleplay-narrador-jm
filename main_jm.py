@@ -84,7 +84,8 @@ def carregar_memorias():
 def construir_prompt_com_narrador():
     mem_mary, mem_janio, mem_all = carregar_memorias()
     emocao = st.session_state.get("emocao_oculta", "nenhuma")
-    resumo = st.session_state.get("resumo_capitulo", carregar_resumo())
+    resumo = carregar_resumo()
+    st.session_state["resumo_capitulo"] = resumo
 
     try:
         aba = planilha.worksheet("interacoes_jm")
@@ -159,6 +160,8 @@ def responder_com_modelo_escolhido():
         return gerar_resposta_openrouter_stream(modelo)
 
 
+
+
 # (O restante do script permanece igual e já estava completo na versão anterior.)
 
 
@@ -223,9 +226,10 @@ if entrada_usuario:
                 except:
                     continue
 
-        mensagem_final = cortar_antes_do_climax(mensagem_final)
+       # mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
 
 
 
