@@ -70,8 +70,8 @@ def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
-        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[mary]"]
-        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[jânio]" or r.get("tipo", "").strip().lower() == "[janio]"]
+        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[mary]")]
+        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[jânio]", "[janio]")]
         mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[all]"]
         return mem_mary, mem_janio, mem_all
     except Exception as e:
@@ -100,7 +100,6 @@ Você é o narrador de uma história em construção. Os protagonistas são Mary
 Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
 
 
-
 🎭 Emoção oculta da cena: {emocao}
 
 📖 Capítulo anterior:
@@ -120,8 +119,6 @@ Compartilhadas:
 {texto_ultimas}
 """
     return prompt.strip()
-
-
 
 # --------------------------- #
 # Modelos disponíveis
@@ -159,6 +156,7 @@ def responder_com_modelo_escolhido():
     else:
         st.session_state["provedor_ia"] = "openrouter"
         return gerar_resposta_openrouter_stream(modelo)
+
 
 # (O restante do script permanece igual e já estava completo na versão anterior.)
 
@@ -227,6 +225,7 @@ if entrada_usuario:
         mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
 
 
 
