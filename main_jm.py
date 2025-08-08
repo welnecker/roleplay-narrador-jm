@@ -153,39 +153,45 @@ if entrada_usuario:
 with st.sidebar:
     st.title("🌐 Configurações de IA")
     provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0)
+
+    modelos_disponiveis = {
+        # === OPENROUTER ===
+        "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+        "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+        "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+        "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+        "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+        "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+        "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+        "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+        "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+        "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+        "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+        "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+        "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+        "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+        "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+        "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+        "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+        # === TOGETHER AI ===
+        "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+        "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    }
+
+    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0)
+    modelo_escolhido_id = modelos_disponiveis[modelo_nome]
+
     if provedor == "OpenRouter":
-        modelos = {
-            "💬 DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
-            "🧠 GPT-4.1": "openai/gpt-4.1",
-            "🗣️ Qwen 72B": "qwen/qwen-72b-chat",
-            "🗣️ Qwen 32B": "qwen/qwen-32b-chat",
-            "🔮 Nous Hermes 13B": "nousresearch/nous-hermes-llama2-13b",
-            "🌀 Mixtral 8x7B": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-            "📜 Claude 3 Opus": "anthropic/claude-3-opus",
-            "🦙 LLaMA 3 70B": "meta-llama/llama-3-70b-instruct",
-            "💬 OpenChat 3.5": "openchat/openchat-3.5-0106",
-            "🔄 OpenRouter Auto": "openrouter/auto"
-        }
-        modelo_nome = st.selectbox("Modelo", list(modelos.keys()), index=0)
         api_url = "https://openrouter.ai/api/v1/chat/completions"
         api_key = st.secrets["OPENROUTER_API_KEY"]
     else:
-        modelos = {
-            "🦙 LLaMA 2 70B": "togethercomputer/llama-2-70b-chat",
-            "🦙 LLaMA 2 13B": "togethercomputer/llama-2-13b-chat",
-            "🦙 LLaMA 2 7B": "togethercomputer/llama-2-7b-chat",
-            "🌀 Mixtral 8x7B": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-            "🗣️ Qwen 72B": "qwen/qwen-72b-chat",
-            "🗣️ Qwen 32B": "qwen/qwen-32b-chat",
-            "💬 DeepSeek Chat": "deepseek/deepseek-chat"
-        }
-        modelo_nome = st.selectbox("Modelo", list(modelos.keys()), index=0)
         api_url = "https://api.together.xyz/v1/chat/completions"
         api_key = st.secrets["TOGETHER_API_KEY"]
 
-    st.session_state.modelo_escolhido = modelos[modelo_nome]
+    st.session_state.modelo_escolhido = modelo_escolhido_id
     st.session_state.api_url = api_url
     st.session_state.api_key = api_key
+
 
 
     emocao = st.selectbox("🎭 Emoção oculta da cena", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0)
@@ -219,4 +225,5 @@ with st.sidebar:
                 st.success("Resumo gerado e salvo com sucesso!")
         except Exception as e:
             st.error(f"Erro ao resumir: {e}")
+
 
