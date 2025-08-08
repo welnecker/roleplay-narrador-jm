@@ -22,7 +22,7 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
+        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
         return None
@@ -134,15 +134,18 @@ if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
 
 # --------------------------- #
-# Título e resumo na tela principal
+# Título, resumo e prompt de entrada
 # --------------------------- #
 st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
-st.markdown("""
----
-#### 📖 Último resumo salvo:
-""")
+st.markdown("---")
+st.markdown("#### 📖 Último resumo salvo:")
 st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
+
+entrada_usuario = st.chat_input("Digite sua direção de cena...")
+if entrada_usuario:
+    salvar_interacao("user", entrada_usuario)
+    st.session_state.entrada_atual = entrada_usuario
 
 # --------------------------- #
 # Sidebar
