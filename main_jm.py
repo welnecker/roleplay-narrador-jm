@@ -70,9 +70,9 @@ def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
-        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[mary]"]
-        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[jânio]", "[janio]")]
-        mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[all]"]
+        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[mary]", "mary")]
+        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip() in ("[Jânio]", "Jânio")]
+        mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[all]", "all")]
         return mem_mary, mem_janio, mem_all
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
@@ -162,6 +162,7 @@ def responder_com_modelo_escolhido():
 
 
 
+
 # (O restante do script permanece igual e já estava completo na versão anterior.)
 
 
@@ -229,6 +230,7 @@ if entrada_usuario:
        # mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
 
 
 
