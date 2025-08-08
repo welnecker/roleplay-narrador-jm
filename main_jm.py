@@ -25,7 +25,7 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
         return None
@@ -46,14 +46,20 @@ def salvar_interacao(role, content):
 def salvar_resumo(resumo):
     try:
         aba = planilha.worksheet("perfil_jm")
-        aba.update_cell(2, 7, resumo)
+        linhas = aba.get_all_values()
+        ultima_linha = len(linhas) + 1
+        aba.update_cell(ultima_linha, 7, resumo)
     except Exception as e:
         st.warning(f"Erro ao salvar resumo: {e}")
 
 def carregar_resumo():
     try:
         aba = planilha.worksheet("perfil_jm")
-        return aba.cell(2, 7).value
+        col = aba.col_values(7)
+        for item in reversed(col):
+            if item.strip():
+                return item
+        return ""
     except:
         return ""
 
@@ -64,9 +70,9 @@ def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
-        mem_mary = [r["memoria"] for r in registros if r["tipo"].lower() == "mary"]
-        mem_janio = [r["memoria"] for r in registros if r["tipo"].lower() == "janio"]
-        mem_all = [r["memoria"] for r in registros if r["tipo"].lower() == "all"]
+        mem_mary = [r["memoria"] for r in registros if r.get("tipo", "").lower().strip() == "mary"]
+        mem_janio = [r["memoria"] for r in registros if r.get("tipo", "").lower().strip() == "janio"]
+        mem_all = [r["memoria"] for r in registros if r.get("tipo", "").lower().strip() == "all"]
         return mem_mary, mem_janio, mem_all
     except:
         return [], [], []
@@ -77,7 +83,7 @@ def carregar_memorias():
 def construir_prompt_com_narrador():
     mem_mary, mem_janio, mem_all = carregar_memorias()
     emocao = st.session_state.get("emocao_oculta", "nenhuma")
-    resumo = st.session_state.get("resumo_capitulo", "")
+    resumo = st.session_state.get("resumo_capitulo", carregar_resumo())
 
     try:
         aba = planilha.worksheet("interacoes_jm")
@@ -92,7 +98,7 @@ Você é o narrador de uma história em construção. Os protagonistas são Mary
 
 Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
 
-⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.
+
 
 🎭 Emoção oculta da cena: {emocao}
 
@@ -114,14 +120,7 @@ Compartilhadas:
 """
     return prompt.strip()
 
-# --------------------------- #
-# Cortar antes do clímax explícito
-# --------------------------- #
-def cortar_antes_do_climax(texto: str) -> str:
-    paragrafos = texto.strip().split("\n\n")
-    if len(paragrafos) > 3:
-        return "\n\n".join(paragrafos[:3]) + "\n\n[🛑 Cena interrompida. Envie * para continuar.]"
-    return texto
+
 
 # --------------------------- #
 # Modelos disponíveis
@@ -227,6 +226,7 @@ if entrada_usuario:
         mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
 
 
 
