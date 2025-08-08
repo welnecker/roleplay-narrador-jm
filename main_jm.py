@@ -177,6 +177,38 @@ with st.sidebar:
         salvar_resumo(st.session_state.get("resumo_capitulo", ""))
         st.success("Resumo salvo com sucesso!")
 
+    if st.button("📝 Criar novo resumo"):
+        try:
+            aba = planilha.worksheet("interacoes_jm")
+            registros = aba.get_all_records()
+            ultimas = registros[-15:] if len(registros) > 15 else registros
+            texto = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
+
+            # Chamada à IA para resumir
+            st.info("Gerando resumo automático com base nas últimas interações...")
+            resposta = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY']}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "openai/gpt-3.5-turbo",  # ou outro modelo que preferir
+                    "messages": [
+                        {"role": "system", "content": "Resuma os principais eventos dessa história para ser usado como introdução do próximo capítulo. Seja claro, emocional e sem revelar tudo."},
+                        {"role": "user", "content": texto}
+                    ]
+                }
+            )
+
+            dados = resposta.json()
+            resumo_gerado = dados["choices"][0]["message"]["content"]
+            st.session_state["resumo_capitulo"] = resumo_gerado
+            st.success("Resumo gerado com sucesso! Revise antes de salvar.")
+        except Exception as e:
+            st.error(f"Erro ao gerar resumo: {e}")
+
+
 # --------------------------- #
 # Tela principal
 # --------------------------- #
@@ -230,6 +262,7 @@ if entrada_usuario:
        # mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
 
 
 
