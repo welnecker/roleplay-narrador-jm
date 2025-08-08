@@ -5,7 +5,6 @@ import re
 import requests
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
-import time
 
 st.set_page_config(page_title="Narrador JM", page_icon="🎬")
 
@@ -128,33 +127,6 @@ def salvar_interacao(role, content):
         st.error(f"Erro ao salvar interação: {e}")
 
 # --------------------------- #
-# Função para enviar à IA
-# --------------------------- #
-def gerar_resposta_ia(prompt):
-    try:
-        resposta = requests.post(
-            st.session_state.api_url,
-            headers={
-                "Authorization": f"Bearer {st.session_state.api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": st.session_state.modelo_escolhido,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 1000,
-                "temperature": 0.85
-            }
-        )
-        if resposta.status_code == 200:
-            return resposta.json()["choices"][0]["message"]["content"]
-        else:
-            st.error(f"Erro na API: {resposta.status_code} - {resposta.text}")
-            return ""
-    except Exception as e:
-        st.error(f"Erro ao gerar resposta: {e}")
-        return ""
-
-# --------------------------- #
 # Carregar resumo ao iniciar
 # --------------------------- #
 if "resumo_capitulo" not in st.session_state:
@@ -173,21 +145,15 @@ entrada_usuario = st.chat_input("Digite sua direção de cena...")
 if entrada_usuario:
     salvar_interacao("user", entrada_usuario)
     st.session_state.entrada_atual = entrada_usuario
-    prompt = construir_prompt_com_narrador() + f"\n\n📜 Direção do roteirista: {entrada_usuario}"
-    resposta_ia = gerar_resposta_ia(prompt)
-    if resposta_ia:
-        salvar_interacao("assistant", resposta_ia)
-        st.markdown(f"**IA:** {resposta_ia}")
 
 # --------------------------- #
-# Sidebar - Seleção de provedor e modelos
+# Sidebar - Provedor e Modelos
 # --------------------------- #
 with st.sidebar:
     st.title("🌐 Configurações de IA")
     provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0)
 
-    modelos_disponiveis = {
-        # === OPENROUTER ===
+    modelos_openrouter = {
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
         "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
@@ -205,41 +171,53 @@ with st.sidebar:
         "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
         "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
         "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-        # === TOGETHER AI ===
-        "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    }
+
+    modelos_together = {
+        "🧠 Qwen3 Coder 480B (Together)": "Qwen3-Coder-480B-A35B-Instruct-FP8",
         "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
     }
 
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0)
-    modelo_escolhido_id = modelos_disponiveis[modelo_nome]
-
     if provedor == "OpenRouter":
+        modelos_disponiveis = modelos_openrouter
         api_url = "https://openrouter.ai/api/v1/chat/completions"
         api_key = st.secrets["OPENROUTER_API_KEY"]
     else:
+        modelos_disponiveis = modelos_together
         api_url = "https://api.together.xyz/v1/chat/completions"
         api_key = st.secrets["TOGETHER_API_KEY"]
 
-    st.session_state.modelo_escolhido = modelo_escolhido_id
+    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0)
+    modelo_id = modelos_disponiveis[modelo_nome]
+
     st.session_state.api_url = api_url
     st.session_state.api_key = api_key
+    st.session_state.modelo_escolhido = modelo_id
 
-    emocao = st.selectbox("🎭 Emoção oculta da cena", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0)
-    st.session_state.emocao_oculta = emocao
-
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            aba = planilha.worksheet("interacoes_jm")
-            registros = aba.get_all_records()
-            ultimas = registros[-6:] if len(registros) > 6 else registros
-            texto = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
-            prompt_resumo = f"Resuma o seguinte trecho como um capítulo de novela:\n\n{texto}\n\nResumo:"
-
-            resumo = gerar_resposta_ia(prompt_resumo)
-            if resumo:
-                st.session_state.resumo_capitulo = resumo
-                salvar_resumo(resumo)
-                st.success("Resumo gerado e salvo com sucesso!")
-        except Exception as e:
-            st.error(f"Erro ao resumir: {e}")
-
+# --------------------------- #
+# Envio para API
+# --------------------------- #
+if entrada_usuario:
+    prompt_final = construir_prompt_com_narrador() + f"\n\n🎬 Direção de cena: {entrada_usuario}"
+    try:
+        resposta = requests.post(
+            st.session_state.api_url,
+            headers={
+                "Authorization": f"Bearer {st.session_state.api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": st.session_state.modelo_escolhido,
+                "messages": [{"role": "user", "content": prompt_final}],
+                "max_tokens": 800,
+                "temperature": 0.85
+            }
+        )
+        if resposta.status_code == 200:
+            conteudo = resposta.json()["choices"][0]["message"]["content"]
+            salvar_interacao("assistant", conteudo)
+            st.markdown(f"**IA:** {conteudo}")
+        else:
+            st.error(f"Erro {resposta.status_code} - {resposta.text}")
+    except Exception as e:
+        st.error(f"Erro ao gerar resposta: {e}")
