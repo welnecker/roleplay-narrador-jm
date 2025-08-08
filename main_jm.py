@@ -91,7 +91,7 @@ Você é o narrador de uma história em construção. Os protagonistas são Mary
 
 Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
 
-⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.
+
 
 🎭 Emoção oculta da cena: {emocao}
 
@@ -233,5 +233,6 @@ if entrada_usuario:
             st.error(f"Erro {resposta.status_code} - {resposta.text}")
     except Exception as e:
         st.error(f"Erro ao gerar resposta: {e}")
+
 
 
