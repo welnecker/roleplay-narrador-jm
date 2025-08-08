@@ -147,13 +147,14 @@ if entrada_usuario:
     st.session_state.entrada_atual = entrada_usuario
 
 # --------------------------- #
-# Sidebar - Provedor e Modelos
+# Sidebar - Seleção de provedor e modelos
 # --------------------------- #
 with st.sidebar:
     st.title("🌐 Configurações de IA")
     provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0)
 
-    modelos_openrouter = {
+    modelos_disponiveis = {
+        # === OPENROUTER ===
         "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
         "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
         "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
@@ -171,28 +172,28 @@ with st.sidebar:
         "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
         "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
         "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+        # === TOGETHER AI ===
+        "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/qwen3-coder-480b-a35b-instruct",
+        "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/mixtral-8x7b-instruct-v0.1"
     }
 
-    modelos_together = {
-        "🧠 Qwen3 Coder 480B (Together)": "Qwen3-Coder-480B-A35B-Instruct-FP8",
-        "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    }
+    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0)
+    modelo_escolhido_id = modelos_disponiveis[modelo_nome]
 
     if provedor == "OpenRouter":
-        modelos_disponiveis = modelos_openrouter
         api_url = "https://openrouter.ai/api/v1/chat/completions"
         api_key = st.secrets["OPENROUTER_API_KEY"]
     else:
-        modelos_disponiveis = modelos_together
         api_url = "https://api.together.xyz/v1/chat/completions"
         api_key = st.secrets["TOGETHER_API_KEY"]
 
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0)
-    modelo_id = modelos_disponiveis[modelo_nome]
-
+    st.session_state.modelo_escolhido = modelo_escolhido_id
     st.session_state.api_url = api_url
     st.session_state.api_key = api_key
-    st.session_state.modelo_escolhido = modelo_id
+
+    emocao = st.selectbox("🎭 Emoção oculta da cena", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0)
+    st.session_state.emocao_oculta = emocao
+
 
 # --------------------------- #
 # Envio para API
@@ -221,3 +222,4 @@ if entrada_usuario:
             st.error(f"Erro {resposta.status_code} - {resposta.text}")
     except Exception as e:
         st.error(f"Erro ao gerar resposta: {e}")
+
