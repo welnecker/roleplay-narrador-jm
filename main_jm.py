@@ -25,7 +25,7 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
         return None
@@ -70,7 +70,7 @@ def carregar_memorias():
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
-        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[mary]")]
+        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[mary]"]
         mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[jânio]", "[janio]")]
         mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[all]"]
         return mem_mary, mem_janio, mem_all
@@ -99,6 +99,7 @@ Você é o narrador de uma história em construção. Os protagonistas são Mary
 
 Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
 
+⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.
 
 🎭 Emoção oculta da cena: {emocao}
 
@@ -225,6 +226,7 @@ if entrada_usuario:
         mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
 
 
 
