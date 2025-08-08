@@ -242,3 +242,4 @@ with st.sidebar:
                 st.success("Resumo gerado e salvo com sucesso!")
         except Exception as e:
             st.error(f"Erro ao resumir: {e}")
+
