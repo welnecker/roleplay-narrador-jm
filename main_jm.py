@@ -25,7 +25,7 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
+        return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-Mn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
         return None
@@ -43,7 +43,6 @@ def salvar_interacao(role, content):
     except Exception as e:
         st.warning(f"Erro ao salvar interação: {e}")
 
-
 def salvar_resumo(resumo):
     try:
         aba = planilha.worksheet("perfil_jm")
@@ -51,16 +50,12 @@ def salvar_resumo(resumo):
     except Exception as e:
         st.warning(f"Erro ao salvar resumo: {e}")
 
-
 def carregar_resumo():
     try:
         aba = planilha.worksheet("perfil_jm")
-        col = aba.col_values(7)
-        col = [r.strip() for r in col if r.strip()]
-        return col[-1] if len(col) > 1 else ""
+        return aba.cell(2, 7).value
     except:
         return ""
-
 
 # --------------------------- #
 # Carregar memórias
@@ -132,7 +127,6 @@ def cortar_antes_do_climax(texto: str) -> str:
 # Modelos disponíveis
 # --------------------------- #
 modelos_disponiveis = {
-    # === OPENROUTER ===
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
     "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
@@ -150,10 +144,24 @@ modelos_disponiveis = {
     "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
     "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
     "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-    # === TOGETHER AI ===
     "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
 }
+
+# --------------------------- #
+# Função de resposta (OpenRouter + Together)
+# --------------------------- #
+def responder_com_modelo_escolhido():
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+        st.session_state["provedor_ia"] = "together"
+        return gerar_resposta_together_stream(modelo)
+    else:
+        st.session_state["provedor_ia"] = "openrouter"
+        return gerar_resposta_openrouter_stream(modelo)
+
+# (O restante do script permanece igual e já estava completo na versão anterior.)
+
 
 # --------------------------- #
 # Sidebar
@@ -219,4 +227,5 @@ if entrada_usuario:
         mensagem_final = cortar_antes_do_climax(mensagem_final)
         placeholder.markdown(mensagem_final)
         salvar_interacao("assistant", mensagem_final)
+
 
