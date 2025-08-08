@@ -148,32 +148,45 @@ if entrada_usuario:
     st.session_state.entrada_atual = entrada_usuario
 
 # --------------------------- #
-# Sidebar
+# Sidebar - Seleção de provedor e modelos
 # --------------------------- #
 with st.sidebar:
-    st.title("🎛️ Controle do Roteirista")
-
-    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0)
-
+    st.title("🌐 Configurações de IA")
+    provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0)
     if provedor == "OpenRouter":
         modelos = {
-            "💬 DeepSeek V3 (OpenRouter)": "deepseek/deepseek-chat-v3-0324",
-            "🧠 GPT-4.1 (OpenRouter)": "openai/gpt-4.1"
+            "💬 DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
+            "🧠 GPT-4.1": "openai/gpt-4.1",
+            "🗣️ Qwen 72B": "qwen/qwen-72b-chat",
+            "🗣️ Qwen 32B": "qwen/qwen-32b-chat",
+            "🔮 Nous Hermes 13B": "nousresearch/nous-hermes-llama2-13b",
+            "🌀 Mixtral 8x7B": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+            "📜 Claude 3 Opus": "anthropic/claude-3-opus",
+            "🦙 LLaMA 3 70B": "meta-llama/llama-3-70b-instruct",
+            "💬 OpenChat 3.5": "openchat/openchat-3.5-0106",
+            "🔄 OpenRouter Auto": "openrouter/auto"
         }
-        chave_api = st.secrets["OPENROUTER_API_KEY"]
-        url_api = "https://openrouter.ai/api/v1/chat/completions"
+        modelo_nome = st.selectbox("Modelo", list(modelos.keys()), index=0)
+        api_url = "https://openrouter.ai/api/v1/chat/completions"
+        api_key = st.secrets["OPENROUTER_API_KEY"]
     else:
         modelos = {
-            "🧠 Mixtral (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-            "🧠 Qwen (Together)": "qwen3-coder-480b-a35b-instruct"
+            "🦙 LLaMA 2 70B": "togethercomputer/llama-2-70b-chat",
+            "🦙 LLaMA 2 13B": "togethercomputer/llama-2-13b-chat",
+            "🦙 LLaMA 2 7B": "togethercomputer/llama-2-7b-chat",
+            "🌀 Mixtral 8x7B": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+            "🗣️ Qwen 72B": "qwen/qwen-72b-chat",
+            "🗣️ Qwen 32B": "qwen/qwen-32b-chat",
+            "💬 DeepSeek Chat": "deepseek/deepseek-chat"
         }
-        chave_api = st.secrets["TOGETHER_API_KEY"]
-        url_api = "https://api.together.xyz/v1/chat/completions"
+        modelo_nome = st.selectbox("Modelo", list(modelos.keys()), index=0)
+        api_url = "https://api.together.xyz/v1/chat/completions"
+        api_key = st.secrets["TOGETHER_API_KEY"]
 
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos.keys()), index=0)
     st.session_state.modelo_escolhido = modelos[modelo_nome]
-    st.session_state.url_api = url_api
-    st.session_state.chave_api = chave_api
+    st.session_state.api_url = api_url
+    st.session_state.api_key = api_key
+
 
     emocao = st.selectbox("🎭 Emoção oculta da cena", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0)
     st.session_state.emocao_oculta = emocao
@@ -206,3 +219,4 @@ with st.sidebar:
                 st.success("Resumo gerado e salvo com sucesso!")
         except Exception as e:
             st.error(f"Erro ao resumir: {e}")
+
