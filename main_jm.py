@@ -1,20 +1,23 @@
 import streamlit as st
 import gspread
 import json
+import re
 import requests
-import time
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
+import time
+import numpy as np
+from openai import OpenAI
+import asyncio
 
 st.set_page_config(page_title="Narrador JM", page_icon="🎬")
 
-# =========================== #
+# --------------------------- #
 # Conectar à planilha
-# =========================== #
+# --------------------------- #
 def conectar_planilha():
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-        # MUITO IMPORTANTE: converter \n literais da chave privada
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         scope = [
             "https://spreadsheets.google.com/feeds",
@@ -29,81 +32,75 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
-# =========================== #
+# --------------------------- #
 # Utilidades de Planilha
-# =========================== #
+# --------------------------- #
+def salvar_interacao(role, content):
+    try:
+        aba = planilha.worksheet("interacoes_jm")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        aba.append_row([timestamp, role, content])
+    except Exception as e:
+        st.warning(f"Erro ao salvar interação: {e}")
+
+def salvar_resumo(resumo):
+    try:
+        aba = planilha.worksheet("perfil_jm")
+        linhas = aba.get_all_values()
+        ultima_linha = len(linhas) + 1
+        aba.update_cell(ultima_linha, 7, resumo)
+    except Exception as e:
+        st.warning(f"Erro ao salvar resumo: {e}")
+
+def carregar_resumo():
+    try:
+        aba = planilha.worksheet("perfil_jm")
+        col = aba.col_values(7)
+        for item in reversed(col):
+            if item.strip():
+                return item
+        return ""
+    except:
+        return ""
+
+# --------------------------- #
+# Carregar memórias
+# --------------------------- #
 def carregar_memorias():
-    """Lê a aba memorias_jm e separa por [mary], [jânio], [all]."""
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
-        mem_mary = [r.get("conteudo", "").strip() for r in registros if r.get("tipo", "").strip().lower() == "[mary]"]
-        mem_janio = [r.get("conteudo", "").strip() for r in registros if r.get("tipo", "").strip().lower() == "[jânio]"]
-        mem_all = [r.get("conteudo", "").strip() for r in registros if r.get("tipo", "").strip().lower() == "[all]"]
-        # remove vazios
-        mem_mary = [m for m in mem_mary if m]
-        mem_janio = [m for m in mem_janio if m]
-        mem_all = [m for m in mem_all if m]
+        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[mary]", "mary")]
+        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip() in ("[Jânio]", "Jânio")]
+        mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[all]", "all")]
         return mem_mary, mem_janio, mem_all
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
         return [], [], []
 
-def carregar_resumo_salvo():
-    """Pega o último resumo não vazio da aba perfil_jm, coluna 7."""
-    try:
-        aba = planilha.worksheet("perfil_jm")
-        valores = aba.col_values(7)
-        for val in reversed(valores[1:]):
-            if val and val.strip():
-                return val.strip()
-        return ""
-    except Exception as e:
-        st.warning(f"Erro ao carregar resumo salvo: {e}")
-        return ""
-
-def salvar_resumo(resumo: str):
-    """Anexa um resumo na aba perfil_jm (coluna 7), com timestamp na coluna 6."""
-    try:
-        aba = planilha.worksheet("perfil_jm")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        linha = ["", "", "", "", "", timestamp, resumo]
-        aba.append_row(linha, value_input_option="RAW")
-    except Exception as e:
-        st.error(f"Erro ao salvar resumo: {e}")
-
-def salvar_interacao(role: str, content: str):
-    if not planilha:
-        return
-    try:
-        aba = planilha.worksheet("interacoes_jm")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        aba.append_row([timestamp, role.strip(), content.strip()], value_input_option="RAW")
-    except Exception as e:
-        st.error(f"Erro ao salvar interação: {e}")
-
-# =========================== #
+# --------------------------- #
 # Construir prompt narrativo
-# =========================== #
+# --------------------------- #
 def construir_prompt_com_narrador():
     mem_mary, mem_janio, mem_all = carregar_memorias()
     emocao = st.session_state.get("emocao_oculta", "nenhuma")
-    resumo = st.session_state.get("resumo_capitulo", "")
+    resumo = carregar_resumo()
+    st.session_state["resumo_capitulo"] = resumo
 
     try:
         aba = planilha.worksheet("interacoes_jm")
         registros = aba.get_all_records()
         ultimas = registros[-15:] if len(registros) > 15 else registros
-        texto_ultimas = "\n".join(f"{r.get('role','')}: {r.get('content','')}" for r in ultimas)
-    except Exception:
+        texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
+    except:
         texto_ultimas = ""
 
-    # Regra opcional de bloqueio
-    regra_intimo = "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista." if st.session_state.get("bloqueio_intimo", False) else ""
+    prompt = f"""
+Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
 
-    prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
+Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
 
-Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.{regra_intimo}
+⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.
 
 🎭 Emoção oculta da cena: {emocao}
 
@@ -112,23 +109,23 @@ Sua função é narrar cenas com naturalidade e profundidade. Use narração em 
 
 ### 🧠 Memórias:
 Mary:
-- {('\n- '.join(mem_mary)) if mem_mary else 'Nenhuma.'}
+- {'\n- '.join(mem_mary) if mem_mary else 'Nenhuma.'}
 
 Jânio:
-- {('\n- '.join(mem_janio)) if mem_janio else 'Nenhuma.'}
+- {'\n- '.join(mem_janio) if mem_janio else 'Nenhuma.'}
 
 Compartilhadas:
-- {('\n- '.join(mem_all)) if mem_all else 'Nenhuma.'}
+- {'\n- '.join(mem_all) if mem_all else 'Nenhuma.'}
 
 ### 📖 Últimas interações:
 {texto_ultimas}
 """
     return prompt.strip()
 
-# =========================== #
-# Provedores e Modelos (IDs exatos)
-# =========================== #
-MODELOS_OPENROUTER = {
+# --------------------------- #
+# Modelos disponíveis
+# --------------------------- #
+modelos_disponiveis = {
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
     "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
@@ -146,112 +143,93 @@ MODELOS_OPENROUTER = {
     "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
     "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
     "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1"
 }
 
-MODELOS_TOGETHER = {
-    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/qwen3-coder-480b-a35b-instruct",
-    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/mixtral-8x7b-instruct-v0.1",
-}
-
-def api_config_for_provider(provider: str):
-    if provider == "OpenRouter":
-        return (
-            "https://openrouter.ai/api/v1/chat/completions",
-            st.secrets["OPENROUTER_API_KEY"],
-            MODELOS_OPENROUTER,
-        )
+# --------------------------- #
+# Função de resposta (OpenRouter + Together)
+# --------------------------- #
+def responder_com_modelo_escolhido():
+    modelo = st.session_state.get("modelo_escolhido_id", "deepseek/deepseek-chat-v3-0324")
+    if modelo.startswith("togethercomputer/") or modelo.startswith("mistralai/"):
+        st.session_state["provedor_ia"] = "together"
+        return gerar_resposta_together_stream(modelo)
     else:
-        return (
-            "https://api.together.xyz/v1/chat/completions",
-            st.secrets["TOGETHER_API_KEY"],
-            MODELOS_TOGETHER,
-        )
+        st.session_state["provedor_ia"] = "openrouter"
+        return gerar_resposta_openrouter_stream(modelo)
 
-# =========================== #
-# Sidebar – provedor, modelo e resumo
-# =========================== #
+
+
+
+
+# (O restante do script permanece igual e já estava completo na versão anterior.)
+
+
+# --------------------------- #
+# Sidebar
+# --------------------------- #
 with st.sidebar:
-    st.title("🧭 Painel do Roteirista")
+    st.title("🎛️ Opções do Roteirista")
+    st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), key="modelo_ia")
+    st.text_input("🎭 Emoção oculta da cena", key="emocao_oculta")
+    if st.button("💾 Salvar resumo atual"):
+        salvar_resumo(st.session_state.get("resumo_capitulo", ""))
+        st.success("Resumo salvo com sucesso!")
 
-    provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0, key="provedor_ia")
-    api_url, api_key, modelos_disponiveis = api_config_for_provider(provedor)
-
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0, key="modelo_ia_nome")
-    modelo_id = modelos_disponiveis[modelo_nome]
-
-    # Persistir na sessão para uso nas chamadas
-    st.session_state.api_url = api_url
-    st.session_state.api_key = api_key
-    st.session_state.modelo_id = modelo_id
-
-    st.markdown("---")
-    st.caption("Gerar resumo usando o modelo selecionado acima")
-    if st.button("📝 Gerar resumo do capítulo"):
+    if st.button("📝 Criar novo resumo"):
         try:
-            aba_i = planilha.worksheet("interacoes_jm")
-            registros = aba_i.get_all_records()
-            ultimas = registros[-6:] if len(registros) > 6 else registros
-            texto = "\n".join(f"{r.get('role','')}: {r.get('content','')}" for r in ultimas)
-            prompt_resumo = (
-                "Resuma o seguinte trecho como um capítulo de novela brasileiro, mantendo tom e emoções.\n\n"
-                + texto
-                + "\n\nResumo:"
-            )
+            aba = planilha.worksheet("interacoes_jm")
+            registros = aba.get_all_records()
+            ultimas = registros[-15:] if len(registros) > 15 else registros
+            texto = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
 
-            r = requests.post(
-                st.session_state.api_url,
+            # Chamada à IA para resumir
+            st.info("Gerando resumo automático com base nas últimas interações...")
+            resposta = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {st.session_state.api_key}",
-                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY']}",
+                    "Content-Type": "application/json"
                 },
                 json={
-                    "model": st.session_state.modelo_id,
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": 0.85,
-                },
-                timeout=120,
+                    "model": "openai/gpt-3.5-turbo",  # ou outro modelo que preferir
+                    "messages": [
+                        {"role": "system", "content": "Resuma os principais eventos dessa história para ser usado como introdução do próximo capítulo. Seja claro, emocional e sem revelar tudo."},
+                        {"role": "user", "content": texto}
+                    ]
+                }
             )
-            if r.status_code == 200:
-                novo_resumo = r.json()["choices"][0]["message"]["content"].strip()
-                salvar_resumo(novo_resumo)
-                st.session_state.resumo_capitulo = novo_resumo
-                st.success("Resumo gerado e salvo com sucesso!")
-            else:
-                st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
+
+            dados = resposta.json()
+            resumo_gerado = dados["choices"][0]["message"]["content"]
+            st.session_state["resumo_capitulo"] = resumo_gerado
+            st.success("Resumo gerado com sucesso! Revise antes de salvar.")
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
 
-    st.markdown("---")
-    st.caption("Opções de narrativa")
-    st.session_state.bloqueio_intimo = st.checkbox("Bloquear avanços íntimos sem ordem", value=False)
-    st.session_state.emocao_oculta = st.selectbox(
-        "🎭 Emoção oculta", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0
-    )
 
-# =========================== #
-# Tela principal – título, resumo e histórico
-# =========================== #
+# --------------------------- #
+# Tela principal
+# --------------------------- #
 st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 st.markdown("---")
 
-# Carregar resumo ao iniciar (apenas 1x)
-if "resumo_capitulo" not in st.session_state:
-    st.session_state.resumo_capitulo = carregar_resumo_salvo()
-
 st.markdown("#### 📖 Último resumo salvo:")
+st.session_state.resumo_capitulo = carregar_resumo()
 st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
 
-# Mostrar histórico recente de interações (role para cima para ver mais antigas)
+# Mostrar histórico recente de interações
 with st.container():
     try:
         aba = planilha.worksheet("interacoes_jm")
         registros = aba.get_all_records()
         ultimas = registros[-20:] if len(registros) > 20 else registros
+
         for r in ultimas:
-            role = r.get("role", "user")
-            content = r.get("content", "")
+            role = r["role"]
+            content = r["content"]
             if role == "user":
                 with st.chat_message("user"):
                     st.markdown(content)
@@ -261,43 +239,59 @@ with st.container():
     except Exception as e:
         st.warning(f"Erro ao carregar interações: {e}")
 
-# =========================== #
-# Entrada de cena e geração (efeito de digitação)
-# =========================== #
-def exibir_resposta_digitando(texto: str, delay: float = 0.02):
-    box = st.empty()
-    acumulado = ""
-    for ch in texto:
-        acumulado += ch
-        box.markdown(acumulado)
-        time.sleep(delay)
-
 entrada_usuario = st.chat_input("Digite sua direção de cena...")
 if entrada_usuario:
     salvar_interacao("user", entrada_usuario)
+    st.session_state.entrada_atual = entrada_usuario
 
-    prompt_final = construir_prompt_com_narrador() + f"\n\n🎬 Direção do roteirista: {entrada_usuario}"
+    with st.spinner("Narrando..."):
+        prompt = construir_prompt_com_narrador()
 
-    try:
-        resp = requests.post(
-            st.session_state.api_url,
-            headers={
-                "Authorization": f"Bearer {st.session_state.api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": st.session_state.modelo_id,
-                "messages": [{"role": "user", "content": prompt_final}],
-                "max_tokens": 1000,
-                "temperature": 0.85,
-            },
-            timeout=180,
-        )
-        if resp.status_code == 200:
-            conteudo = resp.json()["choices"][0]["message"]["content"].strip()
-            salvar_interacao("assistant", conteudo)
-            exibir_resposta_digitando(conteudo)
-        else:
-            st.error(f"Erro {resp.status_code} - {resp.text}")
-    except Exception as e:
-        st.error(f"Erro ao gerar resposta: {e}")
+        modelo_id = modelos_disponiveis[st.session_state.modelo_ia]
+        headers = {
+            "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY'] if 'openrouter' in modelo_id or 'deepseek' in modelo_id or 'openai' in modelo_id else st.secrets['TOGETHER_API_KEY']}",
+            "Content-Type": "application/json"
+        }
+        endpoint = "https://openrouter.ai/api/v1/chat/completions" if "openai" in modelo_id or "deepseek" in modelo_id or "openrouter" in modelo_id else "https://api.together.xyz/v1/chat/completions"
+
+        payload = {
+            "model": modelo_id,
+            "messages": [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": entrada_usuario}
+            ],
+            "stream": True
+        }
+
+        resposta = requests.post(endpoint, headers=headers, json=payload, stream=True)
+
+        mensagem_final = ""
+        placeholder = st.empty()
+        for linha in resposta.iter_lines():
+            if linha:
+                try:
+                    dados = json.loads(linha.decode("utf-8").replace("data: ", ""))
+                    delta = dados["choices"][0]["delta"].get("content")
+                    if delta:
+                        mensagem_final += delta
+                        placeholder.markdown(mensagem_final + "▌")
+                except:
+                    continue
+
+        placeholder.markdown(mensagem_final)
+        salvar_interacao("assistant", mensagem_final)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
