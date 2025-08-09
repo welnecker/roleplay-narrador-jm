@@ -78,20 +78,14 @@ def construir_prompt_com_narrador():
         registros = aba.get_all_records()
         ultimas = registros[-15:] if len(registros) > 15 else registros
         texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
-    except Exception:
+    except:
         texto_ultimas = ""
 
-    regra_intimo = (
-        "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
-        if st.session_state.get("bloqueio_intimo", False)
-        else ""
-    )
-
-    prompt = f"""
-Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
+    prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
 
 Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
-{regra_intimo}
+
+⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.
 
 🎭 Emoção oculta da cena: {emocao}
 
@@ -100,20 +94,17 @@ Sua função é narrar cenas com naturalidade e profundidade. Use narração em 
 
 ### 🧠 Memórias:
 Mary:
-- {"\n- ".join(mem_mary) if mem_mary else 'Nenhuma.'}
+- {'\n- '.join(mem_mary) if mem_mary else 'Nenhuma.'}
 
 Jânio:
-- {"\n- ".join(mem_janio) if mem_janio else 'Nenhuma.'}
+- {'\n- '.join(mem_janio) if mem_janio else 'Nenhuma.'}
 
 Compartilhadas:
-- {"\n- ".join(mem_all) if mem_all else 'Nenhuma.'}
+- {'\n- '.join(mem_all) if mem_all else 'Nenhuma.'}
 
 ### 📖 Últimas interações:
-{texto_ultimas}
-"""
+{texto_ultimas}"""
     return prompt.strip()
-
-
 
 # =========================== #
 # Provedores e Modelos (IDs exatos)
@@ -295,4 +286,5 @@ if entrada_usuario:
             st.error(f"Erro {resp.status_code} - {resp.text}")
     except Exception as e:
         st.error(f"Erro ao gerar resposta: {e}")
+
 
