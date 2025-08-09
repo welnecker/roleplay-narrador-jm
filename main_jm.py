@@ -8,14 +8,10 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(page_title="Narrador JM", page_icon="🎬")
 
-# =========================== #
-# Conectar à planilha
-# =========================== #
 def conectar_planilha():
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-        creds_dict["private_key"] = creds_dict["private_key"].replace("\n", "
-")
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         scope = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive",
@@ -29,12 +25,7 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
-# =========================== #
-# Utilidades de Planilha
-# =========================== #
-
 def carregar_memorias():
-    """Lê a aba memorias_jm e separa por [mary], [jânio], [all]."""
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
@@ -46,9 +37,7 @@ def carregar_memorias():
         st.warning(f"Erro ao carregar memórias: {e}")
         return [], [], []
 
-
 def carregar_resumo_salvo():
-    """Pega o último resumo não vazio da aba perfil_jm, coluna 7."""
     try:
         aba = planilha.worksheet("perfil_jm")
         valores = aba.col_values(7)
@@ -60,9 +49,7 @@ def carregar_resumo_salvo():
         st.warning(f"Erro ao carregar resumo salvo: {e}")
         return ""
 
-
 def salvar_resumo(resumo: str):
-    """Anexa um resumo na aba perfil_jm (coluna 7), com timestamp na coluna 6."""
     try:
         aba = planilha.worksheet("perfil_jm")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -70,7 +57,6 @@ def salvar_resumo(resumo: str):
         aba.append_row(linha, value_input_option="RAW")
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
-
 
 def salvar_interacao(role: str, content: str):
     if not planilha:
@@ -82,11 +68,6 @@ def salvar_interacao(role: str, content: str):
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
-
-# =========================== #
-# Construir prompt narrativo
-# =========================== #
-
 def construir_prompt_com_narrador():
     mem_mary, mem_janio, mem_all = carregar_memorias()
     emocao = st.session_state.get("emocao_oculta", "nenhuma")
@@ -96,14 +77,12 @@ def construir_prompt_com_narrador():
         aba = planilha.worksheet("interacoes_jm")
         registros = aba.get_all_records()
         ultimas = registros[-15:] if len(registros) > 15 else registros
-        texto_ultimas = "
-".join(f"{r['role']}: {r['content']}" for r in ultimas)
+        texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
     except Exception:
         texto_ultimas = ""
 
     regra_intimo = (
-        "
-⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
+        "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
         if st.session_state.get("bloqueio_intimo", False)
         else ""
     )
@@ -121,21 +100,19 @@ Sua função é narrar cenas com naturalidade e profundidade. Use narração em 
 
 ### 🧠 Memórias:
 Mary:
-- {'
-- '.join(mem_mary) if mem_mary else 'Nenhuma.'}
+- {"\n- ".join(mem_mary) if mem_mary else 'Nenhuma.'}
 
 Jânio:
-- {'
-- '.join(mem_janio) if mem_janio else 'Nenhuma.'}
+- {"\n- ".join(mem_janio) if mem_janio else 'Nenhuma.'}
 
 Compartilhadas:
-- {'
-- '.join(mem_all) if mem_all else 'Nenhuma.'}
+- {"\n- ".join(mem_all) if mem_all else 'Nenhuma.'}
 
 ### 📖 Últimas interações:
 {texto_ultimas}
 """
     return prompt.strip()
+
 
 
 # =========================== #
@@ -318,3 +295,4 @@ if entrada_usuario:
             st.error(f"Erro {resp.status_code} - {resp.text}")
     except Exception as e:
         st.error(f"Erro ao gerar resposta: {e}")
+
