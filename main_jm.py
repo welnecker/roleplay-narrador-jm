@@ -8,13 +8,16 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(page_title="Narrador JM", page_icon="🎬")
 
+# =========================== #
+# Conectar à planilha
+# =========================== #
 def conectar_planilha():
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         scope = [
             "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/drive"
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
@@ -25,7 +28,12 @@ def conectar_planilha():
 
 planilha = conectar_planilha()
 
+# =========================== #
+# Utilidades de Planilha
+# =========================== #
+
 def carregar_memorias():
+    """Lê a aba memorias_jm e separa por [mary], [jânio], [all]."""
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
@@ -37,7 +45,9 @@ def carregar_memorias():
         st.warning(f"Erro ao carregar memórias: {e}")
         return [], [], []
 
+
 def carregar_resumo_salvo():
+    """Pega o último resumo não vazio da aba perfil_jm, coluna 7."""
     try:
         aba = planilha.worksheet("perfil_jm")
         valores = aba.col_values(7)
@@ -49,7 +59,9 @@ def carregar_resumo_salvo():
         st.warning(f"Erro ao carregar resumo salvo: {e}")
         return ""
 
+
 def salvar_resumo(resumo: str):
+    """Anexa um resumo na aba perfil_jm (coluna 7), com timestamp na coluna 6."""
     try:
         aba = planilha.worksheet("perfil_jm")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -57,6 +69,7 @@ def salvar_resumo(resumo: str):
         aba.append_row(linha, value_input_option="RAW")
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
+
 
 def salvar_interacao(role: str, content: str):
     if not planilha:
@@ -68,6 +81,11 @@ def salvar_interacao(role: str, content: str):
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
+
+# =========================== #
+# Construir prompt narrativo
+# =========================== #
+
 def construir_prompt_com_narrador():
     mem_mary, mem_janio, mem_all = carregar_memorias()
     emocao = st.session_state.get("emocao_oculta", "nenhuma")
@@ -78,28 +96,43 @@ def construir_prompt_com_narrador():
         registros = aba.get_all_records()
         ultimas = registros[-15:] if len(registros) > 15 else registros
         texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
-    except:
+    except Exception:
         texto_ultimas = ""
 
-    prompt = (
-        "Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.\n\n"
-        "Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.\n\n"
-        "⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.\n\n"
-        f"🎭 Emoção oculta da cena: {emocao}\n\n"
-        "📖 Capítulo anterior:\n"
-        f"{resumo if resumo else 'Nenhum resumo salvo.'}\n\n"
-        "### 🧠 Memórias:\n"
-        "Mary:\n- " + ("\n- ".join(mem_mary) if mem_mary else "Nenhuma.") + "\n\n"
-        "Jânio:\n- " + ("\n- ".join(mem_janio) if mem_janio else "Nenhuma.") + "\n\n"
-        "Compartilhadas:\n- " + ("\n- ".join(mem_all) if mem_all else "Nenhuma.") + "\n\n"
-        "### 📖 Últimas interações:\n"
-        f"{texto_ultimas}"
-    )
+    regra_intimo = "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista." if st.session_state.get("bloqueio_intimo", False) else ""
+
+    prompt = f"""
+Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
+
+Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
+{regra_intimo}
+
+🎭 Emoção oculta da cena: {emocao}
+
+📖 Capítulo anterior:
+{resumo if resumo else 'Nenhum resumo salvo.'}
+
+### 🧠 Memórias:
+Mary:
+- {'\n- '.join(mem_mary) if mem_mary else 'Nenhuma.'}
+
+Jânio:
+- {'\n- '.join(mem_janio) if mem_janio else 'Nenhuma.'}
+
+Compartilhadas:
+- {'\n- '.join(mem_all) if mem_all else 'Nenhuma.'}
+
+### 📖 Últimas interações:
+{texto_ultimas}
+"""
     return prompt.strip()
 
+
 # =========================== #
-# Provedores e Modelos (IDs exatos)
+# Provedores e Modelos
 # =========================== #
+
+# Modelos EXATOS por provedor (IDs aceitos pela API)
 MODELOS_OPENROUTER = {
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
@@ -126,85 +159,25 @@ MODELOS_TOGETHER = {
 }
 
 
-# =========================== #
-# Sidebar – provedor, modelo e resumo
-# =========================== #
-with st.sidebar:
-    st.title("🧭 Painel do Roteirista")
-
-    provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0, key="provedor_ia")
-
-    # Modelos por provedor
-    if provedor == "OpenRouter":
-        modelos_disponiveis = MODELOS_OPENROUTER
-        api_url = "https://openrouter.ai/api/v1/chat/completions"
-        api_key = st.secrets["OPENROUTER_API_KEY"]
+def api_config_for_provider(provider: str):
+    if provider == "OpenRouter":
+        return (
+            "https://openrouter.ai/api/v1/chat/completions",
+            st.secrets["OPENROUTER_API_KEY"],
+            MODELOS_OPENROUTER,
+        )
     else:
-        modelos_disponiveis = MODELOS_TOGETHER
-        api_url = "https://api.together.xyz/v1/chat/completions"
-        api_key = st.secrets["TOGETHER_API_KEY"]
+        return (
+            "https://api.together.xyz/v1/chat/completions",
+            st.secrets["TOGETHER_API_KEY"],
+            MODELOS_TOGETHER,
+        )
 
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0, key="modelo_ia_nome")
-    modelo_id = modelos_disponiveis[modelo_nome]
-
-    # Persistir na sessão
-    st.session_state.api_url = api_url
-    st.session_state.api_key = api_key
-    st.session_state.modelo_id = modelo_id
-
-    st.markdown("---")
-    st.caption("Gerar resumo usando o modelo selecionado acima")
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            aba_i = planilha.worksheet("interacoes_jm")
-            registros = aba_i.get_all_records()
-            ultimas = registros[-6:] if len(registros) > 6 else registros
-            texto = "
-".join(f"{r['role']}: {r['content']}" for r in ultimas)
-            prompt_resumo = (
-                "Resuma o seguinte trecho como um capítulo de novela brasileiro, mantendo tom e emoções.
-
-"
-                + texto
-                + "
-
-Resumo:"
-            )
-
-            r = requests.post(
-                st.session_state.api_url,
-                headers={
-                    "Authorization": f"Bearer {st.session_state.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": st.session_state.modelo_id,
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": 0.85,
-                },
-                timeout=120,
-            )
-            if r.status_code == 200:
-                novo_resumo = r.json()["choices"][0]["message"]["content"].strip()
-                salvar_resumo(novo_resumo)
-                st.session_state.resumo_capitulo = novo_resumo
-                st.success("Resumo gerado e salvo com sucesso!")
-            else:
-                st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
-        except Exception as e:
-            st.error(f"Erro ao gerar resumo: {e}")
-
-    st.markdown("---")
-    st.caption("Opções de narrativa")
-    st.session_state.bloqueio_intimo = st.checkbox("Bloquear avanços íntimos sem ordem", value=False)
-    st.session_state.emocao_oculta = st.selectbox(
-        "🎭 Emoção oculta", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0
-    )
 
 # =========================== #
-# Tela principal – título, resumo e histórico
+# UI Principal
 # =========================== #
+
 st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 st.markdown("---")
@@ -213,30 +186,90 @@ st.markdown("---")
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
 
-st.markdown("#### 📖 Último resumo salvo:")
-st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
+# Controles principais
+col1, col2 = st.columns([3, 2])
+with col1:
+    st.markdown("#### 📖 Último resumo salvo:")
+    st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
+with col2:
+    st.markdown("#### ⚙️ Opções")
+    st.session_state.bloqueio_intimo = st.checkbox("Bloquear avanços íntimos sem ordem", value=False)
+    st.session_state.emocao_oculta = st.selectbox(
+        "🎭 Emoção oculta", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0
+    )
 
-# Mostrar histórico recente de interações (role para cima para ver mais antigas)
-with st.container():
+# Botão de gerar resumo (na tela principal)
+if st.button("📝 Gerar resumo do capítulo"):
     try:
-        aba = planilha.worksheet("interacoes_jm")
-        registros = aba.get_all_records()
-        ultimas = registros[-20:] if len(registros) > 20 else registros
-        for r in ultimas:
-            role = r.get("role", "user")
-            content = r.get("content", "")
-            if role == "user":
-                with st.chat_message("user"):
-                    st.markdown(content)
-            else:
-                with st.chat_message("assistant"):
-                    st.markdown(content)
-    except Exception as e:
-        st.warning(f"Erro ao carregar interações: {e}")
+        # Puxa últimas interações
+        try:
+            aba_i = planilha.worksheet("interacoes_jm")
+            registros = aba_i.get_all_records()
+            ultimas = registros[-6:] if len(registros) > 6 else registros
+            texto = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
+        except Exception:
+            texto = ""
 
-# =========================== #
-# Entrada de cena e geração (com digitação)
-# =========================== #
+        # Seleção de provedor/modelo para o resumo (usa sessão atual, se existir; senão defaults)
+        provider = st.session_state.get("provedor_ia_for_summary", st.session_state.get("provedor_ia", "OpenRouter"))
+        api_url, api_key, modelos = api_config_for_provider(provider)
+        modelo_id = st.session_state.get("modelo_resumo_id", list(MODELOS_OPENROUTER.values())[0])
+
+        prompt_resumo = (
+            "Resuma o seguinte trecho como um capítulo de novela brasileiro, mantendo tom e emoções.\n\n" + texto + "\n\nResumo:"
+        )
+
+        r = requests.post(
+            api_url,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": modelo_id,
+                "messages": [{"role": "user", "content": prompt_resumo}],
+                "max_tokens": 800,
+                "temperature": 0.85,
+            },
+            timeout=120,
+        )
+        if r.status_code == 200:
+            resumo = r.json()["choices"][0]["message"]["content"].strip()
+            st.session_state.resumo_capitulo = resumo
+            salvar_resumo(resumo)
+            st.success("Resumo gerado e salvo com sucesso!")
+        else:
+            st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
+    except Exception as e:
+        st.error(f"Erro ao gerar resumo: {e}")
+
+# --------------------------- #
+# Sidebar - Provedor/Modelo para NARRATIVA
+# --------------------------- #
+with st.sidebar:
+    st.title("🌐 Configurações de IA")
+    provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0, key="provedor_ia")
+    api_url, api_key, modelos_disponiveis = api_config_for_provider(provedor)
+    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0)
+    modelo_id = modelos_disponiveis[modelo_nome]
+
+    # Persistir seleção para uso na chamada
+    st.session_state.api_url = api_url
+    st.session_state.api_key = api_key
+    st.session_state.modelo_escolhido = modelo_id
+
+    # (Opcional) escolher modelo do resumo separadamente
+    st.markdown("---")
+    st.caption("Modelo p/ Gerar Resumo (opcional)")
+    prov_resumo = st.selectbox("Provedor do Resumo", ["OpenRouter", "Together"], index=0)
+    st.session_state.provedor_ia_for_summary = prov_resumo
+    _, _, modelos_res = api_config_for_provider(prov_resumo)
+    nome_res = st.selectbox("Modelo do Resumo", list(modelos_res.keys()), index=0)
+    st.session_state.modelo_resumo_id = modelos_res[nome_res]
+
+# --------------------------- #
+# Entrada do usuário e geração da narrativa
+# --------------------------- #
+
+entrada_usuario = st.chat_input("Digite sua direção de cena...")
+
 
 def exibir_resposta_digitando(texto: str, delay: float = 0.02):
     box = st.empty()
@@ -246,23 +279,21 @@ def exibir_resposta_digitando(texto: str, delay: float = 0.02):
         box.markdown(acumulado)
         time.sleep(delay)
 
-entrada_usuario = st.chat_input("Digite sua direção de cena...")
+
 if entrada_usuario:
+    # Salva entrada do usuário
     salvar_interacao("user", entrada_usuario)
 
-    prompt = construir_prompt_com_narrador() + f"
+    # Constrói prompt narrativo
+    prompt = construir_prompt_com_narrador() + f"\n\n🎬 Direção do roteirista: {entrada_usuario}"
 
-🎬 Direção do roteirista: {entrada_usuario}"
-
+    # Chama a IA
     try:
         resp = requests.post(
             st.session_state.api_url,
-            headers={
-                "Authorization": f"Bearer {st.session_state.api_key}",
-                "Content-Type": "application/json",
-            },
+            headers={"Authorization": f"Bearer {st.session_state.api_key}", "Content-Type": "application/json"},
             json={
-                "model": st.session_state.modelo_id,
+                "model": st.session_state.modelo_escolhido,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 1000,
                 "temperature": 0.85,
@@ -277,6 +308,4 @@ if entrada_usuario:
             st.error(f"Erro {resp.status_code} - {resp.text}")
     except Exception as e:
         st.error(f"Erro ao gerar resposta: {e}")
-
-
 
