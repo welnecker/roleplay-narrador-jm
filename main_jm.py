@@ -81,29 +81,20 @@ def construir_prompt_com_narrador():
     except:
         texto_ultimas = ""
 
-    prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
-
-Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
-
-⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.
-
-🎭 Emoção oculta da cena: {emocao}
-
-📖 Capítulo anterior:
-{resumo if resumo else 'Nenhum resumo salvo.'}
-
-### 🧠 Memórias:
-Mary:
-- {'\n- '.join(mem_mary) if mem_mary else 'Nenhuma.'}
-
-Jânio:
-- {'\n- '.join(mem_janio) if mem_janio else 'Nenhuma.'}
-
-Compartilhadas:
-- {'\n- '.join(mem_all) if mem_all else 'Nenhuma.'}
-
-### 📖 Últimas interações:
-{texto_ultimas}"""
+    prompt = (
+        "Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.\n\n"
+        "Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.\n\n"
+        "⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista.\n\n"
+        f"🎭 Emoção oculta da cena: {emocao}\n\n"
+        "📖 Capítulo anterior:\n"
+        f"{resumo if resumo else 'Nenhum resumo salvo.'}\n\n"
+        "### 🧠 Memórias:\n"
+        "Mary:\n- " + ("\n- ".join(mem_mary) if mem_mary else "Nenhuma.") + "\n\n"
+        "Jânio:\n- " + ("\n- ".join(mem_janio) if mem_janio else "Nenhuma.") + "\n\n"
+        "Compartilhadas:\n- " + ("\n- ".join(mem_all) if mem_all else "Nenhuma.") + "\n\n"
+        "### 📖 Últimas interações:\n"
+        f"{texto_ultimas}"
+    )
     return prompt.strip()
 
 # =========================== #
@@ -286,5 +277,6 @@ if entrada_usuario:
             st.error(f"Erro {resp.status_code} - {resp.text}")
     except Exception as e:
         st.error(f"Erro ao gerar resposta: {e}")
+
 
 
