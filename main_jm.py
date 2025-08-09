@@ -207,9 +207,10 @@ MODELOS_OPENROUTER = {
     "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
 }
 MODELOS_TOGETHER = {
-    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/qwen3-coder-480b-a35b-instruct",
-    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/mixtral-8x7b-instruct-v0.1",
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
 }
+
 
 # =========================== #
 # Roteador por provedor
@@ -472,4 +473,5 @@ if entrada_usuario:
 
         salvar_interacao("assistant", resposta_txt)
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt})
+
 
