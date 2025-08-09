@@ -215,11 +215,12 @@ MODELOS_TOGETHER = {
 # Roteador por provedor
 # =========================== #
 def responder_com_modelo_escolhido(modelo_escolhido_id: str):
+    # NÃO escrever em st.session_state["provedor_ia"] (é o widget do radio!)
     if modelo_escolhido_id.startswith(("togethercomputer/", "mistralai/")):
-        st.session_state["provedor_ia"] = "together"
+        st.session_state["provedor_ia_runtime"] = "together"  # opcional, só para log
         return gerar_resposta_together_stream(modelo_escolhido_id)
     else:
-        st.session_state["provedor_ia"] = "openrouter"
+        st.session_state["provedor_ia_runtime"] = "openrouter"  # opcional
         return gerar_resposta_openrouter_stream(modelo_escolhido_id)
 
 # =========================== #
@@ -471,3 +472,4 @@ if entrada_usuario:
 
         salvar_interacao("assistant", resposta_txt)
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt})
+
