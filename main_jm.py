@@ -164,7 +164,7 @@ MODELOS_OPENROUTER = {
 }
 MODELOS_TOGETHER = {
     # === TOGETHER AI === (IDs exatos informados por você)
-    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
 }
 
@@ -442,3 +442,4 @@ if entrada:
     if resposta_txt and resposta_txt.strip():
         salvar_interacao("assistant", resposta_txt.strip())
         st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt.strip()})
+
