@@ -241,70 +241,132 @@ if st.button("📝 Gerar resumo do capítulo"):
         st.error(f"Erro ao gerar resumo: {e}")
 
 # --------------------------- #
-# Sidebar - Provedor/Modelo para NARRATIVA
+# Sidebar – Resumo e Modelos
 # --------------------------- #
 with st.sidebar:
-    st.title("🌐 Configurações de IA")
-    provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0, key="provedor_ia")
-    api_url, api_key, modelos_disponiveis = api_config_for_provider(provedor)
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0)
-    modelo_id = modelos_disponiveis[modelo_nome]
+    st.title("🧭 Painel do Roteirista")
 
-    # Persistir seleção para uso na chamada
-    st.session_state.api_url = api_url
-    st.session_state.api_key = api_key
-    st.session_state.modelo_escolhido = modelo_id
+    # Botão de gerar resumo no SIDEBAR
+    if st.button("📝 Gerar resumo do capítulo"):
+        try:
+            aba_i = planilha.worksheet("interacoes_jm")
+            registros = aba_i.get_all_records()
+            ultimas = registros[-6:] if len(registros) > 6 else registros
+            texto = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
+            prompt_resumo = (
+                "Resuma o seguinte trecho como um capítulo de novela brasileiro, mantendo tom e emoções.\n\n"
+                + texto + "\n\nResumo:"
+            )
 
-    # (Opcional) escolher modelo do resumo separadamente
-    st.markdown("---")
-    st.caption("Modelo p/ Gerar Resumo (opcional)")
-    prov_resumo = st.selectbox("Provedor do Resumo", ["OpenRouter", "Together"], index=0)
-    st.session_state.provedor_ia_for_summary = prov_resumo
-    _, _, modelos_res = api_config_for_provider(prov_resumo)
-    nome_res = st.selectbox("Modelo do Resumo", list(modelos_res.keys()), index=0)
-    st.session_state.modelo_resumo_id = modelos_res[nome_res]
+            # Descobrir o modelo/endpoint a partir da seleção atual
+            modelo_id = modelos_disponiveis[st.session_state.modelo_ia]
+            if modelo_id.startswith(("togethercomputer/", "mistralai/")):
+                endpoint = "https://api.together.xyz/v1/chat/completions"
+                api_key = st.secrets["TOGETHER_API_KEY"]
+            else:
+                endpoint = "https://openrouter.ai/api/v1/chat/completions"
+                api_key = st.secrets["OPENROUTER_API_KEY"]
+
+            r = requests.post(
+                endpoint,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": modelo_id,
+                    "messages": [{"role": "user", "content": prompt_resumo}],
+                    "max_tokens": 800,
+                    "temperature": 0.85,
+                },
+                timeout=120,
+            )
+            if r.status_code == 200:
+                novo_resumo = r.json()["choices"][0]["message"]["content"].strip()
+                salvar_resumo(novo_resumo)
+                st.session_state.resumo_capitulo = novo_resumo
+                st.success("Resumo gerado e salvo com sucesso!")
+            else:
+                st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
+        except Exception as e:
+            st.error(f"Erro ao gerar resumo: {e}")
+
+    st.caption("As interações mais recentes aparecem na tela principal. Role para cima para rever as anteriores.")
 
 # --------------------------- #
-# Entrada do usuário e geração da narrativa
+# Tela principal
 # --------------------------- #
+st.title("🎬 Narrador JM")
+st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
+st.markdown("---")
+
+st.markdown("#### 📖 Último resumo salvo:")
+# Carrega o último resumo apenas se ainda não houver um em sessão (evita sobrescrever após gerar)
+if "resumo_capitulo" not in st.session_state or not st.session_state.get("resumo_capitulo"):
+    st.session_state.resumo_capitulo = carregar_resumo()
+st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
+
+# Mostrar histórico recente de interações (role para cima para ver mais antigas na planilha)
+with st.container():
+    try:
+        aba = planilha.worksheet("interacoes_jm")
+        registros = aba.get_all_records()
+        ultimas = registros[-20:] if len(registros) > 20 else registros
+
+        for r in ultimas:
+            role = r["role"]
+            content = r["content"]
+            if role == "user":
+                with st.chat_message("user"):
+                    st.markdown(content)
+            else:
+                with st.chat_message("assistant"):
+                    st.markdown(content)
+    except Exception as e:
+        st.warning(f"Erro ao carregar interações: {e}")
 
 entrada_usuario = st.chat_input("Digite sua direção de cena...")
-
-
-def exibir_resposta_digitando(texto: str, delay: float = 0.02):
-    box = st.empty()
-    acumulado = ""
-    for ch in texto:
-        acumulado += ch
-        box.markdown(acumulado)
-        time.sleep(delay)
-
-
 if entrada_usuario:
-    # Salva entrada do usuário
     salvar_interacao("user", entrada_usuario)
+    st.session_state.entrada_atual = entrada_usuario
 
-    # Constrói prompt narrativo
-    prompt = construir_prompt_com_narrador() + f"\n\n🎬 Direção do roteirista: {entrada_usuario}"
+    with st.spinner("Narrando..."):
+        prompt = construir_prompt_com_narrador()
 
-    # Chama a IA
-    try:
-        resp = requests.post(
-            st.session_state.api_url,
-            headers={"Authorization": f"Bearer {st.session_state.api_key}", "Content-Type": "application/json"},
-            json={
-                "model": st.session_state.modelo_escolhido,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 1000,
-                "temperature": 0.85,
-            },
-            timeout=180,
+        modelo_id = modelos_disponiveis[st.session_state.modelo_ia]
+        headers = {
+            "Authorization": f"Bearer {st.secrets['OPENROUTER_API_KEY'] if not modelo_id.startswith(('togethercomputer/', 'mistralai/')) else st.secrets['TOGETHER_API_KEY']}",
+            "Content-Type": "application/json"
+        }
+        endpoint = (
+            "https://api.together.xyz/v1/chat/completions"
+            if modelo_id.startswith(("togethercomputer/", "mistralai/"))
+            else "https://openrouter.ai/api/v1/chat/completions"
         )
-        if resp.status_code == 200:
-            conteudo = resp.json()["choices"][0]["message"]["content"].strip()
-            salvar_interacao("assistant", conteudo)
-            exibir_resposta_digitando(conteudo)
-        else:
-            st.error(f"Erro {resp.status_code} - {resp.text}")
-    except Exception as e:
-        st.error(f"Erro ao gerar resposta: {e}")
+
+        payload = {
+            "model": modelo_id,
+            "messages": [
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": entrada_usuario}
+            ],
+            "stream": True
+        }
+
+        resposta = requests.post(endpoint, headers=headers, json=payload, stream=True)
+
+        mensagem_final = ""
+        placeholder = st.empty()
+        for linha in resposta.iter_lines():
+            if linha:
+                try:
+                    dados = json.loads(linha.decode("utf-8").replace("data: ", ""))
+                    delta = dados["choices"][0]["delta"].get("content")
+                    if delta:
+                        mensagem_final += delta
+                        placeholder.markdown(mensagem_final + "▌")
+                except Exception:
+                    continue
+
+        placeholder.markdown(mensagem_final)
+        salvar_interacao("assistant", mensagem_final)
