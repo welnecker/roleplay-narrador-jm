@@ -2,7 +2,6 @@ import streamlit as st
 import gspread
 import json
 import requests
-import time
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 
@@ -14,15 +13,15 @@ st.set_page_config(page_title="Narrador JM", page_icon="🎬")
 def conectar_planilha():
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-        # Corrige quebras de linha da private_key
+        # cuidado com a quebra de linha da chave privada
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         scope = [
             "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
+            "https://www.googleapis.com/auth/drive",
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # Substitua pela sua KEY
+        # ID fixo que você usa
         return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
@@ -31,21 +30,16 @@ def conectar_planilha():
 planilha = conectar_planilha()
 
 # =========================== #
-# Utilidades de Planilha
+# Utilidades: memórias, resumo, interações
 # =========================== #
 def carregar_memorias():
     """Lê a aba memorias_jm e separa por [mary], [jânio], [all]."""
     try:
         aba = planilha.worksheet("memorias_jm")
         registros = aba.get_all_records()
-        def norm(x): 
-            return (x or "").strip().lower()
-        mem_mary = [r.get("conteudo","").strip() for r in registros if norm(r.get("tipo")) == "[mary]"]
-        mem_janio = [r.get("conteudo","").strip() for r in registros if norm(r.get("tipo")) == "[jânio]"]
-        mem_all  = [r.get("conteudo","").strip() for r in registros if norm(r.get("tipo")) == "[all]"]
-        mem_mary = [m for m in mem_mary if m]
-        mem_janio = [m for m in mem_janio if m]
-        mem_all = [m for m in mem_all if m]
+        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[mary]"]
+        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[jânio]"]
+        mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[all]"]
         return mem_mary, mem_janio, mem_all
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
@@ -69,14 +63,12 @@ def salvar_resumo(resumo: str):
     try:
         aba = planilha.worksheet("perfil_jm")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # col6 = timestamp, col7 = resumo
         linha = ["", "", "", "", "", timestamp, resumo]
         aba.append_row(linha, value_input_option="RAW")
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
 
 def salvar_interacao(role: str, content: str):
-    """Salva a interação na aba interacoes_jm."""
     if not planilha:
         return
     try:
@@ -85,15 +77,6 @@ def salvar_interacao(role: str, content: str):
         aba.append_row([timestamp, role.strip(), content.strip()], value_input_option="RAW")
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
-
-def carregar_interacoes_recente(n=20):
-    try:
-        aba = planilha.worksheet("interacoes_jm")
-        registros = aba.get_all_records()
-        return registros[-n:] if len(registros) > n else registros
-    except Exception as e:
-        st.warning(f"Erro ao carregar interações: {e}")
-        return []
 
 # =========================== #
 # Construir prompt narrativo
@@ -107,17 +90,18 @@ def construir_prompt_com_narrador():
         aba = planilha.worksheet("interacoes_jm")
         registros = aba.get_all_records()
         ultimas = registros[-15:] if len(registros) > 15 else registros
-        texto_ultimas = "\n".join(f"{r.get('role','')}: {r.get('content','')}" for r in ultimas)
+        texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
     except Exception:
         texto_ultimas = ""
 
-    regra_intimo = "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista." if st.session_state.get("bloqueio_intimo", False) else ""
+    regra_intimo = (
+        "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
+        if st.session_state.get("bloqueio_intimo", False) else ""
+    )
 
-    prompt = f"""
-Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
+    prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
 
-Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.
-{regra_intimo}
+Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.{regra_intimo}
 
 🎭 Emoção oculta da cena: {emocao}
 
@@ -126,24 +110,23 @@ Sua função é narrar cenas com naturalidade e profundidade. Use narração em 
 
 ### 🧠 Memórias:
 Mary:
-- {'\n- '.join(mem_mary) if mem_mary else 'Nenhuma.'}
+- {('\n- '.join(mem_mary)) if mem_mary else 'Nenhuma.'}
 
 Jânio:
-- {'\n- '.join(mem_janio) if mem_janio else 'Nenhuma.'}
+- {('\n- '.join(mem_janio)) if mem_janio else 'Nenhuma.'}
 
 Compartilhadas:
-- {'\n- '.join(mem_all) if mem_all else 'Nenhuma.'}
+- {('\n- '.join(mem_all)) if mem_all else 'Nenhuma.'}
 
 ### 📖 Últimas interações:
-{texto_ultimas}
-"""
+{texto_ultimas}"""
     return prompt.strip()
 
 # =========================== #
-# Provedores e Modelos
+# Modelos / Roteamento de Provedor
 # =========================== #
 MODELOS_OPENROUTER = {
-    # === OPENROUTER === (IDs exatos informados por você)
+    # === OPENROUTER === (IDs EXATOS que você passou)
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
     "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
@@ -162,44 +145,23 @@ MODELOS_OPENROUTER = {
     "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
     "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
 }
+
+# Together — IDs oficiais (como você mostrou nos exemplos funcionais)
 MODELOS_TOGETHER = {
-    # === TOGETHER AI === (IDs exatos informados por você)
     "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
 }
 
-def api_config_for_provider(provider: str):
-    if provider == "OpenRouter":
-        return (
-            "https://openrouter.ai/api/v1/chat/completions",
-            st.secrets["OPENROUTER_API_KEY"],
-            MODELOS_OPENROUTER,
-        )
-    else:
-        return (
-            "https://api.together.xyz/v1/chat/completions",
-            st.secrets["TOGETHER_API_KEY"],
-            MODELOS_TOGETHER,
-        )
+# Detectar Together por prefixo (escala fácil p/ futuros modelos)
+TOGETHER_PREFIXES = ("Qwen/", "mistralai/")
+def is_together_model(model_id: str) -> bool:
+    return model_id.startswith(TOGETHER_PREFIXES)
 
 # =========================== #
-# Roteamento do provedor
+# Streaming – OpenRouter / Together
 # =========================== #
-def responder_com_modelo_escolhido(modelo_escolhido_id: str):
-    # Prefixos que identificam modelos do Together
-    if modelo_escolhido_id.startswith(("togethercomputer/", "mistralai/")):
-        st.session_state["provedor_ia"] = "Together"
-        return gerar_resposta_together_stream(modelo_escolhido_id)
-    else:
-        st.session_state["provedor_ia"] = "OpenRouter"
-        return gerar_resposta_openrouter_stream(modelo_escolhido_id)
-
-# =========================== #
-# OpenRouter - Streaming (SSE)
-# =========================== #
-def gerar_resposta_openrouter_stream(modelo_escolhido_id: str):
-    prompt = construir_prompt_com_narrador().strip()
-    # histórico local da sessão (somente mensagens relevantes do chat)
+def gerar_resposta_openrouter_stream(modelo_id: str):
+    prompt = construir_prompt_com_narrador()
     historico = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
         for m in st.session_state.get("session_msgs", [])
@@ -208,7 +170,7 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id: str):
     mensagens = [{"role": "system", "content": prompt}] + historico
 
     payload = {
-        "model": modelo_escolhido_id,
+        "model": modelo_id,
         "messages": mensagens,
         "max_tokens": 900,
         "temperature": 0.85,
@@ -258,11 +220,8 @@ def gerar_resposta_openrouter_stream(modelo_escolhido_id: str):
     placeholder.markdown(full_text)
     return full_text.strip()
 
-# =========================== #
-# Together - Streaming (SSE)
-# =========================== #
-def gerar_resposta_together_stream(modelo_escolhido_id: str):
-    prompt = construir_prompt_com_narrador().strip()
+def gerar_resposta_together_stream(modelo_id: str):
+    prompt = construir_prompt_com_narrador()
     historico = [
         {"role": m.get("role", "user"), "content": m.get("content", "")}
         for m in st.session_state.get("session_msgs", [])
@@ -271,7 +230,7 @@ def gerar_resposta_together_stream(modelo_escolhido_id: str):
     mensagens = [{"role": "system", "content": prompt}] + historico
 
     payload = {
-        "model": modelo_escolhido_id,
+        "model": modelo_id,
         "messages": mensagens,
         "max_tokens": 900,
         "temperature": 0.85,
@@ -321,71 +280,84 @@ def gerar_resposta_together_stream(modelo_escolhido_id: str):
     placeholder.markdown(full_text)
     return full_text.strip()
 
+def responder_com_modelo_escolhido(modelo_id: str):
+    if is_together_model(modelo_id):
+        return gerar_resposta_together_stream(modelo_id)
+    else:
+        return gerar_resposta_openrouter_stream(modelo_id)
+
 # =========================== #
-# UI – Cabeçalho
+# UI – Cabeçalho, estado inicial
 # =========================== #
 st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 st.markdown("---")
 
-# Inicializa estado
+# inicia estado
 if "session_msgs" not in st.session_state:
-    st.session_state.session_msgs = []  # [{role, content}, ...]
+    st.session_state.session_msgs = []
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
-if "modelo_escolhido_id" not in st.session_state:
-    # default: DeepSeek V3 no OpenRouter
-    st.session_state.modelo_escolhido_id = list(MODELOS_OPENROUTER.values())[0]
+if "bloqueio_intimo" not in st.session_state:
+    st.session_state.bloqueio_intimo = False
+if "emocao_oculta" not in st.session_state:
+    st.session_state.emocao_oculta = "nenhuma"
 
 # =========================== #
-# Sidebar – Provedor, Modelo, Emoção e Resumo
+# Sidebar – Modelos e opções
 # =========================== #
 with st.sidebar:
-    st.title("🌐 Configurações de IA")
-    provedor = st.radio("Provedor de IA", ["OpenRouter", "Together"], index=0)
-    api_url, api_key, modelos_disponiveis = api_config_for_provider(provedor)
+    st.title("🧭 Painel do Roteirista")
 
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0, key="sb_modelo")
-    st.session_state.modelo_escolhido_id = modelos_disponiveis[modelo_nome]
+    st.session_state.bloqueio_intimo = st.checkbox("Bloquear avanços íntimos sem ordem", value=st.session_state.bloqueio_intimo)
+    st.session_state.emocao_oculta = st.selectbox(
+        "🎭 Emoção oculta",
+        ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
+        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.emocao_oculta)
+    )
 
     st.markdown("---")
-    st.subheader("🎭 Emoção / Regras")
-    st.session_state.emocao_oculta = st.selectbox(
-        "Emoção oculta da cena", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0
-    )
-    st.session_state.bloqueio_intimo = st.checkbox(
-        "Bloquear avanços íntimos sem ordem explícita", value=False
-    )
+    st.markdown("**Seleção de modelo**")
 
+    # monta catálogos juntos para o selectbox
+    modelos_disponiveis = {}
+    modelos_disponiveis.update(MODELOS_OPENROUTER)
+    modelos_disponiveis.update(MODELOS_TOGETHER)
+
+    chave_opcao = st.selectbox("🤖 Modelo de IA", list(modelos_disponiveis.keys()), index=0)
+    st.session_state.modelo_escolhido_id = modelos_disponiveis[chave_opcao]
+
+    # Botão de gerar resumo (no sidebar)
     st.markdown("---")
     if st.button("📝 Gerar resumo do capítulo"):
         try:
-            # Pega últimas interações (6)
-            regs = carregar_interacoes_recente(n=6)
-            texto = "\n".join(f"{r.get('role','')}: {r.get('content','')}" for r in regs)
+            # Puxa últimas interações
+            try:
+                aba_i = planilha.worksheet("interacoes_jm")
+                registros = aba_i.get_all_records()
+                ultimas = registros[-6:] if len(registros) > 6 else registros
+                texto = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
+            except Exception:
+                texto = ""
 
             prompt_resumo = (
                 "Resuma o seguinte trecho como um capítulo de novela brasileiro, mantendo tom e emoções.\n\n"
                 + texto + "\n\nResumo:"
             )
 
-            # Decide endpoint pelo modelo escolhido atualmente no sidebar
-            modelo_id = st.session_state.modelo_escolhido_id
-            if modelo_id.startswith(("togethercomputer/", "mistralai/")):
+            modelo_id_resumo = st.session_state.modelo_escolhido_id
+            if is_together_model(modelo_id_resumo):
                 endpoint = "https://api.together.xyz/v1/chat/completions"
-                key = st.secrets["TOGETHER_API_KEY"]
+                api_key = st.secrets["TOGETHER_API_KEY"]
             else:
                 endpoint = "https://openrouter.ai/api/v1/chat/completions"
-                key = st.secrets["OPENROUTER_API_KEY"]
+                api_key = st.secrets["OPENROUTER_API_KEY"]
 
             r = requests.post(
                 endpoint,
-                headers={
-                    "Authorization": f"Bearer {key}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
-                    "model": modelo_id,
+                    "model": modelo_id_resumo,
                     "messages": [{"role": "user", "content": prompt_resumo}],
                     "max_tokens": 800,
                     "temperature": 0.85,
@@ -393,53 +365,59 @@ with st.sidebar:
                 timeout=120,
             )
             if r.status_code == 200:
-                novo_resumo = r.json()["choices"][0]["message"]["content"].strip()
-                salvar_resumo(novo_resumo)
-                st.session_state.resumo_capitulo = novo_resumo
+                resumo = r.json()["choices"][0]["message"]["content"].strip()
+                st.session_state.resumo_capitulo = resumo
+                salvar_resumo(resumo)
                 st.success("Resumo gerado e salvo com sucesso!")
             else:
                 st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
 
-    st.caption("As interações mais recentes aparecem abaixo. Role para cima para rever respostas anteriores.")
+    st.caption("As interações mais recentes aparecem na tela principal. Role para cima para rever as anteriores.")
 
 # =========================== #
-# Último resumo salvo (na tela principal)
+# Tela principal – Resumo + Histórico
 # =========================== #
 st.markdown("#### 📖 Último resumo salvo:")
 st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
 
-# =========================== #
-# Mostrar histórico recente (role para cima para ver mais)
-# =========================== #
+# mostra histórico recente (somente da planilha, para referência rápida)
 with st.container():
-    recentes = carregar_interacoes_recente(n=20)
-    for r in recentes:
-        role = r.get("role", "")
-        content = r.get("content", "")
-        if role == "user":
-            with st.chat_message("user"):
-                st.markdown(content)
-        else:
-            with st.chat_message("assistant"):
-                st.markdown(content)
+    try:
+        aba = planilha.worksheet("interacoes_jm")
+        registros = aba.get_all_records()
+        ultimas = registros[-20:] if len(registros) > 20 else registros
+
+        for r in ultimas:
+            role = r["role"]
+            content = r["content"]
+            if role == "user":
+                with st.chat_message("user"):
+                    st.markdown(content)
+            else:
+                with st.chat_message("assistant"):
+                    st.markdown(content)
+    except Exception as e:
+        st.warning(f"Erro ao carregar interações: {e}")
 
 # =========================== #
-# Entrada do usuário + Streaming
+# Entrada do usuário + Resposta (streaming)
 # =========================== #
-entrada = st.chat_input("Digite sua direção de cena...")
-if entrada:
-    # Salva e injeta no histórico da sessão
-    salvar_interacao("user", entrada)
-    st.session_state.session_msgs.append({"role": "user", "content": entrada})
+entrada_usuario = st.chat_input("Digite sua direção de cena...")
+if entrada_usuario:
+    # mostra a fala do usuário
+    with st.chat_message("user"):
+        st.markdown(entrada_usuario)
 
-    # Gera resposta via modelo selecionado
+    # registra na planilha e no estado
+    salvar_interacao("user", entrada_usuario)
+    st.session_state.session_msgs.append({"role": "user", "content": entrada_usuario})
+
+    # responde (stream) com o modelo escolhido
     with st.spinner("Narrando..."):
         resposta_txt = responder_com_modelo_escolhido(st.session_state.modelo_escolhido_id)
 
-    # Exibe e salva a resposta final
-    if resposta_txt and resposta_txt.strip():
-        salvar_interacao("assistant", resposta_txt.strip())
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt.strip()})
-
+    # salva e mantém no estado
+    salvar_interacao("assistant", resposta_txt)
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt})
