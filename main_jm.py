@@ -436,8 +436,8 @@ if "app_emocao_oculta" not in st.session_state:
 # Linha de opções rápidas
 col1, col2 = st.columns([3, 2])
 with col1:
-    st.markdown("#### 📖 Último resumo salvo:")
-    st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
+    # <-- deixe vazio ou coloque outro texto leve, mas NÃO mostre o resumo aqui
+    st.markdown("#### 📖 Conversas recentes")
 with col2:
     st.markdown("#### ⚙️ Opções")
     st.checkbox(
@@ -451,9 +451,9 @@ with col2:
         index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
         key="app_emocao_oculta_ui",
     )
-    # espelha valores de UI → flags
     st.session_state.app_bloqueio_intimo = st.session_state.get("app_bloqueio_intimo_ui", False)
-    st.session_state.app_emocao_oculta = st.session_state.get("app_emocao_oculta_ui", "nenhuma")
+    st.session_state.app_emocao_oculta   = st.session_state.get("app_emocao_oculta_ui", "nenhuma")
+
 
 
 # =============================================================================
@@ -555,6 +555,12 @@ with st.container():
         else:
             with st.chat_message("assistant"):
                 st.markdown(content)
+
+# --- Resumo depois das interações ---
+st.markdown("---")
+st.subheader("🧠 Último resumo salvo")
+st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
+
 
 
 # =============================================================================
@@ -734,3 +740,4 @@ if entrada:
                 memoria_longa_reforcar(usados)
         except Exception:
             pass
+
