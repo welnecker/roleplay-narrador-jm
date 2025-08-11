@@ -32,7 +32,6 @@ client_openai = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 def conectar_planilha():
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
-        # Corrige quebra da private_key
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         scope = [
             "https://spreadsheets.google.com/feeds",
@@ -40,7 +39,7 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # Troque a KEY abaixo pela sua key da planilha, se necessário
+        # troque a key se necessário
         return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
@@ -235,8 +234,7 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
             continue
         sim = float(np.dot(q, vec) / (np.linalg.norm(q) * np.linalg.norm(vec)))
         if sim >= limiar:
-            # re-ranking: 0.7*sim + 0.3*score
-            rr = 0.7 * sim + 0.3 * score
+            rr = 0.7 * sim + 0.3 * score  # re-ranking
             candidatos.append((texto, score, sim, rr))
 
     candidatos.sort(key=lambda x: x[3], reverse=True)
@@ -293,18 +291,57 @@ def memoria_longa_decadencia(fator: float = 0.97):
 
 
 # -----------------------------------------------------------------------------
-# THINK TOGGLE + FILTRO
+# PROVEDORES E MODELOS
 # -----------------------------------------------------------------------------
-if "show_think" not in st.session_state:
-    st.session_state.show_think = False
+MODELOS_OPENROUTER = {
+    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+}
 
-def maybe_strip_think(text: str) -> str:
-    """Remove <think>...</think> quando o toggle 'show_think' estiver desligado."""
-    if not text:
-        return ""
-    if st.session_state.get("show_think", False):
-        return text  # mantém o <think>
-    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+MODELOS_TOGETHER_UI = {
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "👑 perplexity-ai_r1-1776 (Together)": "perplexity-ai/r1-1776",
+}
+
+def model_id_for_together(api_ui_model_id: str) -> str:
+    # conserta o ID do Qwen 480B pro formato aceito
+    if "Qwen3-Coder-480B-A35B-Instruct-FP8" in api_ui_model_id:
+        return "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
+    if api_ui_model_id.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
+        return "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    # perplexity-ai/r1-1776 e demais permanecem
+    return api_ui_model_id
+
+
+def api_config_for_provider(provider: str):
+    if provider == "OpenRouter":
+        return (
+            "https://openrouter.ai/api/v1/chat/completions",
+            st.secrets["OPENROUTER_API_KEY"],
+            MODELOS_OPENROUTER,
+        )
+    else:
+        return (
+            "https://api.together.xyz/v1/chat/completions",
+            st.secrets["TOGETHER_API_KEY"],
+            MODELOS_TOGETHER_UI,
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -312,7 +349,6 @@ def maybe_strip_think(text: str) -> str:
 # -----------------------------------------------------------------------------
 def construir_prompt_com_narrador():
     mem_mary, mem_janio, mem_all = carregar_memorias()
-    emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
     resumo = st.session_state.get("resumo_capitulo", "")
 
     # últimas 15 interações (texto plano para contexto)
@@ -324,14 +360,26 @@ def construir_prompt_com_narrador():
     except Exception:
         texto_ultimas = ""
 
+    emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
+
     regra_intimo = (
         "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
         if st.session_state.get("app_bloqueio_intimo", False) else ""
     )
 
+    # Regra 1: preservar virgindade (se ligado)
+    regra_virgindade = ""
+    if st.session_state.get("app_preservar_virgindade", True):
+        regra_virgindade = (
+            "\n💠 Mary é virgem e deve permanecer assim. "
+            "Não deve consentir ou realizar atos sexuais que impliquem penetração. "
+            "Se a cena for para esse caminho, redirecione com elegância (carinho, conversa, limites claros) "
+            "e encerre antes de qualquer ato explícito."
+        )
+
     prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
 
-Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.{regra_intimo}
+Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.{regra_intimo}{regra_virgindade}
 
 🎭 Emoção oculta da cena: {emocao}
 
@@ -351,7 +399,7 @@ Compartilhadas:
 ### 📖 Últimas interações:
 {texto_ultimas}"""
 
-    # === Memórias longas relevantes (Top-K) — opcional, se habilitado ===
+    # Memórias longas relevantes (Top-K) — opcional
     if st.session_state.get("use_memoria_longa", True):
         try:
             ultima_entrada = ""
@@ -375,61 +423,6 @@ Compartilhadas:
 
 
 # -----------------------------------------------------------------------------
-# PROVEDORES E MODELOS
-# -----------------------------------------------------------------------------
-MODELOS_OPENROUTER = {
-    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
-    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-}
-
-# IDs exibidos p/ usuário (mantidos)
-MODELOS_TOGETHER_UI = {
-    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "👑 perplexity-ai_r1-1776 (Together)": "perplexity-ai/r1-1776",
-}
-
-# Conserta ID do Together p/ endpoint oficial
-def model_id_for_together(api_ui_model_id: str) -> str:
-    if "Qwen3-Coder-480B-A35B-Instruct-FP8" in api_ui_model_id:
-        return "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
-    if api_ui_model_id.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
-        return "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    # Outros (ex.: perplexity-ai/r1-1776) permanecem como estão
-    return api_ui_model_id
-
-
-def api_config_for_provider(provider: str):
-    if provider == "OpenRouter":
-        return (
-            "https://openrouter.ai/api/v1/chat/completions",
-            st.secrets["OPENROUTER_API_KEY"],
-            MODELOS_OPENROUTER,
-        )
-    else:
-        return (
-            "https://api.together.xyz/v1/chat/completions",
-            st.secrets["TOGETHER_API_KEY"],
-            MODELOS_TOGETHER_UI,
-        )
-
-
-# -----------------------------------------------------------------------------
 # UI – CABEÇALHO E CONTROLES
 # -----------------------------------------------------------------------------
 st.title("🎬 Narrador JM")
@@ -447,19 +440,25 @@ if "k_memoria_longa" not in st.session_state:
     st.session_state.k_memoria_longa = 3
 if "limiar_memoria_longa" not in st.session_state:
     st.session_state.limiar_memoria_longa = 0.78
+# flags UI lógicas
 if "app_bloqueio_intimo" not in st.session_state:
     st.session_state.app_bloqueio_intimo = False
 if "app_emocao_oculta" not in st.session_state:
     st.session_state.app_emocao_oculta = "nenhuma"
+if "app_preservar_virgindade" not in st.session_state:
+    st.session_state.app_preservar_virgindade = True
+if "app_permitir_think" not in st.session_state:
+    st.session_state.app_permitir_think = True  # útil para perplexity
 
 # Linha de opções rápidas
 col1, col2 = st.columns([3, 2])
 with col1:
-    st.markdown("#### 📖 Histórico recente")
-    st.caption("As interações salvas aparecem abaixo. O resumo do capítulo vem depois.")
+    st.markdown("#### 📖 Último resumo salvo:")
+    st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
 with col2:
     st.markdown("#### ⚙️ Opções")
-    # Widgets com keys distintas de estado lógico
+
+    # widgets com keys dedicadas
     st.checkbox(
         "Bloquear avanços íntimos sem ordem",
         value=st.session_state.app_bloqueio_intimo,
@@ -471,9 +470,22 @@ with col2:
         index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
         key="ui_emocao_oculta",
     )
-    # Espelha valores de UI → estado lógico
+    st.checkbox(
+        "Preservar virgindade da Mary",
+        value=st.session_state.app_preservar_virgindade,
+        key="ui_preservar_virgindade",
+    )
+    st.checkbox(
+        "Permitir raciocínio visível (<think>)",
+        value=st.session_state.app_permitir_think,
+        key="ui_permitir_think",
+    )
+
+    # espelha os valores de UI para as flags de app
     st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloqueio_intimo", False)
-    st.session_state.app_emocao_oculta   = st.session_state.get("ui_emocao_oculta", "nenhuma")
+    st.session_state.app_emocao_oculta = st.session_state.get("ui_emocao_oculta", "nenhuma")
+    st.session_state.app_preservar_virgindade = st.session_state.get("ui_preservar_virgindade", True)
+    st.session_state.app_permitir_think = st.session_state.get("ui_permitir_think", True)
 
 
 # -----------------------------------------------------------------------------
@@ -487,12 +499,9 @@ with st.sidebar:
 
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
-    # guarda o ID escolhido para uso na chamada de inferência
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
 
     st.markdown("---")
-    st.checkbox("Mostrar raciocínio (<think>)", value=st.session_state.show_think, key="show_think")
-
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             inter = carregar_interacoes(n=6)
@@ -502,7 +511,6 @@ with st.sidebar:
                 + texto + "\n\nResumo:"
             )
 
-            # Ajusta o ID somente se for Together
             model_id_call = model_id_for_together(modelo_escolhido_id_ui) if provedor == "Together" else modelo_escolhido_id_ui
 
             r = requests.post(
@@ -564,7 +572,7 @@ with st.sidebar:
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
 
-    st.caption("Role a tela principal para ver interações e, ao final, o resumo.")
+    st.caption("Role a tela principal para ver interações anteriores.")
 
 
 # -----------------------------------------------------------------------------
@@ -582,23 +590,20 @@ with st.container():
             with st.chat_message("assistant"):
                 st.markdown(content)
 
-# Depois do histórico, exiba o resumo (como você pediu)
+# Resumo depois das interações (para situar ao reiniciar)
 if st.session_state.get("resumo_capitulo"):
     with st.chat_message("assistant"):
-        st.markdown("### 🧠 Resumo do capítulo anterior")
-        st.markdown(st.session_state.resumo_capitulo)
+        st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.resumo_capitulo}")
 
 
 # -----------------------------------------------------------------------------
-# ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together, com toggle <think>)
+# ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together, com opção de <think>)
 # -----------------------------------------------------------------------------
 entrada = st.chat_input("Digite sua direção de cena...")
 if entrada:
-    # salva e mostra a fala do usuário
     salvar_interacao("user", entrada)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # prompt + histórico
     prompt = construir_prompt_com_narrador()
     historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
                  for m in st.session_state.session_msgs]
@@ -613,32 +618,23 @@ if entrada:
         auth = st.secrets["OPENROUTER_API_KEY"]
         model_to_call = st.session_state.modelo_escolhido_id
 
-    # Monta mensagens (bloqueia <think> só se o toggle estiver desligado)
-    messages = []
-    if not st.session_state.get("show_think", False):
-        messages.append({
-            "role": "system",
-            "content": (
-                "Responda exclusivamente em português do Brasil. "
-                "Nunca inclua rascunhos de raciocínio nem use as tags <think>...</think>. "
-                "Forneça apenas a resposta final ao leitor, no tom narrativo solicitado."
-            ),
-        })
-    messages.append({"role": "system", "content": prompt})
-    messages += historico
+    # System extra: PT-BR + controle do <think>
+    sys_parts = ["Responda em português do Brasil."]
+    if not st.session_state.get("app_permitir_think", True):
+        sys_parts.append("Nunca inclua rascunhos de raciocínio nem use as tags <think>...</think>.")
+    system_guard = {"role": "system", "content": " ".join(sys_parts)}
 
-    # Perplexity: melhor estabilidade em modo não-stream
-    force_non_stream = str(model_to_call).lower().startswith("perplexity-ai/r1-1776")
+    messages = [system_guard, {"role": "system", "content": prompt}] + historico
 
     payload = {
         "model": model_to_call,
         "messages": messages,
         "max_tokens": 1000,
         "temperature": 0.85,
-        "stream": (False if force_non_stream else True),
+        "stream": True,
     }
-    # Pequena ajuda: se Together, define um stop para evitar “vazar” </think>
-    if prov == "Together" and not st.session_state.get("show_think", False):
+    # se bloquear <think>, ajuda extra para Together
+    if prov == "Together" and not st.session_state.get("app_permitir_think", True):
         payload["stop"] = ["</think>"]
 
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
@@ -647,75 +643,98 @@ if entrada:
         placeholder = st.empty()
         resposta_txt = ""
         last_update = time.time()
+        in_think = False
+        pending = ""
 
         try:
-            if force_non_stream:
-                # Chamada direta não-stream (Perplexity mais estável)
-                r = requests.post(endpoint, headers=headers, json=payload, timeout=300)
-                if r.status_code == 200:
-                    resposta_txt = r.json()["choices"][0]["message"]["content"]
+            with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
+                if r.status_code != 200:
+                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
                 else:
-                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')} (não-stream): {r.status_code} - {r.text}")
-                    resposta_txt = "[ERRO]"
-            else:
-                # Streaming
-                with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
-                    if r.status_code != 200:
-                        st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
-                        resposta_txt = "[ERRO STREAM]"
-                    else:
-                        for raw in r.iter_lines(decode_unicode=False):
-                            if not raw:
+                    for raw in r.iter_lines(decode_unicode=False):
+                        if not raw:
+                            continue
+                        line = raw.decode("utf-8", errors="ignore").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            j = json.loads(data)
+                            delta = j["choices"][0]["delta"].get("content", "")
+                            if not delta:
                                 continue
-                            line = raw.decode("utf-8", errors="ignore").strip()
-                            if not line.startswith("data:"):
-                                continue
-                            data = line[5:].strip()
-                            if data == "[DONE]":
-                                break
-                            try:
-                                j = json.loads(data)
-                                delta = j["choices"][0]["delta"].get("content", "")
-                                if delta:
-                                    resposta_txt += delta
-                                    # “digitação” suave
-                                    if time.time() - last_update > 0.10:
-                                        placeholder.markdown((resposta_txt if st.session_state.get("show_think", False) else maybe_strip_think(resposta_txt)) + "▌")
-                                        last_update = time.time()
-                            except Exception:
-                                continue
+
+                            chunk = pending + delta
+                            pending = ""
+
+                            # opcionalmente filtra <think>
+                            if not st.session_state.get("app_permitir_think", True):
+                                out_chars = []
+                                i = 0
+                                while i < len(chunk):
+                                    if not in_think and chunk[i:i+7].lower() == "<think>":
+                                        in_think = True
+                                        i += 7
+                                        continue
+                                    if in_think:
+                                        if chunk[i:i+8].lower() == "</think>":
+                                            in_think = False
+                                            i += 8
+                                            continue
+                                        i += 1
+                                        continue
+                                    out_chars.append(chunk[i])
+                                    i += 1
+                                tail = "".join(out_chars)
+                                for marker in ("<think>", "</think>"):
+                                    cut = marker[:-1]
+                                    if tail.endswith(cut):
+                                        pending = tail[-len(cut):]
+                                        tail = tail[:-len(cut)]
+                                        break
+                            else:
+                                tail = chunk
+
+                            if tail:
+                                resposta_txt += tail
+                                if time.time() - last_update > 0.10:
+                                    placeholder.markdown(resposta_txt + "▌")
+                                    last_update = time.time()
+                        except Exception:
+                            continue
         except Exception as e:
-            st.error(f"Erro na chamada de geração: {e}")
-            resposta_txt = "[Erro ao gerar resposta]"
+            st.error(f"Erro no streaming: {e}")
 
-        # ============================================
-        # FLUSH FINAL + FALLBACK + SALVAR / VALIDAR
-        # ============================================
-        # 1) Mostra o que veio até agora
-        placeholder.markdown((resposta_txt if st.session_state.get("show_think", False) else maybe_strip_think(resposta_txt)) or "▌")
-
-        # 2) Fallback não-stream se vier vazio/curto
-        if (not resposta_txt or len(resposta_txt.strip()) < 20):
+        # flush final + fallback se vazio
+        if not resposta_txt:
+            # tenta uma chamada sem stream
             try:
-                regen_payload = payload.copy()
-                regen_payload["stream"] = False
-                r2 = requests.post(endpoint, headers=headers, json=regen_payload, timeout=180)
-                if r2.status_code == 200:
-                    resposta_txt = r2.json()["choices"][0]["message"]["content"]
+                non_stream = requests.post(
+                    endpoint,
+                    headers=headers,
+                    json={
+                        "model": model_to_call,
+                        "messages": messages,
+                        "max_tokens": 1000,
+                        "temperature": 0.85,
+                        "stream": False,
+                    },
+                    timeout=180,
+                )
+                if non_stream.status_code == 200:
+                    resposta_txt = non_stream.json()["choices"][0]["message"]["content"].strip()
                 else:
-                    st.error(f"Fallback (não-stream) falhou: {r2.status_code} - {r2.text}")
+                    st.error(f"Falha no fallback: {non_stream.status_code} - {non_stream.text}")
             except Exception as e:
-                st.error(f"Erro no fallback não-stream: {e}")
+                st.error(f"Erro no fallback: {e}")
 
-        # 3) Aplica filtro de <think> apenas se o toggle estiver DESLIGADO
-        resposta_visivel = maybe_strip_think(resposta_txt)
+        placeholder.markdown(resposta_txt or "[Sem conteúdo]")
 
-        # 4) Atualiza o placeholder com o texto final visível
-        placeholder.markdown(resposta_visivel or "[Sem conteúdo]")
-
-        # 5) Validação sintática (no texto visível)
-        if not resposta_valida(resposta_visivel):
-            st.warning("⚠️ Resposta possivelmente corrompida. Tentando regenerar sem stream...")
+        # Validação sintática
+        if resposta_txt and not resposta_valida(resposta_txt):
+            st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
             try:
                 regen = requests.post(
                     endpoint,
@@ -730,35 +749,33 @@ if entrada:
                     timeout=180,
                 )
                 if regen.status_code == 200:
-                    resposta_txt = regen.json()["choices"][0]["message"]["content"]
-                    resposta_visivel = maybe_strip_think(resposta_txt)
-                    placeholder.markdown(resposta_visivel or "[Sem conteúdo]")
+                    resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
+                    placeholder.markdown(resposta_txt)
                 else:
                     st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
             except Exception as e:
                 st.error(f"Erro ao regenerar: {e}")
 
-        # 6) Validação semântica (user vs resposta visível)
-        if len(st.session_state.session_msgs) >= 1 and resposta_visivel and resposta_visivel != "[ERRO STREAM]":
-            texto_anterior = st.session_state.session_msgs[-1]["content"]
-            alerta = verificar_quebra_semantica_openai(texto_anterior, resposta_visivel)
+        # Validação semântica (com OpenAI embeddings), compara última entrada do user vs resposta
+        if len(st.session_state.session_msgs) >= 1 and resposta_txt:
+            texto_anterior = st.session_state.session_msgs[-1]["content"]  # última entrada do user
+            alerta = verificar_quebra_semantica_openai(texto_anterior, resposta_txt)
             if alerta:
                 st.info(alerta)
 
-        # 7) Salva na planilha exatamente o que mostramos
-        salvar_interacao("assistant", resposta_visivel)
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_visivel})
-
-        # 8) Reforça memórias a partir do texto visível
-        try:
-            usados = []
-            topk_usadas = memoria_longa_buscar_topk(
-                query_text=resposta_visivel,
-                k=int(st.session_state.k_memoria_longa),
-                limiar=float(st.session_state.limiar_memoria_longa),
-            )
-            for t, _sc, _sim, _rr in topk_usadas:
-                usados.append(t)
-            memoria_longa_reforcar(usados)
-        except Exception:
-            pass
+        # Salva resposta + reforça memórias relevantes
+        if resposta_txt:
+            salvar_interacao("assistant", resposta_txt)
+            st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt})
+            try:
+                usados = []
+                topk_usadas = memoria_longa_buscar_topk(
+                    query_text=resposta_txt,
+                    k=int(st.session_state.k_memoria_longa),
+                    limiar=float(st.session_state.limiar_memoria_longa),
+                )
+                for t, _sc, _sim, _rr in topk_usadas:
+                    usados.append(t)
+                memoria_longa_reforcar(usados)
+            except Exception:
+                pass
