@@ -578,15 +578,20 @@ if entrada:
     messages = [suppress_think_ptbr, {"role": "system", "content": prompt}] + historico
 
     payload = {
-        "model": model_to_call,
-        "messages": messages,
-        "max_tokens": 900,
-        "temperature": 0.85,
-        "stream": True,
+    "model": model_to_call,
+    "messages": messages,
+    "max_tokens": 900,
+    "temperature": 0.85,
+    "stream": True,
     }
-    # Dica: se Together, cortar fechamento de tag caso apareça
+    
+    # NÃO usar stop para modelos tipo R1 (precisam escrever depois de </think>)
     if prov == "Together":
-        payload["stop"] = ["</think>"]
+        lower_id = model_to_call.lower()
+        is_r1_style = ("r1" in lower_id) or ("reasoning" in lower_id) or ("perplexity-ai/r1-1776" in lower_id)
+        if not is_r1_style:
+            payload["stop"] = ["</think>"]
+
 
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
@@ -662,31 +667,58 @@ if entrada:
             resposta_txt = "[Erro ao gerar resposta]"
 
         # flush final
-        placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+placeholder.markdown(resposta_txt or "[Sem conteúdo]")
 
-        # Validação sintática
-        if not resposta_valida(resposta_txt):
-            st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
-            try:
-                regen = requests.post(
-                    endpoint,
-                    headers=headers,
-                    json={
-                        "model": model_to_call,
-                        "messages": messages,
-                        "max_tokens": 900,
-                        "temperature": 0.85,
-                        "stream": False,
-                    },
-                    timeout=180,
-                )
-                if regen.status_code == 200:
-                    resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
-                    placeholder.markdown(resposta_txt)
-                else:
-                    st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
-            except Exception as e:
-                st.error(f"Erro ao regenerar: {e}")
+# Fallback: se veio vazio, tenta 1 chamada SEM stream e SEM stop
+if not resposta_txt or resposta_txt.strip() == "":
+    st.warning("⚠️ Resposta vazia detectada. Tentando regenerar...")
+    try:
+        regen_payload = {
+            "model": model_to_call,
+            "messages": messages,
+            "max_tokens": 900,
+            "temperature": 0.85,
+            "stream": False,
+        }
+        # garante que não existe "stop" no fallback
+        if "stop" in regen_payload:
+            regen_payload.pop("stop", None)
+
+        regen = requests.post(endpoint, headers=headers, json=regen_payload, timeout=180)
+        if regen.status_code == 200:
+            resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
+            # remove qualquer <think>...</think> que venha no retorno não-stream
+            resposta_txt = re.sub(r"(?is)<think>.*?</think>", "", resposta_txt).strip()
+            placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+        else:
+            st.error(f"Fallback sem stream falhou: {regen.status_code} - {regen.text}")
+    except Exception as e:
+        st.error(f"Erro no fallback sem stream: {e}")
+
+# Validação sintática (se não foi só vazio, mas corrompida)
+elif not resposta_valida(resposta_txt):
+    st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
+    try:
+        regen = requests.post(
+            endpoint,
+            headers=headers,
+            json={
+                "model": model_to_call,
+                "messages": messages,
+                "max_tokens": 900,
+                "temperature": 0.85,
+                "stream": False,
+            },
+            timeout=180,
+        )
+        if regen.status_code == 200:
+            resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
+            placeholder.markdown(resposta_txt)
+        else:
+            st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
+    except Exception as e:
+        st.error(f"Erro ao regenerar: {e}")
+
 
         # Validação semântica (com OpenAI embeddings), compara última entrada do user vs resposta
         if len(st.session_state.session_msgs) >= 1 and resposta_txt and resposta_txt != "[ERRO STREAM]":
@@ -710,3 +742,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
