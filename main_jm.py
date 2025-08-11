@@ -488,7 +488,20 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### 🗃️ Memória Longa")
-    st.session_state.use_memoria_longa = st.checkbox("Usar memória longa no prompt", value=st.session_state.use_memoria_longa, key="use_memoria_longa")
+    # antes de renderizar o checkbox, garanta um default:
+if "use_memoria_longa" not in st.session_state:
+    st.session_state.use_memoria_longa = True  # ou False, como preferir
+
+# renderiza o widget e deixa o Streamlit cuidar do session_state
+st.checkbox(
+    "Usar memória longa no prompt",
+    value=st.session_state.use_memoria_longa,
+    key="use_memoria_longa",
+)
+
+# se precisar do valor na mesma execução:
+use_memoria_longa = st.session_state.use_memoria_longa
+
     st.session_state.k_memoria_longa = st.slider("Top-K memórias", 1, 5, st.session_state.k_memoria_longa, 1, key="k_memoria_longa")
     st.session_state.limiar_memoria_longa = st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.limiar_memoria_longa), 0.01, key="limiar_memoria_longa")
 
@@ -638,3 +651,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
