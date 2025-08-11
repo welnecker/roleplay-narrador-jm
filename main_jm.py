@@ -716,7 +716,7 @@ def construir_prompt_com_narrador():
     except Exception:
         texto_ultimas = ""
 
-            regra_intimo = (
+        regra_intimo = (
             "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
             if st.session_state.get("bloqueio_intimo", False) else ""
         )
@@ -1092,6 +1092,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
