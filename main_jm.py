@@ -11,9 +11,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 import numpy as np
 from openai import OpenAI
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # CONFIG BÁSICA
-# =============================================================================
+# -----------------------------------------------------------------------------
 st.set_page_config(page_title="Narrador JM", page_icon="🎬")
 
 # Secrets esperados:
@@ -25,10 +25,9 @@ st.set_page_config(page_title="Narrador JM", page_icon="🎬")
 # Cliente OpenAI p/ embeddings (SEM usar OpenRouter/Together)
 client_openai = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-
-# =============================================================================
+# -----------------------------------------------------------------------------
 # CONEXÃO COM PLANILHA
-# =============================================================================
+# -----------------------------------------------------------------------------
 def conectar_planilha():
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
@@ -39,19 +38,17 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # Troque a KEY abaixo se necessário
+        # Troque a KEY abaixo se necessário:
         return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
         return None
 
-
 planilha = conectar_planilha()
 
-
-# =============================================================================
+# -----------------------------------------------------------------------------
 # UTILIDADES DE PLANILHA (memórias/interações/resumo)
-# =============================================================================
+# -----------------------------------------------------------------------------
 def carregar_memorias():
     """Lê a aba 'memorias_jm' e retorna (mem_mary, mem_janio, mem_all)."""
     try:
@@ -64,7 +61,6 @@ def carregar_memorias():
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
         return [], [], []
-
 
 def carregar_resumo_salvo():
     """Busca o último resumo (coluna 7) da aba 'perfil_jm'."""
@@ -79,7 +75,6 @@ def carregar_resumo_salvo():
         st.warning(f"Erro ao carregar resumo salvo: {e}")
         return ""
 
-
 def salvar_resumo(resumo: str):
     """Salva um novo resumo na aba 'perfil_jm' (timestamp na coluna 6, resumo na 7)."""
     try:
@@ -89,7 +84,6 @@ def salvar_resumo(resumo: str):
         aba.append_row(linha, value_input_option="RAW")
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
-
 
 def salvar_interacao(role: str, content: str):
     """Anexa uma interação na aba 'interacoes_jm'."""
@@ -102,9 +96,8 @@ def salvar_interacao(role: str, content: str):
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
-
 def carregar_interacoes(n=20):
-    """Carrega as últimas n interações (role, content) para exibição."""
+    """Carrega as últimas n interações (role, content)."""
     try:
         aba = planilha.worksheet("interacoes_jm")
         registros = aba.get_all_records()
@@ -113,10 +106,9 @@ def carregar_interacoes(n=20):
         st.warning(f"Erro ao carregar interações: {e}")
         return []
 
-
-# =============================================================================
+# -----------------------------------------------------------------------------
 # VALIDAÇÕES (sintática + semântica via OpenAI)
-# =============================================================================
+# -----------------------------------------------------------------------------
 def resposta_valida(texto: str) -> bool:
     padroes_invalidos = [
         r"check if.*string", r"#\s?1(\.\d+)+", r"\d{10,}", r"the cmd package",
@@ -126,7 +118,6 @@ def resposta_valida(texto: str) -> bool:
         if re.search(padrao, texto.lower()):
             return False
     return True
-
 
 def gerar_embedding_openai(texto: str):
     try:
@@ -139,10 +130,8 @@ def gerar_embedding_openai(texto: str):
         st.error(f"Erro ao gerar embedding: {e}")
         return None
 
-
 def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
     return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
-
 
 def verificar_quebra_semantica_openai(texto1: str, texto2: str, limite=0.6) -> str:
     e1 = gerar_embedding_openai(texto1)
@@ -154,28 +143,24 @@ def verificar_quebra_semantica_openai(texto1: str, texto2: str, limite=0.6) -> s
         return f"⚠️ Baixa continuidade narrativa (similaridade: {sim:.2f})."
     return ""
 
-
-# =============================================================================
+# -----------------------------------------------------------------------------
 # MEMÓRIA LONGA (Sheets + Embeddings OpenAI)
-# =============================================================================
+# -----------------------------------------------------------------------------
 def _sheet_ensure_memoria_longa():
     """Retorna a aba memoria_longa_jm se existir (não cria)."""
     try:
         return planilha.worksheet("memoria_longa_jm")
     except Exception:
-        return None  # silencioso
-
+        return None
 
 def _serialize_vec(vec: np.ndarray) -> str:
     return json.dumps(vec.tolist(), separators=(",", ":"))
-
 
 def _deserialize_vec(s: str) -> np.ndarray:
     try:
         return np.array(json.loads(s), dtype=float)
     except Exception:
         return np.zeros(1)
-
 
 def memoria_longa_salvar(texto: str, tags: str = "") -> bool:
     """Salva uma memória com embedding e score inicial."""
@@ -202,7 +187,6 @@ def memoria_longa_salvar(texto: str, tags: str = "") -> bool:
     except Exception as e:
         st.error(f"Erro ao salvar memória longa: {e}")
         return False
-
 
 def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78):
     """Retorna top-K memórias (texto, score, sim, rr) com base no embedding do query_text."""
@@ -235,12 +219,11 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
             continue
         sim = float(np.dot(q, vec) / (np.linalg.norm(q) * np.linalg.norm(vec)))
         if sim >= limiar:
-            rr = 0.7 * sim + 0.3 * score  # rerank
+            rr = 0.7 * sim + 0.3 * score  # re-ranking
             candidatos.append((texto, score, sim, rr))
 
     candidatos.sort(key=lambda x: x[3], reverse=True)
     return candidatos[:k]
-
 
 def memoria_longa_reforcar(textos_usados: list):
     """Aumenta o score das memórias usadas (pequeno reforço)."""
@@ -268,9 +251,8 @@ def memoria_longa_reforcar(textos_usados: list):
     except Exception:
         pass
 
-
 def memoria_longa_decadencia(fator: float = 0.97):
-    """Decadência leve aplicada a todos os scores (pode ser chamada esporadicamente)."""
+    """Decadência leve aplicada a todos os scores (opcional)."""
     aba = _sheet_ensure_memoria_longa()
     if not aba:
         return
@@ -290,16 +272,15 @@ def memoria_longa_decadencia(fator: float = 0.97):
     except Exception:
         pass
 
-
-# =============================================================================
+# -----------------------------------------------------------------------------
 # PROMPT
-# =============================================================================
+# -----------------------------------------------------------------------------
 def construir_prompt_com_narrador():
     mem_mary, mem_janio, mem_all = carregar_memorias()
     emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
     resumo = st.session_state.get("resumo_capitulo", "")
 
-    # últimas 15 interações
+    # últimas 15 interações (texto plano para contexto)
     try:
         aba = planilha.worksheet("interacoes_jm")
         registros = aba.get_all_records()
@@ -335,7 +316,7 @@ Compartilhadas:
 ### 📖 Últimas interações:
 {texto_ultimas}"""
 
-    # Memórias longas relevantes (Top-K)
+    # Memórias longas relevantes (Top-K) — opcional
     if st.session_state.get("use_memoria_longa", True):
         try:
             ultima_entrada = ""
@@ -357,10 +338,9 @@ Compartilhadas:
 
     return prompt.strip()
 
-
-# =============================================================================
+# -----------------------------------------------------------------------------
 # PROVEDORES E MODELOS
-# =============================================================================
+# -----------------------------------------------------------------------------
 MODELOS_OPENROUTER = {
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
@@ -370,12 +350,18 @@ MODELOS_OPENROUTER = {
     "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
     "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
     "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-mixtral-8x7b-dpo",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
     "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
     "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
     "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
 }
 
+# IDs exibidos p/ usuário (mantidos)
 MODELOS_TOGETHER_UI = {
     "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -383,12 +369,13 @@ MODELOS_TOGETHER_UI = {
 }
 
 def model_id_for_together(api_ui_model_id: str) -> str:
+    """Normaliza IDs que a Together exige com casse/caminho específico."""
     if "Qwen3-Coder-480B-A35B-Instruct-FP8" in api_ui_model_id:
         return "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
     if api_ui_model_id.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
         return "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    # outros (ex.: perplexity-ai/r1-1776) ficam como estão
     return api_ui_model_id
-
 
 def api_config_for_provider(provider: str):
     if provider == "OpenRouter":
@@ -404,15 +391,14 @@ def api_config_for_provider(provider: str):
             MODELOS_TOGETHER_UI,
         )
 
-
-# =============================================================================
+# -----------------------------------------------------------------------------
 # UI – CABEÇALHO E CONTROLES
-# =============================================================================
+# -----------------------------------------------------------------------------
 st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 st.markdown("---")
 
-# Estado inicial seguro
+# Estado inicial
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
 if "session_msgs" not in st.session_state:
@@ -423,16 +409,17 @@ if "k_memoria_longa" not in st.session_state:
     st.session_state.k_memoria_longa = 3
 if "limiar_memoria_longa" not in st.session_state:
     st.session_state.limiar_memoria_longa = 0.78
+# flags de UI -> estado lógico
 if "app_bloqueio_intimo" not in st.session_state:
     st.session_state.app_bloqueio_intimo = False
 if "app_emocao_oculta" not in st.session_state:
     st.session_state.app_emocao_oculta = "nenhuma"
 
-# Linha de opções rápidas
+# Linha de opções rápidas (sem mostrar resumo aqui! — resumo vai ao final)
 col1, col2 = st.columns([3, 2])
 with col1:
-    # <-- deixe vazio ou coloque outro texto leve, mas NÃO mostre o resumo aqui
-    st.markdown("#### 📖 Conversas recentes")
+    st.markdown("#### 🎬 Direção")
+    st.caption("Use 1–2 frases claras; evite múltiplas cenas num único pedido.")
 with col2:
     st.markdown("#### ⚙️ Opções")
     st.checkbox(
@@ -446,14 +433,13 @@ with col2:
         index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
         key="app_emocao_oculta_ui",
     )
+    # espelha UI -> flags usadas
     st.session_state.app_bloqueio_intimo = st.session_state.get("app_bloqueio_intimo_ui", False)
     st.session_state.app_emocao_oculta   = st.session_state.get("app_emocao_oculta_ui", "nenhuma")
 
-
-
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Sidebar – Provedor, modelos, resumo e memória longa
-# =============================================================================
+# -----------------------------------------------------------------------------
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
 
@@ -462,7 +448,7 @@ with st.sidebar:
 
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
-    st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui  # não limpa o histórico
+    st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
 
     st.markdown("---")
     if st.button("📝 Gerar resumo do capítulo"):
@@ -473,9 +459,7 @@ with st.sidebar:
                 "Resuma o seguinte trecho como um capítulo de novela brasileiro, mantendo tom e emoções.\n\n"
                 + texto + "\n\nResumo:"
             )
-
             model_id_call = model_id_for_together(modelo_escolhido_id_ui) if provedor == "Together" else modelo_escolhido_id_ui
-
             r = requests.post(
                 api_url,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
@@ -489,6 +473,8 @@ with st.sidebar:
             )
             if r.status_code == 200:
                 resumo = r.json()["choices"][0]["message"]["content"].strip()
+                # limpa <think> se algum modelo mandar
+                resumo = re.sub(r"<think>.*?</think>", "", resumo, flags=re.DOTALL).strip()
                 st.session_state.resumo_capitulo = resumo
                 salvar_resumo(resumo)
                 st.success("Resumo gerado e salvo com sucesso!")
@@ -518,6 +504,7 @@ with st.sidebar:
         0.01,
         key="limiar_memoria_longa",
     )
+
     if st.button("💾 Salvar última resposta como memória"):
         ultimo_assist = ""
         for m in reversed(st.session_state.get("session_msgs", [])):
@@ -533,12 +520,11 @@ with st.sidebar:
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
 
-    st.caption("Role a tela principal para ver interações anteriores.")
+    st.caption("Trocar de provedor/modelo não apaga o histórico salvo — apenas a renderização atual.")
 
-
-# =============================================================================
-# EXIBIR HISTÓRICO RECENTE (da planilha, não some ao trocar modelo)
-# =============================================================================
+# -----------------------------------------------------------------------------
+# EXIBIR HISTÓRICO RECENTE
+# -----------------------------------------------------------------------------
 with st.container():
     interacoes = carregar_interacoes(n=20)
     for r in interacoes:
@@ -551,59 +537,26 @@ with st.container():
             with st.chat_message("assistant"):
                 st.markdown(content)
 
-# --- Resumo depois das interações ---
-st.markdown("---")
-st.subheader("🧠 Último resumo salvo")
-st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
+# (AGORA) Exibir o resumo salvo — APÓS as interações
+if st.session_state.get("resumo_capitulo"):
+    with st.chat_message("assistant"):
+        st.markdown("#### 📖 Último resumo salvo")
+        st.info(st.session_state.resumo_capitulo)
 
-
-
-# =============================================================================
-# Helpers de mensagens e persistência
-# =============================================================================
-def _build_messages(prompt_system: str):
-    """System PT-BR + System prompt + histórico local desta sessão."""
-    suppress_think_ptbr = {
-        "role": "system",
-        "content": (
-            "Responda exclusivamente em português do Brasil. "
-            "Nunca inclua rascunhos de raciocínio nem use as tags <think>...</think>. "
-            "Forneça apenas a resposta final ao leitor, no tom narrativo solicitado."
-        ),
-    }
-    historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
-                 for m in st.session_state.session_msgs]
-    return [suppress_think_ptbr, {"role": "system", "content": prompt_system}] + historico
-
-
-def _persist_assistant_reply(texto: str):
-    """Salva a resposta do assistente na planilha e no histórico local, se houver conteúdo."""
-    if not isinstance(texto, str):
-        return
-    texto = texto.strip()
-    if not texto or texto in ("[ERRO]", "[ERRO STREAM]", "[Sem conteúdo]"):
-        return
-    try:
-        salvar_interacao("assistant", texto)
-    except Exception as e:
-        st.error(f"Falha ao salvar resposta na planilha: {e}")
-    st.session_state.session_msgs.append({"role": "assistant", "content": texto})
-
-
-# =============================================================================
-# ENVIO DO USUÁRIO + INFERÊNCIA (Stream + fallback non-stream)
-# =============================================================================
+# -----------------------------------------------------------------------------
+# ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together) com anti-<think>
+# -----------------------------------------------------------------------------
 entrada = st.chat_input("Digite sua direção de cena...")
 if entrada:
-    # Salva e adiciona ao histórico local
+    # salva e mostra a fala do usuário
     salvar_interacao("user", entrada)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # Monta mensagens
+    # prompt + histórico
     prompt = construir_prompt_com_narrador()
-    messages = _build_messages(prompt)
+    historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
+                 for m in st.session_state.session_msgs]
 
-    # Roteamento
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
@@ -614,77 +567,108 @@ if entrada:
         auth = st.secrets["OPENROUTER_API_KEY"]
         model_to_call = st.session_state.modelo_escolhido_id
 
-    # Alguns modelos (ex.: perplexity r1-1776) não fazem stream bem: force non-stream
-    NON_STREAM_MODELS = {"perplexity-ai/r1-1776"}
-    use_stream = (model_to_call not in NON_STREAM_MODELS)
+    # System pt-BR e anti-think
+    system_guard = {
+        "role": "system",
+        "content": (
+            "Responda exclusivamente em português do Brasil. "
+            "Nunca inclua rascunhos de raciocínio nem use as tags <think>…</think>. "
+            "Forneça apenas a resposta final ao leitor, no tom narrativo solicitado."
+        ),
+    }
+    messages = [system_guard, {"role": "system", "content": prompt}] + historico
 
     payload = {
         "model": model_to_call,
         "messages": messages,
         "max_tokens": 900,
         "temperature": 0.85,
-        "stream": use_stream,
+        "stream": True,
     }
-    # Ajuda extra: Together – cortar <think>
+    # Ajuda extra: Together corta quando encontra o stop
     if prov == "Together":
         payload["stop"] = ["</think>"]
 
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
+    # Streaming com filtro de <think>
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
         last_update = time.time()
+        in_think = False
+        pending = ""
 
         try:
-            with requests.post(endpoint, headers=headers, json=payload, stream=use_stream, timeout=300) as r:
+            with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
                 if r.status_code != 200:
                     st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
-                    resposta_txt = "[ERRO]"
+                    resposta_txt = ""
                 else:
-                    if use_stream:
-                        # === STREAMING ===
-                        for raw in r.iter_lines(decode_unicode=False):
-                            if not raw:
-                                continue
-                            line = raw.decode("utf-8", errors="ignore").strip()
-                            if not line.startswith("data:"):
-                                continue
-                            data = line[5:].strip()
-                            if data == "[DONE]":
-                                break
-                            try:
-                                j = json.loads(data)
-                                delta = j["choices"][0]["delta"].get("content", "")
-                                if delta:
-                                    resposta_txt += delta
-                                    if time.time() - last_update > 0.10:
-                                        placeholder.markdown(resposta_txt + "▌")
-                                        last_update = time.time()
-                            except Exception:
-                                continue
-                    else:
-                        # === NON-STREAM (ex.: Perplexity R1) ===
-                        jr = r.json()
-                        content = ""
+                    for raw in r.iter_lines(decode_unicode=False):
+                        if not raw:
+                            continue
+                        line = raw.decode("utf-8", errors="ignore").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
                         try:
-                            content = jr["choices"][0]["message"]["content"]
+                            j = json.loads(data)
+                            delta = j["choices"][0]["delta"].get("content", "")
+                            if not delta:
+                                continue
+
+                            # filtra <think>…</think> (mesmo quebrado)
+                            chunk = pending + delta
+                            pending = ""
+
+                            out_chars = []
+                            i = 0
+                            while i < len(chunk):
+                                if not in_think and chunk[i:i+7].lower() == "<think>":
+                                    in_think = True
+                                    i += 7
+                                    continue
+                                if in_think:
+                                    if chunk[i:i+8].lower() == "</think>":
+                                        in_think = False
+                                        i += 8
+                                        continue
+                                    i += 1
+                                    continue
+                                out_chars.append(chunk[i])
+                                i += 1
+
+                            tail = "".join(out_chars)
+
+                            # protege fronteiras de tags quebradas
+                            for marker in ("<think>", "</think>"):
+                                cut = marker[:-1]
+                                if tail.endswith(cut):
+                                    pending = tail[-len(cut):]
+                                    tail = tail[:-len(cut)]
+                                    break
+
+                            if tail:
+                                resposta_txt += tail
+                                if time.time() - last_update > 0.10:
+                                    placeholder.markdown(resposta_txt + "▌")
+                                    last_update = time.time()
                         except Exception:
-                            content = jr.get("output_text") or ""
-                        resposta_txt = (content or "").strip()
-
+                            continue
         except Exception as e:
-            st.error(f"Erro na requisição: {e}")
-            resposta_txt = "[ERRO]"
+            st.error(f"Erro no streaming: {e}")
+            resposta_txt = ""
 
-        # flush final
-        placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+        # flush parcial
+        placeholder.markdown(resposta_txt or "…")
 
-        # Validação sintática + tentativa de regeneração se necessário
-        if resposta_txt and resposta_txt not in ("[ERRO]", "[ERRO STREAM]") and not resposta_valida(resposta_txt):
-            st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
+        # Se veio vazio ou muito curto, tenta fallback NÃO-stream
+        def _non_stream_completion():
             try:
-                regen = requests.post(
+                r2 = requests.post(
                     endpoint,
                     headers=headers,
                     json={
@@ -693,47 +677,55 @@ if entrada:
                         "max_tokens": 900,
                         "temperature": 0.85,
                         "stream": False,
+                        "stop": ["</think>"] if prov == "Together" else None,
                     },
                     timeout=180,
                 )
-                if regen.status_code == 200:
-                    jr2 = regen.json()
-                    novo = ""
-                    try:
-                        novo = jr2["choices"][0]["message"]["content"]
-                    except Exception:
-                        novo = jr2.get("output_text") or ""
-                    if novo:
-                        resposta_txt = novo.strip()
-                        placeholder.markdown(resposta_txt)
+                if r2.status_code == 200:
+                    txt = r2.json()["choices"][0]["message"]["content"].strip()
+                    # limpa <think> se vier em resposta não-stream
+                    txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL).strip()
+                    return txt
                 else:
-                    st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
+                    st.error(f"Fallback non-stream falhou: {r2.status_code} - {r2.text}")
+                    return ""
             except Exception as e:
-                st.error(f"Erro ao regenerar: {e}")
+                st.error(f"Erro no fallback non-stream: {e}")
+                return ""
 
-        # Validação semântica (user vs resposta)
-        if len(st.session_state.session_msgs) >= 1 and resposta_txt and resposta_txt not in ("[ERRO]", "[ERRO STREAM]"):
-            texto_anterior = st.session_state.session_msgs[-1]["content"]
+        if not resposta_txt or resposta_txt.strip() == "":
+            resposta_txt = _non_stream_completion()
+            placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+
+        # Validação sintática
+        if not resposta_valida(resposta_txt):
+            st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
+            regen_txt = _non_stream_completion()
+            if regen_txt:
+                resposta_txt = regen_txt
+                placeholder.markdown(resposta_txt)
+
+        # Validação semântica (OpenAI embeddings): última entrada do user vs resposta
+        if len(st.session_state.session_msgs) >= 1 and resposta_txt:
+            texto_anterior = st.session_state.session_msgs[-1]["content"]  # última entrada do user
             alerta = verificar_quebra_semantica_openai(texto_anterior, resposta_txt)
             if alerta:
                 st.info(alerta)
 
-        # Persistência garantida da resposta do assistente
-        _persist_assistant_reply(resposta_txt)
+        # Salva resposta
+        salvar_interacao("assistant", resposta_txt)
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt})
 
-        # Reforço de memórias (opcional)
+        # Reforço de memórias relevantes
         try:
-            if resposta_txt and resposta_txt not in ("[ERRO]", "[ERRO STREAM]"):
-                usados = []
-                topk_usadas = memoria_longa_buscar_topk(
-                    query_text=resposta_txt,
-                    k=int(st.session_state.k_memoria_longa),
-                    limiar=float(st.session_state.limiar_memoria_longa),
-                )
-                for t, _sc, _sim, _rr in topk_usadas:
-                    usados.append(t)
-                memoria_longa_reforcar(usados)
+            usados = []
+            topk_usadas = memoria_longa_buscar_topk(
+                query_text=resposta_txt,
+                k=int(st.session_state.k_memoria_longa),
+                limiar=float(st.session_state.limiar_memoria_longa),
+            )
+            for t, _sc, _sim, _rr in topk_usadas:
+                usados.append(t)
+            memoria_longa_reforcar(usados)
         except Exception:
             pass
-
-
