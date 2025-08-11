@@ -291,10 +291,13 @@ def construir_prompt_com_narrador():
     except Exception:
         texto_ultimas = ""
 
-    regra_intimo = (
-        "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
-        if st.session_state.get("bloqueio_intimo", False) else ""
-    )
+    emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
+
+regra_intimo = (
+    "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
+    if st.session_state.get("app_bloqueio_intimo", False) else ""
+)
+
 
     prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
 
@@ -419,9 +422,30 @@ with col1:
     st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
 with col2:
     st.markdown("#### ⚙️ Opções")
-    # Esses widgets escrevem no session_state pelas keys, sem atribuição direta
-    st.checkbox("Bloquear avanços íntimos sem ordem", value=False, key="bloqueio_intimo")
-    st.selectbox("🎭 Emoção oculta", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0, key="emocao_oculta")
+
+    # defaults do estado lógico (NÃO são usados como keys de widget)
+    if "app_bloqueio_intimo" not in st.session_state:
+        st.session_state.app_bloqueio_intimo = False
+    if "app_emocao_oculta" not in st.session_state:
+        st.session_state.app_emocao_oculta = "nenhuma"
+
+    # widgets com keys distintas (prefixo ui_)
+    st.checkbox(
+        "Bloquear avanços íntimos sem ordem",
+        value=st.session_state.app_bloqueio_intimo,
+        key="ui_bloqueio_intimo",
+    )
+    st.selectbox(
+        "🎭 Emoção oculta",
+        ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
+        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
+        key="ui_app_emocao_oculta",
+    )
+
+    # espelha valores de UI → estado lógico (prefixo app_)
+    st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloqueio_intimo", False)
+    st.session_state.app_emocao_oculta   = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
+
 
 # -----------------------------------------------------------------------------
 # Sidebar – Provedor, modelos, resumo e memória longa
@@ -704,7 +728,7 @@ if entrada:
 # -----------------------------------------------------------------------------
 def construir_prompt_com_narrador():
     mem_mary, mem_janio, mem_all = carregar_memorias()
-    emocao = st.session_state.get("emocao_oculta", "nenhuma")
+    emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
     resumo = st.session_state.get("resumo_capitulo", "")
 
     # últimas 15 interações (texto plano para contexto)
@@ -718,7 +742,7 @@ def construir_prompt_com_narrador():
 
         regra_intimo = (
             "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
-            if st.session_state.get("bloqueio_intimo", False) else ""
+            if st.session_state.get("app_bloqueio_intimo", False) else ""
         )
 
     prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
@@ -849,27 +873,27 @@ with col2:
     st.markdown("#### ⚙️ Opções")
 
     # defaults seguros antes de renderizar widgets
-    if "bloqueio_intimo" not in st.session_state:
-        st.session_state.bloqueio_intimo = False
-    if "emocao_oculta" not in st.session_state:
-        st.session_state.emocao_oculta = "nenhuma"
+    if "app_bloqueio_intimo" not in st.session_state:
+        st.session_state.app_bloqueio_intimo = False
+    if "app_emocao_oculta" not in st.session_state:
+        st.session_state.app_emocao_oculta = "nenhuma"
 
     # use uma KEY só para o widget e espelhe no estado lógico
     st.checkbox(
         "Bloquear avanços íntimos sem ordem",
-        value=st.session_state.bloqueio_intimo,
-        key="bloqueio_intimo_ui",
+        value=st.session_state.app_bloqueio_intimo,
+        key="app_bloqueio_intimo_ui",
     )
     st.selectbox(
         "🎭 Emoção oculta",
         ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
-        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.emocao_oculta),
-        key="emocao_oculta_ui",
+        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
+        key="app_emocao_oculta_ui",
     )
 
     # espelha valores das keys de UI para as flags que o app usa
-    st.session_state.bloqueio_intimo = st.session_state.get("bloqueio_intimo_ui", False)
-    st.session_state.emocao_oculta = st.session_state.get("emocao_oculta_ui", "nenhuma")
+    st.session_state.app_bloqueio_intimo = st.session_state.get("app_bloqueio_intimo_ui", False)
+    st.session_state.app_emocao_oculta = st.session_state.get("app_emocao_oculta_ui", "nenhuma")
 
 
 # -----------------------------------------------------------------------------
@@ -1092,6 +1116,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
