@@ -439,10 +439,13 @@ with col1:
     st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
 with col2:
     st.markdown("#### ⚙️ Opções")
-    st.session_state.bloqueio_intimo = st.checkbox("Bloquear avanços íntimos sem ordem", value=False)
-    st.session_state.emocao_oculta = st.selectbox("🎭 Emoção oculta", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0)
+    # Esses widgets escrevem no session_state pelas keys, sem atribuição direta
+    st.checkbox("Bloquear avanços íntimos sem ordem", value=False, key="bloqueio_intimo")
+    st.selectbox("🎭 Emoção oculta", ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"], index=0, key="emocao_oculta")
 
+# -----------------------------------------------------------------------------
 # Sidebar – Provedor, modelos, resumo e memória longa
+# -----------------------------------------------------------------------------
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
 
@@ -451,7 +454,8 @@ with st.sidebar:
 
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
-    st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui  # p/ uso na chamada
+    # guarda o ID escolhido para uso na chamada de inferência
+    st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
 
     st.markdown("---")
     if st.button("📝 Gerar resumo do capítulo"):
@@ -463,6 +467,7 @@ with st.sidebar:
                 + texto + "\n\nResumo:"
             )
 
+            # Ajusta o ID somente se for Together
             model_id_call = model_id_for_together(modelo_escolhido_id_ui) if provedor == "Together" else modelo_escolhido_id_ui
 
             r = requests.post(
@@ -488,22 +493,27 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### 🗃️ Memória Longa")
-    # antes de renderizar o checkbox, garanta um default:
-if "use_memoria_longa" not in st.session_state:
-    st.session_state.use_memoria_longa = True  # ou False, como preferir
 
-# renderiza o widget e deixa o Streamlit cuidar do session_state
-st.checkbox(
-    "Usar memória longa no prompt",
-    value=st.session_state.use_memoria_longa,
-    key="use_memoria_longa",
-)
-
-# se precisar do valor na mesma execução:
-use_memoria_longa = st.session_state.use_memoria_longa
-
-    st.session_state.k_memoria_longa = st.slider("Top-K memórias", 1, 5, st.session_state.k_memoria_longa, 1, key="k_memoria_longa")
-    st.session_state.limiar_memoria_longa = st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.limiar_memoria_longa), 0.01, key="limiar_memoria_longa")
+    # Widgets controlam o session_state pelas keys (sem atribuição direta)
+    st.checkbox(
+        "Usar memória longa no prompt",
+        value=st.session_state.get("use_memoria_longa", True),
+        key="use_memoria_longa",
+    )
+    st.slider(
+        "Top-K memórias",
+        1, 5,
+        st.session_state.get("k_memoria_longa", 3),
+        1,
+        key="k_memoria_longa",
+    )
+    st.slider(
+        "Limiar de similaridade",
+        0.50, 0.95,
+        float(st.session_state.get("limiar_memoria_longa", 0.78)),
+        0.01,
+        key="limiar_memoria_longa",
+    )
 
     if st.button("💾 Salvar última resposta como memória"):
         ultimo_assist = ""
@@ -515,6 +525,8 @@ use_memoria_longa = st.session_state.use_memoria_longa
             ok = memoria_longa_salvar(ultimo_assist, tags="auto")
             if ok:
                 st.success("Memória de longo prazo salva!")
+            else:
+                st.error("Falha ao salvar memória de longo prazo.")
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
 
@@ -651,4 +663,5 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
