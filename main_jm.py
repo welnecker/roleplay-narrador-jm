@@ -343,6 +343,7 @@ MODELOS_OPENROUTER = {
 MODELOS_TOGETHER_UI = {
     "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "👑 perplexity-ai (Together)": "perplexity-ai/r1-1776",
 }
 def model_id_for_together(api_ui_model_id: str) -> str:
     # Corrige para os IDs aceitos pela Together API
@@ -688,3 +689,4 @@ if entrada:
 
         # Atualiza estado da cena
         atualizar_scene_state_via_llm(resposta_txt)
+
