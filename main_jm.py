@@ -32,6 +32,7 @@ client_openai = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 def conectar_planilha():
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
+        # Corrige quebra da private_key
         creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
         scope = [
             "https://spreadsheets.google.com/feeds",
@@ -39,7 +40,7 @@ def conectar_planilha():
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # troque a key se necessário
+        # Troque a KEY abaixo pela sua key da planilha, se necessário
         return client.open_by_key("1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM")
     except Exception as e:
         st.error(f"Erro ao conectar à planilha: {e}")
@@ -234,7 +235,8 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
             continue
         sim = float(np.dot(q, vec) / (np.linalg.norm(q) * np.linalg.norm(vec)))
         if sim >= limiar:
-            rr = 0.7 * sim + 0.3 * score  # re-ranking
+            # re-ranking: 0.7*sim + 0.3*score
+            rr = 0.7 * sim + 0.3 * score
             candidatos.append((texto, score, sim, rr))
 
     candidatos.sort(key=lambda x: x[3], reverse=True)
@@ -291,6 +293,116 @@ def memoria_longa_decadencia(fator: float = 0.97):
 
 
 # -----------------------------------------------------------------------------
+# CASTIDADE DE MARY (flags + filtro)
+# -----------------------------------------------------------------------------
+# Defaults de estado
+if "mary_casta" not in st.session_state:
+    st.session_state.mary_casta = True
+if "mary_destino" not in st.session_state:
+    st.session_state.mary_destino = "Jânio"
+if "mary_liberada" not in st.session_state:
+    st.session_state.mary_liberada = False
+
+def aplicar_filtro_castidade_mary(texto: str) -> str:
+    """Enquanto Mary estiver casta (por vontade própria), suaviza/corta sexo explícito envolvendo Mary."""
+    if not (st.session_state.get("mary_casta", True) and not st.session_state.get("mary_liberada", False)):
+        return texto
+
+    padroes = [
+        r"\btrans(ar|ou|ando)\b", r"\bcom(er|eu|endo)\b", r"\bpenetra(ção|r|ndo)\b",
+        r"\bmet(eu|endo)\b", r"\bgoz(ar|ou|ando)\b", r"\bsexo\b", r"\bfazer amor\b",
+        r"\b(tirar|tirou|retirou) (a )?roupa\b", r"\bnua\b", r"\bnu\b"
+    ]
+    if any(re.search(p, texto, flags=re.IGNORECASE) for p in padroes):
+        limite = (
+            "\n\nMary respirou fundo e sorriu com carinho, mas firme: "
+            "\"Eu quero esperar. Beijos, carinho… e só. É a minha escolha.\""
+        )
+        return re.sub(r"\s+$", "", texto) + limite
+    return texto
+
+
+# -----------------------------------------------------------------------------
+# PROMPT
+# -----------------------------------------------------------------------------
+def construir_prompt_com_narrador():
+    mem_mary, mem_janio, mem_all = carregar_memorias()
+    emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
+    resumo = st.session_state.get("resumo_capitulo", "")
+
+    # últimas 15 interações (texto plano para contexto)
+    try:
+        aba = planilha.worksheet("interacoes_jm")
+        registros = aba.get_all_records()
+        ultimas = registros[-15:] if len(registros) > 15 else registros
+        texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
+    except Exception:
+        texto_ultimas = ""
+
+    regra_intimo = (
+        "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
+        if st.session_state.get("app_bloqueio_intimo", False) else ""
+    )
+
+    prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
+
+Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.{regra_intimo}
+
+🎭 Emoção oculta da cena: {emocao}
+
+📖 Capítulo anterior:
+{(resumo or 'Nenhum resumo salvo.')}
+
+### 🧠 Memórias:
+Mary:
+- {("\n- ".join(mem_mary)) if mem_mary else 'Nenhuma.'}
+
+Jânio:
+- {("\n- ".join(mem_janio)) if mem_janio else 'Nenhuma.'}
+
+Compartilhadas:
+- {("\n- ".join(mem_all)) if mem_all else 'Nenhuma.'}
+
+### 📖 Últimas interações:
+{texto_ultimas}"""
+
+    # Memórias longas relevantes (Top-K)
+    if st.session_state.get("use_memoria_longa", True):
+        try:
+            ultima_entrada = ""
+            if st.session_state.get("session_msgs"):
+                for m in reversed(st.session_state.session_msgs):
+                    if m.get("role") == "user":
+                        ultima_entrada = m.get("content", "")
+                        break
+            query = (resumo or "") + "\n" + (ultima_entrada or "")
+
+            k = int(st.session_state.get("k_memoria_longa", 3))
+            limiar = float(st.session_state.get("limiar_memoria_longa", 0.78))
+            topk = memoria_longa_buscar_topk(query_text=query, k=k, limiar=limiar)
+            if topk:
+                linhas = [f"- {t}" for (t, _sc, _sim, _rr) in topk]
+                prompt += "\n\n### 🗃️ Memórias de longo prazo relevantes\n" + "\n".join(linhas)
+        except Exception:
+            pass
+
+    # Regra de castidade de Mary (vontade própria)
+    if st.session_state.get("mary_casta", True) and not st.session_state.get("mary_liberada", False):
+        destino = st.session_state.get("mary_destino", "Jânio")
+        prompt += f"""
+
+### 💍 Regra pessoal de Mary (respeitar sempre)
+- Mary é casta por vontade própria.
+- Ela não faz sexo com ninguém até decidir estar oficialmente com {destino}.
+- Pode haver afeto, beijos e clima — mas Mary impõe limites claros, sem avançar para atos sexuais.
+- Quando pressionada, Mary recusa com firmeza e elegância, preservando sua agência:
+  Ex.: "Eu quero respeitar meu tempo. Beijos… e só hoje."
+"""
+
+    return prompt.strip()
+
+
+# -----------------------------------------------------------------------------
 # PROVEDORES E MODELOS
 # -----------------------------------------------------------------------------
 MODELOS_OPENROUTER = {
@@ -320,12 +432,12 @@ MODELOS_TOGETHER_UI = {
 }
 
 def model_id_for_together(api_ui_model_id: str) -> str:
-    # conserta o ID do Qwen 480B pro formato aceito
+    """Conserta ID do Together p/ endpoint oficial quando necessário."""
     if "Qwen3-Coder-480B-A35B-Instruct-FP8" in api_ui_model_id:
         return "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
     if api_ui_model_id.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
         return "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    # perplexity-ai/r1-1776 e demais permanecem
+    # outros modelos (ex.: perplexity-ai/r1-1776) ficam como estão
     return api_ui_model_id
 
 
@@ -342,84 +454,6 @@ def api_config_for_provider(provider: str):
             st.secrets["TOGETHER_API_KEY"],
             MODELOS_TOGETHER_UI,
         )
-
-
-# -----------------------------------------------------------------------------
-# PROMPT
-# -----------------------------------------------------------------------------
-def construir_prompt_com_narrador():
-    mem_mary, mem_janio, mem_all = carregar_memorias()
-    resumo = st.session_state.get("resumo_capitulo", "")
-
-    # últimas 15 interações (texto plano para contexto)
-    try:
-        aba = planilha.worksheet("interacoes_jm")
-        registros = aba.get_all_records()
-        ultimas = registros[-15:] if len(registros) > 15 else registros
-        texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
-    except Exception:
-        texto_ultimas = ""
-
-    emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
-
-    regra_intimo = (
-        "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
-        if st.session_state.get("app_bloqueio_intimo", False) else ""
-    )
-
-    # Regra 1: preservar virgindade (se ligado)
-    regra_virgindade = ""
-    if st.session_state.get("app_preservar_virgindade", True):
-        regra_virgindade = (
-            "\n💠 Mary é virgem e deve permanecer assim. "
-            "Não deve consentir ou realizar atos sexuais que impliquem penetração. "
-            "Se a cena for para esse caminho, redirecione com elegância (carinho, conversa, limites claros) "
-            "e encerre antes de qualquer ato explícito."
-        )
-
-    prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
-
-Sua função é narrar cenas com naturalidade e profundidade. Use narração em 3ª pessoa e falas/pensamentos dos personagens em 1ª pessoa.{regra_intimo}{regra_virgindade}
-
-🎭 Emoção oculta da cena: {emocao}
-
-📖 Capítulo anterior:
-{(resumo or 'Nenhum resumo salvo.')}
-
-### 🧠 Memórias:
-Mary:
-- {("\n- ".join(mem_mary)) if mem_mary else 'Nenhuma.'}
-
-Jânio:
-- {("\n- ".join(mem_janio)) if mem_janio else 'Nenhuma.'}
-
-Compartilhadas:
-- {("\n- ".join(mem_all)) if mem_all else 'Nenhuma.'}
-
-### 📖 Últimas interações:
-{texto_ultimas}"""
-
-    # Memórias longas relevantes (Top-K) — opcional
-    if st.session_state.get("use_memoria_longa", True):
-        try:
-            ultima_entrada = ""
-            if st.session_state.get("session_msgs"):
-                for m in reversed(st.session_state.session_msgs):
-                    if m.get("role") == "user":
-                        ultima_entrada = m.get("content", "")
-                        break
-            query = (resumo or "") + "\n" + (ultima_entrada or "")
-
-            k = int(st.session_state.get("k_memoria_longa", 3))
-            limiar = float(st.session_state.get("limiar_memoria_longa", 0.78))
-            topk = memoria_longa_buscar_topk(query_text=query, k=k, limiar=limiar)
-            if topk:
-                linhas = [f"- {t}" for (t, _sc, _sim, _rr) in topk]
-                prompt += "\n\n### 🗃️ Memórias de longo prazo relevantes\n" + "\n".join(linhas)
-        except Exception:
-            pass
-
-    return prompt.strip()
 
 
 # -----------------------------------------------------------------------------
@@ -440,25 +474,20 @@ if "k_memoria_longa" not in st.session_state:
     st.session_state.k_memoria_longa = 3
 if "limiar_memoria_longa" not in st.session_state:
     st.session_state.limiar_memoria_longa = 0.78
-# flags UI lógicas
+# flags UI principais
 if "app_bloqueio_intimo" not in st.session_state:
     st.session_state.app_bloqueio_intimo = False
 if "app_emocao_oculta" not in st.session_state:
     st.session_state.app_emocao_oculta = "nenhuma"
-if "app_preservar_virgindade" not in st.session_state:
-    st.session_state.app_preservar_virgindade = True
-if "app_permitir_think" not in st.session_state:
-    st.session_state.app_permitir_think = True  # útil para perplexity
+# controle anti-<think> (permitir por padrão para Perplexity)
+if "permitir_think" not in st.session_state:
+    st.session_state.permitir_think = True
 
 # Linha de opções rápidas
 col1, col2 = st.columns([3, 2])
 with col1:
-    st.markdown("#### 📖 Último resumo salvo:")
-    st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
-with col2:
     st.markdown("#### ⚙️ Opções")
-
-    # widgets com keys dedicadas
+    # widgets com keys distintas (prefixo ui_)
     st.checkbox(
         "Bloquear avanços íntimos sem ordem",
         value=st.session_state.app_bloqueio_intimo,
@@ -468,24 +497,39 @@ with col2:
         "🎭 Emoção oculta",
         ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
         index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
-        key="ui_emocao_oculta",
+        key="ui_app_emocao_oculta",
     )
     st.checkbox(
-        "Preservar virgindade da Mary",
-        value=st.session_state.app_preservar_virgindade,
-        key="ui_preservar_virgindade",
-    )
-    st.checkbox(
-        "Permitir raciocínio visível (<think>)",
-        value=st.session_state.app_permitir_think,
+        "Permitir bloco <think> do modelo (útil para Perplexity)",
+        value=st.session_state.permitir_think,
         key="ui_permitir_think",
     )
-
-    # espelha os valores de UI para as flags de app
+    # espelha valores UI → estado lógico
     st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloqueio_intimo", False)
-    st.session_state.app_emocao_oculta = st.session_state.get("ui_emocao_oculta", "nenhuma")
-    st.session_state.app_preservar_virgindade = st.session_state.get("ui_preservar_virgindade", True)
-    st.session_state.app_permitir_think = st.session_state.get("ui_permitir_think", True)
+    st.session_state.app_emocao_oculta   = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
+    st.session_state.permitir_think      = st.session_state.get("ui_permitir_think", True)
+
+with col2:
+    st.markdown("#### 💍 Castidade de Mary")
+    st.checkbox(
+        "Manter Mary casta até o encontro com o destino",
+        value=st.session_state.mary_casta,
+        key="ui_mary_casta",
+    )
+    st.text_input(
+        "Parceiro-destino de Mary",
+        value=st.session_state.mary_destino,
+        key="ui_mary_destino",
+    )
+    st.checkbox(
+        "Liberar Mary para relações agora (quando fizer sentido)",
+        value=st.session_state.mary_liberada,
+        key="ui_mary_liberada",
+    )
+    # espelha UI → estado
+    st.session_state.mary_casta    = st.session_state.get("ui_mary_casta", True)
+    st.session_state.mary_destino  = st.session_state.get("ui_mary_destino", "Jânio")
+    st.session_state.mary_liberada = st.session_state.get("ui_mary_liberada", False)
 
 
 # -----------------------------------------------------------------------------
@@ -499,6 +543,7 @@ with st.sidebar:
 
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
+    # guarda o ID escolhido para uso na chamada de inferência
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
 
     st.markdown("---")
@@ -511,6 +556,7 @@ with st.sidebar:
                 + texto + "\n\nResumo:"
             )
 
+            # Ajusta o ID somente se for Together
             model_id_call = model_id_for_together(modelo_escolhido_id_ui) if provedor == "Together" else modelo_escolhido_id_ui
 
             r = requests.post(
@@ -537,6 +583,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 🗃️ Memória Longa")
 
+    # Widgets controlam o session_state pelas keys (sem atribuição direta)
     st.checkbox(
         "Usar memória longa no prompt",
         value=st.session_state.get("use_memoria_longa", True),
@@ -572,11 +619,9 @@ with st.sidebar:
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
 
-    st.caption("Role a tela principal para ver interações anteriores.")
-
 
 # -----------------------------------------------------------------------------
-# EXIBIR HISTÓRICO RECENTE (interações primeiro)
+# EXIBIR HISTÓRICO RECENTE (antes) + RESUMO (depois)
 # -----------------------------------------------------------------------------
 with st.container():
     interacoes = carregar_interacoes(n=20)
@@ -590,20 +635,21 @@ with st.container():
             with st.chat_message("assistant"):
                 st.markdown(content)
 
-# Resumo depois das interações (para situar ao reiniciar)
-if st.session_state.get("resumo_capitulo"):
-    with st.chat_message("assistant"):
-        st.markdown(f"### 🧠 *Capítulo anterior...*\n\n> {st.session_state.resumo_capitulo}")
+st.divider()
+st.markdown("#### 📖 Capítulo anterior (resumo salvo)")
+st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
 
 
 # -----------------------------------------------------------------------------
-# ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together, com opção de <think>)
+# ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together, anti-<think> opcional)
 # -----------------------------------------------------------------------------
 entrada = st.chat_input("Digite sua direção de cena...")
 if entrada:
+    # salva e mostra a fala do usuário
     salvar_interacao("user", entrada)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
+    # prompt + histórico
     prompt = construir_prompt_com_narrador()
     historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
                  for m in st.session_state.session_msgs]
@@ -618,38 +664,47 @@ if entrada:
         auth = st.secrets["OPENROUTER_API_KEY"]
         model_to_call = st.session_state.modelo_escolhido_id
 
-    # System extra: PT-BR + controle do <think>
-    sys_parts = ["Responda em português do Brasil."]
-    if not st.session_state.get("app_permitir_think", True):
-        sys_parts.append("Nunca inclua rascunhos de raciocínio nem use as tags <think>...</think>.")
-    system_guard = {"role": "system", "content": " ".join(sys_parts)}
-
-    messages = [system_guard, {"role": "system", "content": prompt}] + historico
+    # Mensagens: opcionalmente suprime <think>
+    messages = [{"role": "system", "content": prompt}] + historico
+    if not st.session_state.get("permitir_think", True):
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Responda exclusivamente em português do Brasil. "
+                    "Nunca inclua rascunhos de raciocínio nem use as tags <think>...</think>. "
+                    "Forneça apenas a resposta final ao leitor, no tom narrativo solicitado."
+                ),
+            }
+        ] + messages
 
     payload = {
         "model": model_to_call,
         "messages": messages,
-        "max_tokens": 1000,
+        "max_tokens": 900,
         "temperature": 0.85,
         "stream": True,
     }
-    # se bloquear <think>, ajuda extra para Together
-    if prov == "Together" and not st.session_state.get("app_permitir_think", True):
+    # Se bloquear <think>, dá um stop para cortar fechamento de tag
+    if (prov == "Together") and (not st.session_state.get("permitir_think", True)):
         payload["stop"] = ["</think>"]
 
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
+    # Streaming estilo “digitação”; opcional filtro de <think>
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
         last_update = time.time()
         in_think = False
         pending = ""
+        filtrar_think = not st.session_state.get("permitir_think", True)
 
         try:
             with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
                 if r.status_code != 200:
                     st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+                    resposta_txt = "[ERRO STREAM]"
                 else:
                     for raw in r.iter_lines(decode_unicode=False):
                         if not raw:
@@ -666,11 +721,9 @@ if entrada:
                             if not delta:
                                 continue
 
-                            chunk = pending + delta
-                            pending = ""
-
-                            # opcionalmente filtra <think>
-                            if not st.session_state.get("app_permitir_think", True):
+                            if filtrar_think:
+                                chunk = pending + delta
+                                pending = ""
                                 out_chars = []
                                 i = 0
                                 while i < len(chunk):
@@ -688,52 +741,37 @@ if entrada:
                                     out_chars.append(chunk[i])
                                     i += 1
                                 tail = "".join(out_chars)
+                                # protege fronteiras
                                 for marker in ("<think>", "</think>"):
                                     cut = marker[:-1]
                                     if tail.endswith(cut):
                                         pending = tail[-len(cut):]
                                         tail = tail[:-len(cut)]
                                         break
+                                if tail:
+                                    resposta_txt += tail
                             else:
-                                tail = chunk
+                                resposta_txt += delta
 
-                            if tail:
-                                resposta_txt += tail
-                                if time.time() - last_update > 0.10:
-                                    placeholder.markdown(resposta_txt + "▌")
-                                    last_update = time.time()
+                            # “digitação” suave
+                            if time.time() - last_update > 0.10:
+                                placeholder.markdown((resposta_txt or "").rstrip() + "▌")
+                                last_update = time.time()
                         except Exception:
                             continue
         except Exception as e:
             st.error(f"Erro no streaming: {e}")
+            resposta_txt = "[Erro ao gerar resposta]"
 
-        # flush final + fallback se vazio
-        if not resposta_txt:
-            # tenta uma chamada sem stream
-            try:
-                non_stream = requests.post(
-                    endpoint,
-                    headers=headers,
-                    json={
-                        "model": model_to_call,
-                        "messages": messages,
-                        "max_tokens": 1000,
-                        "temperature": 0.85,
-                        "stream": False,
-                    },
-                    timeout=180,
-                )
-                if non_stream.status_code == 200:
-                    resposta_txt = non_stream.json()["choices"][0]["message"]["content"].strip()
-                else:
-                    st.error(f"Falha no fallback: {non_stream.status_code} - {non_stream.text}")
-            except Exception as e:
-                st.error(f"Erro no fallback: {e}")
+        # aplica filtro de castidade
+        if resposta_txt and resposta_txt != "[ERRO STREAM]":
+            resposta_txt = aplicar_filtro_castidade_mary(resposta_txt)
 
+        # flush final visível
         placeholder.markdown(resposta_txt or "[Sem conteúdo]")
 
         # Validação sintática
-        if resposta_txt and not resposta_valida(resposta_txt):
+        if not resposta_valida(resposta_txt):
             st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
             try:
                 regen = requests.post(
@@ -742,7 +780,7 @@ if entrada:
                     json={
                         "model": model_to_call,
                         "messages": messages,
-                        "max_tokens": 1000,
+                        "max_tokens": 900,
                         "temperature": 0.85,
                         "stream": False,
                     },
@@ -750,32 +788,33 @@ if entrada:
                 )
                 if regen.status_code == 200:
                     resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
-                    placeholder.markdown(resposta_txt)
+                    # aplica filtro novamente após regen
+                    resposta_txt = aplicar_filtro_castidade_mary(resposta_txt)
+                    placeholder.markdown(resposta_txt or "[Sem conteúdo]")
                 else:
                     st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
             except Exception as e:
                 st.error(f"Erro ao regenerar: {e}")
 
         # Validação semântica (com OpenAI embeddings), compara última entrada do user vs resposta
-        if len(st.session_state.session_msgs) >= 1 and resposta_txt:
+        if len(st.session_state.session_msgs) >= 1 and resposta_txt and resposta_txt != "[ERRO STREAM]":
             texto_anterior = st.session_state.session_msgs[-1]["content"]  # última entrada do user
             alerta = verificar_quebra_semantica_openai(texto_anterior, resposta_txt)
             if alerta:
                 st.info(alerta)
 
         # Salva resposta + reforça memórias relevantes
-        if resposta_txt:
-            salvar_interacao("assistant", resposta_txt)
-            st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt})
-            try:
-                usados = []
-                topk_usadas = memoria_longa_buscar_topk(
-                    query_text=resposta_txt,
-                    k=int(st.session_state.k_memoria_longa),
-                    limiar=float(st.session_state.limiar_memoria_longa),
-                )
-                for t, _sc, _sim, _rr in topk_usadas:
-                    usados.append(t)
-                memoria_longa_reforcar(usados)
-            except Exception:
-                pass
+        salvar_interacao("assistant", resposta_txt or "")
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt or ""})
+        try:
+            usados = []
+            topk_usadas = memoria_longa_buscar_topk(
+                query_text=resposta_txt or "",
+                k=int(st.session_state.k_memoria_longa),
+                limiar=float(st.session_state.limiar_memoria_longa),
+            )
+            for t, _sc, _sim, _rr in topk_usadas:
+                usados.append(t)
+            memoria_longa_reforcar(usados)
+        except Exception:
+            pass
