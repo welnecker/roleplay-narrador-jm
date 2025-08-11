@@ -387,6 +387,7 @@ MODELOS_OPENROUTER = {
 MODELOS_TOGETHER_UI = {
     "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "👑 perplexity-ai_r1-1776 (Together)": "perplexity-ai/r1-1776",
 }
 
 # Conserta ID do Together p/ endpoint oficial
@@ -663,5 +664,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
