@@ -608,19 +608,57 @@ if pending_id and pending_id != processed_id:
 
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
-    # === Streaming (mantém seu código atual) ===
     with st.chat_message("assistant"):
-        placeholder = st.empty()
-        resposta_txt = ""
+    placeholder = st.empty()
+    resposta_txt = ""
+
+    # --- helper: detecta texto cortado no meio
+    def _provavel_corte(texto: str) -> bool:
+        if not texto or len(texto) < 80:
+            return False
+        fim = texto.strip()[-1:]
+        # termina sem pontuação forte e sem fechamento de aspas/parênteses?
+        if fim not in ".!?…»”\"'）)]}":
+            return True
+        # termina com aspas ou travessão “abertos”?
+        aberto = sum(1 for c in texto if c in ['“','"','«','(']) > \
+                 sum(1 for c in texto if c in ['”','"','»',')'])
+        return aberto
+
+    # --- define se vamos usar stream (nunca para reasoning tipo r1)
+    def _is_reasoning_model(mid: str) -> bool:
+        mid_l = (mid or "").lower()
+        return any(tok in mid_l for tok in [
+            "perplexity-ai/r1-1776", "deepseek-r1", "r1-0528", "r1t2", "r1-distill"
+        ])
+
+    use_stream = not _is_reasoning_model(model_to_call)
+
+    # Mensagens já montadas antes: `messages` (inclui system anti-<think> + system prompt + histórico)
+    # OBS: para não-stream NÃO passaremos `stop`, pra evitar corte precoce
+    base_payload = {
+        "model": model_to_call,
+        "messages": messages,
+        "max_tokens": 1400 if not use_stream else 900,
+        "temperature": 0.75 if not use_stream else 0.85,
+        "top_p": 0.9,
+        "stream": use_stream,
+        # "repetition_penalty": 1.05,   # opcional: Together aceita
+    }
+    headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
+
+    if use_stream:
+        # ===== CAMINHO STREAMING (mantém seu filtro <think>) =====
         last_update = time.time()
         in_think = False
         pending = ""
-
         try:
+            payload = dict(base_payload)
+            # aqui tudo ok manter stop pra cortar vazamentos em stream
+            payload["stop"] = ["</think>"]
             with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
                 if r.status_code != 200:
                     st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
-                    resposta_txt = ""
                 else:
                     for raw in r.iter_lines(decode_unicode=False):
                         if not raw:
@@ -636,19 +674,16 @@ if pending_id and pending_id != processed_id:
                             delta = j["choices"][0]["delta"].get("content", "")
                             if not delta:
                                 continue
-
-                            # filtro <think> (se usar models reasoning)
+                            # filtro <think>
                             chunk = pending + delta
                             pending = ""
                             out_chars, i = [], 0
                             while i < len(chunk):
                                 if not in_think and chunk[i:i+7].lower() == "<think>":
-                                    in_think = True
-                                    i += 7; continue
+                                    in_think = True; i += 7; continue
                                 if in_think:
                                     if chunk[i:i+8].lower() == "</think>":
-                                        in_think = False
-                                        i += 8; continue
+                                        in_think = False; i += 8; continue
                                     i += 1; continue
                                 out_chars.append(chunk[i]); i += 1
                             tail = "".join(out_chars)
@@ -658,53 +693,87 @@ if pending_id and pending_id != processed_id:
                                     pending = tail[-len(cut):]
                                     tail = tail[:-len(cut)]
                                     break
-
                             if tail:
                                 resposta_txt += tail
                                 if time.time() - last_update > 0.10:
-                                    placeholder.markdown(resposta_txt + "▌")
-                                    last_update = time.time()
+                                    placeholder.markdown(resposta_txt + "▌"); last_update = time.time()
                         except Exception:
                             continue
         except Exception as e:
             st.error(f"Erro no streaming: {e}")
-            resposta_txt = ""
+    else:
+        # ===== CAMINHO NÃO-STREAM (preferível p/ perplexity-ai/r1-1776) =====
+        try:
+            payload = dict(base_payload)   # sem stop aqui
+            r = requests.post(endpoint, headers=headers, json=payload, timeout=300)
+            if r.status_code != 200:
+                st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+            else:
+                try:
+                    resposta_txt = r.json()["choices"][0]["message"]["content"] or ""
+                except Exception:
+                    resposta_txt = ""
+                # limpa qualquer <think> residual, sem mexer no resto
+                resposta_txt = re.sub(r"(?is)<think>.*?</think>", "", resposta_txt).strip()
 
-        # flush final
-        placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+                # --- continuação automática se cortou no meio ---
+                if _provavel_corte(resposta_txt):
+                    cauda = resposta_txt[-600:]  # dá contexto suficiente
+                    mensagens_continuacao = messages + [
+                        {"role": "assistant", "content": resposta_txt},
+                        {"role": "user",
+                         "content": ("Continue exatamente do ponto onde parou, sem repetir frases anteriores. "
+                                     "Mantenha o tom e finalize a cena com coerência. "
+                                     f"Referência de retomada: «{cauda}»")}
+                    ]
+                    payload_cont = {
+                        "model": model_to_call,
+                        "messages": mensagens_continuacao,
+                        "max_tokens": 800,
+                        "temperature": 0.7,
+                        "top_p": 0.9,
+                        "stream": False,
+                    }
+                    r2 = requests.post(endpoint, headers=headers, json=payload_cont, timeout=300)
+                    if r2.status_code == 200:
+                        extra = r2.json()["choices"][0]["message"]["content"] or ""
+                        extra = re.sub(r"(?is)<think>.*?</think>", "", extra).strip()
+                        # evita duplicação: se a continuação repetir começo, recorta
+                        if extra and resposta_txt and extra.startswith(resposta_txt[-200:]):
+                            extra = extra[len(resposta_txt[-200:]):].lstrip()
+                        resposta_txt = (resposta_txt + ("\n\n" if extra else "") + extra).strip()
+        except Exception as e:
+            st.error(f"Erro na chamada sem stream: {e}")
 
-        # Fallback vazio / corrompido (mantém seu fluxo atual)
-        if not resposta_txt.strip():
-            st.warning("⚠️ Resposta vazia detectada. Tentando regenerar...")
-            try:
-                regen = requests.post(
-                    endpoint, headers=headers,
-                    json={"model": model_to_call, "messages": messages, "max_tokens": 900, "temperature": 0.85, "stream": False},
-                    timeout=180,
-                )
-                if regen.status_code == 200:
-                    resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
-                    resposta_txt = re.sub(r"(?is)<think>.*?</think>", "", resposta_txt).strip()
-                    placeholder.markdown(resposta_txt or "[Sem conteúdo]")
-                else:
-                    st.error(f"Fallback sem stream falhou: {regen.status_code} - {regen.text}")
-            except Exception as e:
-                st.error(f"Erro no fallback sem stream: {e}")
-        elif not resposta_valida(resposta_txt):
-            st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
-            try:
-                regen = requests.post(
-                    endpoint, headers=headers,
-                    json={"model": model_to_call, "messages": messages, "max_tokens": 900, "temperature": 0.85, "stream": False},
-                    timeout=180,
-                )
-                if regen.status_code == 200:
-                    resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
-                    placeholder.markdown(resposta_txt or "[Sem conteúdo]")
-                else:
-                    st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
-            except Exception as e:
-                st.error(f"Erro ao regenerar: {e}")
+    # flush final
+    placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+
+    # --- sua validação sintática / regen (mantém)
+    if not resposta_valida(resposta_txt):
+        st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
+        try:
+            regen = requests.post(
+                endpoint,
+                headers=headers,
+                json={
+                    "model": model_to_call,
+                    "messages": messages,
+                    "max_tokens": 1200,
+                    "temperature": 0.75,
+                    "top_p": 0.9,
+                    "stream": False,
+                },
+                timeout=180,
+            )
+            if regen.status_code == 200:
+                resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
+                resposta_txt = re.sub(r"(?is)<think>.*?</think>", "", resposta_txt).strip()
+                placeholder.markdown(resposta_txt)
+            else:
+                st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
+        except Exception as e:
+            st.error(f"Erro ao regenerar: {e}")
+
 
         # checagem semântica + persistência
         if len(st.session_state.session_msgs) >= 1 and resposta_txt:
@@ -729,4 +798,5 @@ if pending_id and pending_id != processed_id:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
