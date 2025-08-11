@@ -542,151 +542,191 @@ with st.container():
             with st.chat_message("assistant"):
                 st.markdown(content)
 
-# =============================================================================
-# ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together, PT-BR e anti-<think>)
-# =============================================================================
+# ============================
+# ENVIO DO USUÁRIO (à prova de rerun)
+# ============================
+
+# 1) Captura o submit do chat_input e grava como "pendente"
 entrada = st.chat_input("Digite sua direção de cena...")
 if entrada:
+    # gere um id único para esta submissão
+    st.session_state.pending_user_msg = entrada
+    st.session_state.pending_id = time.time_ns()
+
+# 2) Só processa se houver pendente E ainda não foi processado
+pending_id   = st.session_state.get("pending_id")
+processed_id = st.session_state.get("processed_id")
+
+if pending_id and pending_id != processed_id:
+    # consome a pendência
+    user_text = st.session_state.get("pending_user_msg", "").strip()
+    # marque como processado ANTES de chamar a API (evita duplicar mesmo se houver erro)
+    st.session_state.processed_id = pending_id
+    st.session_state.pending_user_msg = ""
+    # --- daqui pra baixo é igual ao seu fluxo atual ---
+
     # salva e mostra a fala do usuário
-    salvar_interacao("user", entrada)
-    st.session_state.session_msgs.append({"role": "user", "content": entrada})
+    salvar_interacao("user", user_text)
+    st.session_state.session_msgs.append({"role": "user", "content": user_text})
 
     # prompt + histórico
-prompt = construir_prompt_com_narrador()
-historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
-             for m in st.session_state.session_msgs]
+    prompt = construir_prompt_com_narrador()
+    historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
+                 for m in st.session_state.session_msgs]
 
-# IMPORTANTe: defina 'messages' e re-use em payload e fallback
-messages = [{"role": "system", "content": prompt}] + historico
+    # (opcional) system extra para PT-BR + escondendo <think> em reasoning models
+    suppress_think_ptbr = {
+        "role": "system",
+        "content": (
+            "Responda exclusivamente em português do Brasil. "
+            "Nunca inclua rascunhos de raciocínio nem use as tags <think>...</think>. "
+            "Forneça apenas a resposta final ao leitor, no tom narrativo solicitado."
+        ),
+    }
+    messages = [suppress_think_ptbr, {"role": "system", "content": prompt}] + historico
 
-prov = st.session_state.get("provedor_ia", "OpenRouter")
-if prov == "Together":
-    endpoint = "https://api.together.xyz/v1/chat/completions"
-    auth = st.secrets["TOGETHER_API_KEY"]
-    model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
-else:
-    endpoint = "https://openrouter.ai/api/v1/chat/completions"
-    auth = st.secrets["OPENROUTER_API_KEY"]
-    model_to_call = st.session_state.modelo_escolhido_id
+    # roteamento de provedor
+    prov = st.session_state.get("provedor_ia", "OpenRouter")
+    if prov == "Together":
+        endpoint = "https://api.together.xyz/v1/chat/completions"
+        auth = st.secrets["TOGETHER_API_KEY"]
+        model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
+    else:
+        endpoint = "https://openrouter.ai/api/v1/chat/completions"
+        auth = st.secrets["OPENROUTER_API_KEY"]
+        model_to_call = st.session_state.modelo_escolhido_id
 
-payload = {
-    "model": model_to_call,
-    "messages": messages,
-    "max_tokens": 900,
-    "temperature": 0.85,
-    "stream": True,
-}
-headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
+    payload = {
+        "model": model_to_call,
+        "messages": messages,
+        "max_tokens": 900,
+        "temperature": 0.85,
+        "stream": True,
+    }
+    if prov == "Together":
+        payload["stop"] = ["</think>"]  # corta derrames de tag
 
-# Streaming + flush + fallbacks — tudo no MESMO escopo do placeholder
-with st.chat_message("assistant"):
-    placeholder = st.empty()
-    resposta_txt = ""
-    last_update = time.time()
+    headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
-    try:
-        with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
-            if r.status_code != 200:
-                st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
-                resposta_txt = ""
-            else:
-                for raw in r.iter_lines(decode_unicode=False):
-                    if not raw:
-                        continue
-                    line = raw.decode("utf-8", errors="ignore").strip()
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        j = json.loads(data)
-                        delta = j["choices"][0]["delta"].get("content", "")
-                        if delta:
-                            resposta_txt += delta
-                            if time.time() - last_update > 0.10:
-                                placeholder.markdown(resposta_txt + "▌")
-                                last_update = time.time()
-                    except Exception:
-                        continue
-    except Exception as e:
-        st.error(f"Erro no streaming: {e}")
+    # === Streaming (mantém seu código atual) ===
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
         resposta_txt = ""
+        last_update = time.time()
+        in_think = False
+        pending = ""
 
-    # ---- FLUSH FINAL ----
-    placeholder.markdown(resposta_txt or "[Sem conteúdo]")
-
-    # ---- FALLBACK 1: resposta vazia (comum em modelos reasoning) ----
-    if not resposta_txt.strip():
-        st.warning("⚠️ Resposta vazia detectada. Tentando regenerar...")
         try:
-            regen = requests.post(
-                endpoint,
-                headers=headers,
-                json={
-                    "model": model_to_call,
-                    "messages": messages,
-                    "max_tokens": 900,
-                    "temperature": 0.85,
-                    "stream": False,
-                },
-                timeout=180,
-            )
-            if regen.status_code == 200:
-                resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
-                # se vier um <think> no payload não-stream, retire
-                resposta_txt = re.sub(r"(?is)<think>.*?</think>", "", resposta_txt).strip()
-                placeholder.markdown(resposta_txt or "[Sem conteúdo]")
-            else:
-                st.error(f"Fallback sem stream falhou: {regen.status_code} - {regen.text}")
-        except Exception as e:
-            st.error(f"Erro no fallback sem stream: {e}")
+            with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
+                if r.status_code != 200:
+                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+                    resposta_txt = ""
+                else:
+                    for raw in r.iter_lines(decode_unicode=False):
+                        if not raw:
+                            continue
+                        line = raw.decode("utf-8", errors="ignore").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            j = json.loads(data)
+                            delta = j["choices"][0]["delta"].get("content", "")
+                            if not delta:
+                                continue
 
-    # ---- FALLBACK 2: validação sintática (conteúdo corrompido) ----
-    elif not resposta_valida(resposta_txt):
-        st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
+                            # filtro <think> (se usar models reasoning)
+                            chunk = pending + delta
+                            pending = ""
+                            out_chars, i = [], 0
+                            while i < len(chunk):
+                                if not in_think and chunk[i:i+7].lower() == "<think>":
+                                    in_think = True
+                                    i += 7; continue
+                                if in_think:
+                                    if chunk[i:i+8].lower() == "</think>":
+                                        in_think = False
+                                        i += 8; continue
+                                    i += 1; continue
+                                out_chars.append(chunk[i]); i += 1
+                            tail = "".join(out_chars)
+                            for marker in ("<think>", "</think>"):
+                                cut = marker[:-1]
+                                if tail.endswith(cut):
+                                    pending = tail[-len(cut):]
+                                    tail = tail[:-len(cut)]
+                                    break
+
+                            if tail:
+                                resposta_txt += tail
+                                if time.time() - last_update > 0.10:
+                                    placeholder.markdown(resposta_txt + "▌")
+                                    last_update = time.time()
+                        except Exception:
+                            continue
+        except Exception as e:
+            st.error(f"Erro no streaming: {e}")
+            resposta_txt = ""
+
+        # flush final
+        placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+
+        # Fallback vazio / corrompido (mantém seu fluxo atual)
+        if not resposta_txt.strip():
+            st.warning("⚠️ Resposta vazia detectada. Tentando regenerar...")
+            try:
+                regen = requests.post(
+                    endpoint, headers=headers,
+                    json={"model": model_to_call, "messages": messages, "max_tokens": 900, "temperature": 0.85, "stream": False},
+                    timeout=180,
+                )
+                if regen.status_code == 200:
+                    resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
+                    resposta_txt = re.sub(r"(?is)<think>.*?</think>", "", resposta_txt).strip()
+                    placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+                else:
+                    st.error(f"Fallback sem stream falhou: {regen.status_code} - {regen.text}")
+            except Exception as e:
+                st.error(f"Erro no fallback sem stream: {e}")
+        elif not resposta_valida(resposta_txt):
+            st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
+            try:
+                regen = requests.post(
+                    endpoint, headers=headers,
+                    json={"model": model_to_call, "messages": messages, "max_tokens": 900, "temperature": 0.85, "stream": False},
+                    timeout=180,
+                )
+                if regen.status_code == 200:
+                    resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
+                    placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+                else:
+                    st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
+            except Exception as e:
+                st.error(f"Erro ao regenerar: {e}")
+
+        # checagem semântica + persistência
+        if len(st.session_state.session_msgs) >= 1 and resposta_txt:
+            texto_anterior = st.session_state.session_msgs[-1]["content"]
+            alerta = verificar_quebra_semantica_openai(texto_anterior, resposta_txt)
+            if alerta:
+                st.info(alerta)
+
+        salvar_interacao("assistant", resposta_txt or "[Sem conteúdo]")
+        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt or "[Sem conteúdo]"})
+
+        # reforço memória longa
         try:
-            regen = requests.post(
-                endpoint,
-                headers=headers,
-                json={
-                    "model": model_to_call,
-                    "messages": messages,
-                    "max_tokens": 900,
-                    "temperature": 0.85,
-                    "stream": False,
-                },
-                timeout=180,
+            usados = []
+            topk_usadas = memoria_longa_buscar_topk(
+                query_text=resposta_txt,
+                k=int(st.session_state.k_memoria_longa),
+                limiar=float(st.session_state.limiar_memoria_longa),
             )
-            if regen.status_code == 200:
-                resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
-                placeholder.markdown(resposta_txt or "[Sem conteúdo]")
-            else:
-                st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
-        except Exception as e:
-            st.error(f"Erro ao regenerar: {e}")
-
-    # ---- Checagem semântica e persistência ----
-    if len(st.session_state.session_msgs) >= 1 and resposta_txt:
-        texto_anterior = st.session_state.session_msgs[-1]["content"]
-        alerta = verificar_quebra_semantica_openai(texto_anterior, resposta_txt)
-        if alerta:
-            st.info(alerta)
-
-    salvar_interacao("assistant", resposta_txt or "[Sem conteúdo]")
-    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt or "[Sem conteúdo]"})
-
-    try:
-        usados = []
-        topk_usadas = memoria_longa_buscar_topk(
-            query_text=resposta_txt,
-            k=int(st.session_state.k_memoria_longa),
-            limiar=float(st.session_state.limiar_memoria_longa),
-        )
-        for t, _sc, _sim, _rr in topk_usadas:
-            usados.append(t)
-        memoria_longa_reforcar(usados)
-    except Exception:
-        pass
-
+            for t, _sc, _sim, _rr in topk_usadas:
+                usados.append(t)
+            memoria_longa_reforcar(usados)
+        except Exception:
+            pass
 
