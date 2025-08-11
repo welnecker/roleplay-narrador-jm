@@ -609,7 +609,7 @@ if pending_id and pending_id != processed_id:
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
     with st.chat_message("assistant"):
-    placeholder = st.empty()
+        placeholder = st.empty()
     resposta_txt = ""
 
     # --- helper: detecta texto cortado no meio
@@ -798,5 +798,6 @@ if pending_id and pending_id != processed_id:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
