@@ -51,25 +51,42 @@ planilha = conectar_planilha()
 # -----------------------------------------------------------------------------
 # UTILIDADES DE PLANILHA (memórias/interações/resumo)
 # -----------------------------------------------------------------------------
-def carregar_memorias():
-    """Lê a aba 'memorias_jm' e retorna (mem_mary, mem_janio, mem_all)."""
+def carregar_memorias_brutas():
+    """Lê 'memorias_jm' e devolve um dict {tag_lower: [linhas]}."""
     try:
         aba = planilha.worksheet("memorias_jm")
-        registros = aba.get_all_records()
-        mem_mary = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[mary]"]
-        mem_janio = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() in ("[jânio]", "[janio]")]
-        mem_all = [r["conteudo"] for r in registros if r.get("tipo", "").strip().lower() == "[all]"]
-        return mem_mary, mem_janio, mem_all
+        regs = aba.get_all_records()
+        buckets = {}
+        for r in regs:
+            tag = (r.get("tipo","") or "").strip().lower()
+            txt = (r.get("conteudo","") or "").strip()
+            if tag and txt:
+                buckets.setdefault(tag, []).append(txt)
+        return buckets
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
-        return [], [], []
+        return {}
+
+def persona_block(nome: str, buckets: dict, max_linhas: int = 8) -> str:
+    """Monta bloco compacto da persona (ordena por prefixos úteis)."""
+    tag = f"[{nome}]"
+    linhas = buckets.get(tag, [])
+    ordem = ["OBJ:", "TAT:", "LV:", "VOZ:", "BIO:", "ROTINA:", "LACOS:", "APS:", "CONFLITOS:"]
+    def peso(l):
+        up = l.upper()
+        for i, p in enumerate(ordem):
+            if up.startswith(p):
+                return i
+        return len(ordem)
+    linhas_ordenadas = sorted(linhas, key=peso)[:max_linhas]
+    titulo = "Jânio" if nome in ("janio","jânio") else "Mary" if nome=="mary" else nome.capitalize()
+    return f"{titulo}:\n- " + "\n- ".join(linhas_ordenadas) if linhas_ordenadas else ""
 
 def carregar_resumo_salvo():
     """Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo)."""
     try:
         aba = planilha.worksheet("perfil_jm")
-        registros = aba.get_all_records()  # respeita nomes do cabeçalho
-        # pega o último registro cujo 'resumo' não está vazio
+        registros = aba.get_all_records()
         for r in reversed(registros):
             txt = (r.get("resumo") or "").strip()
             if txt:
@@ -88,13 +105,14 @@ def salvar_resumo(resumo: str):
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
 
-
 def salvar_interacao(role: str, content: str):
     """Anexa uma interação na aba 'interacoes_jm'."""
     if not planilha:
         return
     try:
         aba = planilha.worksheet("interacoes_jm")
+        timestamp = datetime.now().strftime("%Y-%-%m-%d %H:%M:%S").replace("%-", "%")  # compat fix
+        # corrigir caso %-% no Windows: garantimos formatação segura
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         aba.append_row([timestamp, role.strip(), content.strip()], value_input_option="RAW")
     except Exception as e:
@@ -186,6 +204,16 @@ def memoria_longa_salvar(texto: str, tags: str = "") -> bool:
         st.error(f"Erro ao salvar memória longa: {e}")
         return False
 
+def memoria_longa_listar_registros():
+    """Retorna todos os registros da aba memoria_longa_jm (ou [])."""
+    aba = _sheet_ensure_memoria_longa()
+    if not aba:
+        return []
+    try:
+        return aba.get_all_records()
+    except Exception:
+        return []
+
 def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78):
     """Retorna top-K memórias (texto, score, sim, rr) com base no embedding do query_text."""
     aba = _sheet_ensure_memoria_longa()
@@ -201,8 +229,8 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
         return []
     candidatos = []
     for row in dados:
-        texto = row.get("texto", "").strip()
-        emb_s = row.get("embedding", "")
+        texto = (row.get("texto") or "").strip()
+        emb_s = (row.get("embedding") or "").strip()
         try:
             score = float(row.get("score", 1.0) or 1.0)
         except Exception:
@@ -234,7 +262,7 @@ def memoria_longa_reforcar(textos_usados: list):
         for i, linha in enumerate(dados[1:], start=2):
             if len(linha) <= max(idx_texto, idx_score):
                 continue
-            t = linha[idx_texto].strip()
+            t = (linha[idx_texto] or "").strip()
             if t in textos_usados:
                 try:
                     sc = float(linha[idx_score] or 1.0)
@@ -267,9 +295,8 @@ def memoria_longa_decadencia(fator: float = 0.97):
         pass
 
 
-
 # -----------------------------------------------------------------------------
-# HELPERS – histórico fundido (Sheets + sessão) e listagem de memória longa
+# HELPERS – histórico fundido (Sheets + sessão)
 # -----------------------------------------------------------------------------
 def construir_ultimas_interacoes_fundidas(n_sheet: int = 15) -> str:
     """
@@ -284,18 +311,15 @@ def construir_ultimas_interacoes_fundidas(n_sheet: int = 15) -> str:
     except Exception:
         sheet_regs = []
 
-    # Sessão atual -> padroniza para {role, content}
     sess = [{"role": m.get("role", "user"), "content": m.get("content", "")}
             for m in st.session_state.get("session_msgs", [])]
 
-    # Concatena mantendo ordem: Sheets (mais antigos) -> Sessão (mais recentes)
     combinados = []
     for r in sheet_regs:
         combinados.append({"role": r.get("role", "user"), "content": r.get("content", "")})
     for r in sess:
         combinados.append({"role": r.get("role", "user"), "content": r.get("content", "")})
 
-    # Dedup por par (role, content) preservando a primeira ocorrência
     vistos = set()
     resultado = []
     for r in combinados:
@@ -309,26 +333,90 @@ def construir_ultimas_interacoes_fundidas(n_sheet: int = 15) -> str:
     return "\n".join(resultado)
 
 
-def memoria_longa_listar_registros():
-    """Retorna todos os registros da aba memoria_longa_jm (ou [])."""
-    aba = _sheet_ensure_memoria_longa()
-    if not aba:
-        return []
-    try:
-        return aba.get_all_records()
-    except Exception:
-        return []
+# -----------------------------------------------------------------------------
+# RADAR DE CONTEXTO (off-screen) — opcional, enxuto
+# -----------------------------------------------------------------------------
+def radar_contexto(max_itens=3):
+    """
+    Puxa eventos recentes relevantes para Mary/Janio na memoria_longa_jm
+    (sem inflar o prompt). Use tags tipo [mary][relacao][evento], [janio][agenda].
+    """
+    linhas = []
+    for who, tag in (("mary", "[mary]"), ("janio", "[janio]")):
+        top = memoria_longa_buscar_topk(query_text=who, k=3, limiar=0.70)
+        preferidas = [t for (t, _sc, _sim, _rr) in top
+                      if any(k in (t or "").lower() for k in ["namoro", "discutiu", "marcou", "ensaio", "decidiu", "agenda", "show", "letra"])]
+        if preferidas:
+            resumo = preferidas[0]
+            titulo = "Mary" if who=="mary" else "Jânio"
+            linhas.append(f"- {titulo}: {resumo}")
+    return "### 📡 Radar de contexto (off-screen)\n" + "\n".join(linhas[:max_itens]) if linhas else ""
 
 
 # -----------------------------------------------------------------------------
-# REGRAS DE CENA (castidade de Mary / liberdade do Jânio)
+# ROMANCE MANUAL: Fases Mary & Jânio (0–4) + persistência via memória longa
+# -----------------------------------------------------------------------------
+FASES_ROMANCE = {
+    0: {"nome": "Estranhos",
+        "permitidos": "olhares; near-miss (mesmo café/rua/ônibus); detalhe do ambiente",
+        "proibidos":  "troca de nomes; toques; conversa pessoal"},
+    1: {"nome": "Percepção",
+        "permitidos": "cumprimento neutro; pergunta impessoal curta",
+        "proibidos":  "contato físico; confidências"},
+    2: {"nome": "Conhecidos",
+        "permitidos": "troca de nomes; pequena ajuda (porta/caneta/horário); 1 pergunta pessoal leve",
+        "proibidos":  "toque prolongado; encontro a sós planejado"},
+    3: {"nome": "Amizade",
+        "permitidos": "conversa de 10–20 min; caminhar juntos em local público; troca de contatos; 1 gesto de afeto leve (mão/ombro) com consentimento",
+        "proibidos":  "beijos; carícias intimistas"},
+    4: {"nome": "Confiança / Quase",
+        "permitidos": "confidências; abraço com consentimento expresso; marcar encontro futuro claro",
+        "proibidos":  "sexo; sexo oral/manual; pressa ou “provas de amor” físicas"},
+}
+
+FLAG_FASE_TXT_PREFIX = "FLAG: mj_fase="
+
+def _fase_label(n: int) -> str:
+    f = FASES_ROMANCE.get(int(n), FASES_ROMANCE[0])
+    return f"{int(n)} — {f['nome']}"
+
+def mj_carregar_fase_inicial() -> int:
+    if "mj_fase" in st.session_state:
+        return int(st.session_state.mj_fase)
+    try:
+        aba = _sheet_ensure_memoria_longa()
+        if aba:
+            regs = aba.get_all_records()
+            for r in reversed(regs):
+                t = (r.get("texto") or "").strip()
+                if t.startswith(FLAG_FASE_TXT_PREFIX):
+                    n = int(t.split("=")[1])
+                    st.session_state.mj_fase = n
+                    return n
+    except Exception:
+        pass
+    st.session_state.mj_fase = 0
+    return 0
+
+def mj_set_fase(n: int, persist: bool = True):
+    n = max(0, min(4, int(n)))
+    st.session_state.mj_fase = n
+    if persist:
+        try:
+            memoria_longa_salvar(f"{FLAG_FASE_TXT_PREFIX}{n}", tags="[flag]")
+        except Exception:
+            pass
+
+
+# -----------------------------------------------------------------------------
+# REGRAS DE CENA (foco em Mary & Jânio; castidade e consentimento)
 # -----------------------------------------------------------------------------
 def inserir_regras_mary_e_janio(prompt_base: str) -> str:
     regras = """
 ⚖️ Regras imutáveis de coerência:
 - Mary é virgem e decidiu permanecer casta até seu encontro definitivo com Jânio. Ela pode beijar, sentir desejo, mas NÃO cede a atos sexuais (sem penetração, sexo oral). Se pressionada, impõe limites com firmeza e elegância.
-- Jânio é livre para ter encontros íntimos com outras personagens.
-- Qualquer violação dessas regras deve ser evitada na narrativa.
+- Jânio não pressiona; respeita limites e prioriza o vínculo. 
+- Sem sexo explícito. Priorize emoção, escolha e consequência.
 """
     return prompt_base + "\n" + regras.strip()
 
@@ -337,18 +425,24 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 # PROMPT
 # -----------------------------------------------------------------------------
 def construir_prompt_com_narrador():
-    mem_mary, mem_janio, mem_all = carregar_memorias()
+    buckets = carregar_memorias_brutas()
+    mem_all = buckets.get("[all]", [])
+
     emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
     resumo = st.session_state.get("resumo_capitulo", "")
 
-    # HISTÓRICO FUNDIDO (Sheets + sessão), com N ajustável na sidebar
+    # HISTÓRICO FUNDIDO (Sheets + sessão), com N ajustável
     n_sheet = int(st.session_state.get("n_sheet_prompt", 15))
     texto_ultimas = construir_ultimas_interacoes_fundidas(n_sheet=n_sheet)
 
     regra_intimo = (
-        "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
+        "\n⛔ Jamais antecipe cenas íntimas sem ordem explícita do roteirista."
         if st.session_state.get("app_bloqueio_intimo", False) else ""
     )
+
+    # Dossiê dos protagonistas (só Mary & Jânio)
+    pb_mary  = persona_block("mary",  buckets, max_linhas=8)
+    pb_janio = persona_block("janio", buckets, max_linhas=8)
 
     prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
 
@@ -359,28 +453,26 @@ Sua função é narrar cenas com naturalidade e profundidade. Use narração em 
 📖 Capítulo anterior:
 {(resumo or 'Nenhum resumo salvo.')}
 
-### 🧠 Memórias canônicas:
-Mary:
-- {('\n- '.join(mem_mary)) if mem_mary else 'Nenhuma.'}
+### 🧠 Dossiê dos protagonistas
+{pb_mary or 'Mary: (sem dados)'}
+ 
+{pb_janio or 'Jânio: (sem dados)'}"""
 
-Jânio:
-- {('\n- '.join(mem_janio)) if mem_janio else 'Nenhuma.'}
+    if mem_all:
+        prompt += "\n\n### 🎬 Regras do mundo (ALL)\n- " + "\n- ".join(mem_all[:6])
 
-Compartilhadas:
-- {('\n- '.join(mem_all)) if mem_all else 'Nenhuma.'}
+    # Últimas interações
+    prompt += f"""
 
 ### 📖 Últimas interações (fundidas: Sheets + sessão)
 {texto_ultimas}"""
 
-    # -----------------------
-    # Memória longa relevante
-    # -----------------------
+    # Memória longa relevante + recorrentes
     st.session_state._ml_topk_texts = []
     st.session_state._ml_recorrentes = []
-
     if st.session_state.get("use_memoria_longa", True):
         try:
-            # Query: resumo + última entrada do usuário
+            # Usa resumo + última direção do usuário como query
             ultima_entrada = ""
             if st.session_state.get("session_msgs"):
                 for m in reversed(st.session_state.session_msgs):
@@ -389,16 +481,14 @@ Compartilhadas:
                         break
             query = (resumo or "") + "\n" + (ultima_entrada or "")
 
-            # Busca principal (Top-K por similaridade)
             k = int(st.session_state.get("k_memoria_longa", 3))
             limiar = float(st.session_state.get("limiar_memoria_longa", 0.78))
             topk = memoria_longa_buscar_topk(query_text=query, k=k, limiar=limiar)
 
-            # Busca secundária: memórias recorrentes (score alto), mesmo que a similaridade seja menor
+            # Recorrentes por score
             recorrentes = []
             try:
                 regs = memoria_longa_listar_registros()
-                # Seleciona as de score > 1.5 e que não estão em topk; limita 2
                 ja = {t for (t, _sc, _sim, _rr) in topk}
                 for r in regs:
                     try:
@@ -412,7 +502,6 @@ Compartilhadas:
             except Exception:
                 recorrentes = []
 
-            # Anexa ao prompt
             if topk:
                 linhas = [f"- {t}" for (t, _sc, _sim, _rr) in topk]
                 prompt += "\n\n### 🗃️ Memórias de longo prazo relevantes\n" + "\n".join(linhas)
@@ -422,20 +511,33 @@ Compartilhadas:
                 linhas = [f"- {t} (score {sc:.2f})" for (t, sc) in recorrentes]
                 prompt += "\n\n### ♻️ Memórias recorrentes (alto score)\n" + "\n".join(linhas)
                 st.session_state._ml_recorrentes = [t for (t, _sc) in recorrentes]
-
         except Exception:
             pass
 
-    # Cola narrativa (consistência de tom e comportamento)
-    prompt += """
-    
+    # Radar de contexto off-screen (curtíssimo, 0–3 linhas)
+    radar = radar_contexto()
+    if radar:
+        prompt += "\n\n" + radar
+
+    # Estado/fase manual do romance
+    fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
+    fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
+    prompt += f"""
+
+### ⏱️ Estado do romance (manual)
+- Fase atual: {_fase_label(fase)}
+- Permitidos nesta fase: {fdata['permitidos']}
+- Proibidos nesta fase: {fdata['proibidos']}
+- **Regra por cena:** avance no máximo **um** micro-passo compatível com a fase atual.
+- Se a direção do roteirista pedir além da fase, **negocie** ou **adicie** com elegância (sem travar a cena).
+- Finalize com **microconquista + gancho** (palavra, gesto ou plano marcado), sem sexo explícito.
+
 📌 Regras de continuidade:
 - Mantenha o tom e os comportamentos apresentados nas últimas interações.
-- As personalidades listadas nas memórias são estáveis durante a sessão.
-- Não repita descrições idênticas; evolua reações e interações naturalmente.
+- Não repita descrições idênticas; evolua reações naturalmente.
 - Sempre considere ações e palavras ditas anteriormente para construir a próxima cena.
 """
-    # Regras imutáveis de coerência (Mary/Jânio)
+    # Regras imutáveis (castidade/consentimento)
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt.strip()
 
@@ -473,7 +575,7 @@ def model_id_for_together(api_ui_model_id: str) -> str:
     if "Qwen3-Coder-480B-A35B-Instruct-FP8" in api_ui_model_id:
         return "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
     if api_ui_model_id.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
-        return "mistralai/Mixtral-8x7B-Instruct-V0.1".replace("V0.1","v0.1")  # normaliza
+        return "mistralai/Mixtral-8x7B-Instruct-v0.1".replace("V0.1","v0.1")
     return api_ui_model_id
 
 def api_config_for_provider(provider: str):
@@ -513,6 +615,8 @@ if "app_bloqueio_intimo" not in st.session_state:
     st.session_state.app_bloqueio_intimo = False
 if "app_emocao_oculta" not in st.session_state:
     st.session_state.app_emocao_oculta = "nenhuma"
+if "mj_fase" not in st.session_state:
+    st.session_state.mj_fase = mj_carregar_fase_inicial()
 
 # Linha de opções rápidas
 col1, col2 = st.columns([3, 2])
@@ -537,7 +641,7 @@ with col2:
 
 
 # -----------------------------------------------------------------------------
-# Sidebar – Provedor, modelos, resumo e memória longa
+# Sidebar – Provedor, modelos, resumo, memória longa e ROMANCE MANUAL
 # -----------------------------------------------------------------------------
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
@@ -644,8 +748,31 @@ with st.sidebar:
         key="n_sheet_prompt",
     )
 
-    st.caption("Role a tela principal para ver interações anteriores.")
+    # ---- ROMANCE MANUAL ----
+    st.markdown("---")
+    st.markdown("### 💞 Romance Mary & Jânio (manual)")
+    fase_default = mj_carregar_fase_inicial()
+    fase_escolhida = st.select_slider(
+        "Fase do romance",
+        options=[0,1,2,3,4],
+        value=int(st.session_state.get("mj_fase", fase_default)),
+        format_func=_fase_label,
+        key="ui_mj_fase"
+    )
+    if fase_escolhida != st.session_state.get("mj_fase", fase_default):
+        mj_set_fase(fase_escolhida, persist=True)
 
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("➕ Avançar 1 passo"):
+            mj_set_fase(min(4, int(st.session_state.get("mj_fase", 0)) + 1), persist=True)
+    with col_b:
+        if st.button("↺ Reiniciar (0)"):
+            mj_set_fase(0, persist=True)
+
+    st.caption("Regra: 1 microavanço por cena. A fase só muda quando você decidir.")
+
+    st.caption("Role a tela principal para ver interações anteriores.")
 
 
 # -----------------------------------------------------------------------------
@@ -663,7 +790,7 @@ with st.container():
             with st.chat_message("assistant"):
                 st.markdown(content)
 
-# Resumo no fim da tela (como você pediu)
+# Resumo no fim da tela
 if st.session_state.get("resumo_capitulo"):
     with st.expander("🧠 Resumo do capítulo (mais recente)"):
         st.markdown(st.session_state.resumo_capitulo)
@@ -693,7 +820,6 @@ if entrada:
         auth = st.secrets["OPENROUTER_API_KEY"]
         model_to_call = st.session_state.modelo_escolhido_id
 
-    # System para PT-BR e sem “rascunho” — mas NÃO bloqueia <think> (só não exibe)
     system_pt = {
         "role": "system",
         "content": (
@@ -706,7 +832,7 @@ if entrada:
     payload = {
         "model": model_to_call,
         "messages": messages,
-        "max_tokens": 900,
+        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
         "temperature": 0.9,
         "stream": True,
     }
@@ -718,8 +844,7 @@ if entrada:
         last_update = time.time()
 
         def render_tail(t: str) -> str:
-            # (se quiser ocultar <think>, filtre aqui)
-            return t
+            return t  # se quiser ocultar <think>, filtre aqui
 
         # Reforço antecipado: memórias que ENTRARAM no prompt (topk + recorrentes)
         try:
@@ -733,11 +858,10 @@ if entrada:
             pass
 
         # 1) STREAM
-        stream_ok = False
         try:
-            with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
+            with requests.post(endpoint, headers=headers, json=payload, stream=True,
+                               timeout=int(st.session_state.get("timeout_s", 300))) as r:
                 if r.status_code == 200:
-                    stream_ok = True
                     for raw in r.iter_lines(decode_unicode=False):
                         if not raw:
                             continue
@@ -770,7 +894,7 @@ if entrada:
                 r2 = requests.post(
                     endpoint, headers=headers,
                     json={**payload, "stream": False},
-                    timeout=180
+                    timeout=int(st.session_state.get("timeout_s", 300))
                 )
                 if r2.status_code == 200:
                     resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
@@ -787,11 +911,11 @@ if entrada:
                     json={
                         "model": model_to_call,
                         "messages": [{"role": "system", "content": prompt}] + historico,
-                        "max_tokens": 900,
+                        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
                         "temperature": 0.9,
                         "stream": False,
                     },
-                    timeout=180
+                    timeout=int(st.session_state.get("timeout_s", 300))
                 )
                 if r3.status_code == 200:
                     resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
@@ -804,7 +928,7 @@ if entrada:
         placeholder.markdown(render_tail(resposta_txt) if resposta_txt.strip() else "[Sem conteúdo]")
 
         # Validação sintática + regeneração simples
-        if not resposta_valida(resposta_txt):
+        if resposta_txt.strip() and not resposta_valida(resposta_txt):
             st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
             try:
                 regen = requests.post(
@@ -813,11 +937,11 @@ if entrada:
                     json={
                         "model": model_to_call,
                         "messages": [{"role": "system", "content": prompt}] + historico,
-                        "max_tokens": 900,
+                        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
                         "temperature": 0.9,
                         "stream": False,
                     },
-                    timeout=180,
+                    timeout=int(st.session_state.get("timeout_s", 300)),
                 )
                 if regen.status_code == 200:
                     resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
@@ -851,4 +975,3 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
-
