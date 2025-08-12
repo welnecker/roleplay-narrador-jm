@@ -372,9 +372,11 @@ REGRAS FIXAS:
 - Evite comandos técnicos ([SFX], (cut), etc.).
 """.strip()
 
-# -----------------------------------------------------------------------------
-# PROVEDORES E MODELOS
-# -----------------------------------------------------------------------------
+# ===============
+# MODELOS E CHATS
+# ===============
+
+# Listas completas (como na sua lousa)
 MODELOS_OPENROUTER = {
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
@@ -401,9 +403,14 @@ MODELOS_TOGETHER_UI = {
     "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
 }
 
+# Dicionário unificado esperado pelo resto do app
+MODELOS = {}
+for nome, mid in MODELOS_OPENROUTER.items():
+    MODELOS[nome] = {"prov": "openrouter", "id": mid}
+for nome, mid in MODELOS_TOGETHER_UI.items():
+    MODELOS[nome] = {"prov": "together", "id": mid}
 
-
-def _stream_openrouter(model_id: str, messages, temperature=0.9, max_tokens=900):
+def _stream_openrouter(model_id: str, messages, temperature=0.85, max_tokens=700):(model_id: str, messages, temperature=0.85, max_tokens=700):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
     payload = {
@@ -434,7 +441,7 @@ def _stream_openrouter(model_id: str, messages, temperature=0.9, max_tokens=900)
                 continue
 
 
-def _stream_together(model_id: str, messages, temperature=0.9, max_tokens=900):
+def _stream_together(model_id: str, messages, temperature=0.85, max_tokens=700):
     url = "https://api.together.xyz/v1/chat/completions"
     headers = {"Authorization": f"Bearer {TOGETHER_API_KEY}", "Content-Type": "application/json"}
     payload = {
@@ -446,6 +453,7 @@ def _stream_together(model_id: str, messages, temperature=0.9, max_tokens=900):
     }
     resposta_txt = ""
     with requests.post(url, headers=headers, json=payload, stream=True, timeout=300) as r:
+        # Tratar 400 gracefully
         if r.status_code == 400:
             raise RuntimeError(f"Together 400: {r.text}")
         r.raise_for_status()
@@ -459,7 +467,7 @@ def _stream_together(model_id: str, messages, temperature=0.9, max_tokens=900):
                 try:
                     j = json.loads(data)
                     delta = j["choices"][0]["delta"].get("content", "")
-                    # Perplexity pode enviar <think>…</think>; exibimos integralmente.
+                    # Perplexity pode devolver <think> … </think>. NÃO remova — exiba completo.
                     if delta:
                         resposta_txt += delta
                         yield resposta_txt
@@ -467,18 +475,16 @@ def _stream_together(model_id: str, messages, temperature=0.9, max_tokens=900):
                     continue
 
 
-def gerar_resposta_stream(modelo_cfg: Dict[str, str], historico_msgs: List[Dict[str, str]]):
-    """Injeta memórias longas relevantes e abre stream do provedor."""
+def gerar_resposta(modelo_cfg, historico_msgs):
     prov = modelo_cfg["prov"]
     model_id = modelo_cfg["id"]
 
-    # memoria longa baseada na última fala do usuário
-    ult_user = next((m["content"] for m in reversed(historico_msgs) if m["role"] == "user"), "")
-    topk = memoria_longa_buscar_topk(ult_user, k=st.session_state.get("k_memoria_longa", 3),
-                                     limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)))
-    bloco_mem = ("\n\nMemórias relevantes:\n" + "\n".join(f"- {t}" for (t, _sc, _sim, _rr) in topk)) if topk else ""
+    # Recuperar memórias longas relevantes a partir da última entrada do usuário
+    ultima_usuario = next((m["content"] for m in reversed(historico_msgs) if m["role"] == "user"), "")
+    mem_longas = buscar_memoria_longa(ultima_usuario, k=3, limiar=0.75)
+    bloco_memoria = ("\n\nMemórias relevantes:\n" + "\n".join([f"- {t}" for t in mem_longas])) if mem_longas else ""
 
-    system = {"role": "system", "content": BASE_SYSTEM + bloco_mem}
+    system = {"role": "system", "content": BASE_SYSTEM + bloco_memoria}
     msgs = [system] + historico_msgs
 
     if prov == "openrouter":
@@ -488,106 +494,48 @@ def gerar_resposta_stream(modelo_cfg: Dict[str, str], historico_msgs: List[Dict[
     else:
         raise ValueError("Provedor desconhecido")
 
-# ======================================================================
-# ESTADO INICIAL DA UI
-# ======================================================================
+# ===============
+# STATE INICIAL
+# ===============
 if "hist" not in st.session_state:
-    st.session_state.hist = []  # histórico da sessão atual (mostrado na tela)
+    # hist guarda apenas user/assistant desta sessão (na tela)
+    st.session_state.hist = []
 if "modelo_nome" not in st.session_state:
     st.session_state.modelo_nome = list(MODELOS.keys())[0]
-if "use_memoria_longa" not in st.session_state:
-    st.session_state.use_memoria_longa = True
-if "k_memoria_longa" not in st.session_state:
-    st.session_state.k_memoria_longa = 3
-if "limiar_memoria_longa" not in st.session_state:
-    st.session_state.limiar_memoria_longa = 0.78
-if "app_emocao_oculta" not in st.session_state:
-    st.session_state.app_emocao_oculta = "nenhuma"
-if "app_bloqueio_intimo" not in st.session_state:
-    st.session_state.app_bloqueio_intimo = False
 
-# ======================================================================
-# TOPO DA PÁGINA / INFO RÁPIDA
-# ======================================================================
-col_head = st.container()
-with col_head:
-    st.title("🌹 Mary / 🎸 Jânio — Novela Interativa (JM)")
-    st.caption("Se algo travar, troque de modelo no painel lateral. As memórias longas são salvas com embeddings.")
-
-# ======================================================================
-# LATERAL — Config, modelos, memória longa, resumo
-# ======================================================================
+# ===============
+# UI LATERAL
+# ===============
 with st.sidebar:
-    st.subheader("Configuração")
-    st.session_state.modelo_nome = st.selectbox(
-        "Modelo",
-        list(MODELOS.keys()),
-        index=list(MODELOS.keys()).index(st.session_state.modelo_nome),
-    )
-
-    st.checkbox(
-        "Usar memória longa no prompt",
-        value=st.session_state.use_memoria_longa,
-        key="ui_use_memoria_longa",
-    )
-    st.session_state.use_memoria_longa = st.session_state.get("ui_use_memoria_longa", True)
-
-    st.slider("Top-K memórias", 1, 5, st.session_state.k_memoria_longa, 1, key="ui_k_memoria")
-    st.session_state.k_memoria_longa = st.session_state.get("ui_k_memoria", 3)
-
-    st.slider(
-        "Limiar de similaridade",
-        0.50, 0.95,
-        float(st.session_state.limiar_memoria_longa),
-        0.01,
-        key="ui_limiar_memoria",
-    )
-    st.session_state.limiar_memoria_longa = st.session_state.get("ui_limiar_memoria", 0.78)
+    st.subheader("Config")
+    st.session_state.modelo_nome = st.selectbox("Modelo", list(MODELOS.keys()), index=list(MODELOS.keys()).index(st.session_state.modelo_nome))
+    st.caption("Trocar de modelo NÃO apaga histórico.")
 
     st.markdown("---")
-    st.subheader("Diretrizes de Cena")
-    st.checkbox(
-        "Bloquear avanços íntimos sem ordem",
-        value=st.session_state.app_bloqueio_intimo,
-        key="ui_bloq_intimo",
-    )
-    st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloq_intimo", False)
-
-    st.selectbox(
-        "🎭 Emoção oculta",
-        ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
-        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
-        key="ui_emocao",
-    )
-    st.session_state.app_emocao_oculta = st.session_state.get("ui_emocao", "nenhuma")
-
-    st.markdown("---")
-    st.subheader("Memória Longa — Ações")
-    if st.button("💾 Salvar última resposta como memória", use_container_width=True):
+    st.subheader("Memória Longa")
+    if st.button("Salvar última resposta como memória", use_container_width=True):
         ult = next((m["content"] for m in reversed(st.session_state.hist) if m["role"] == "assistant"), "")
         if ult:
-            ok = salvar_memoria_longa(ult[:1200], tags="auto")
-            st.success("Memória salva." if ok else "Falha ao salvar memória.")
+            salvar_memoria_longa(ult, tags="auto")
+            st.success("Memória salva.")
         else:
-            st.info("Ainda não há resposta desta sessão.")
-
-    if st.button("⬇️ Aplicar decadência suave (scores)", use_container_width=True):
-        memoria_longa_decadencia(0.97)
-        st.success("Decadência aplicada.")
+            st.info("Sem resposta para salvar ainda.")
 
     st.markdown("---")
-    st.subheader("Resumo do Capítulo")
-    if st.button("📝 Gerar e salvar resumo", use_container_width=True):
+    st.subheader("Resumo do capítulo")
+    if st.button("Gerar e salvar resumo", use_container_width=True):
+        # Usa o próprio modelo atual para resumir as últimas interações da sessão
         trecho = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.hist[-10:]]) or "(vazio)"
         user_prompt = (
-            "Resuma como capítulo de novela brasileiro, coeso, sem pornografia, mantendo as emoções.\n\n" + trecho
+            "Resuma como capítulo de novela, coeso e elegante, sem pornografia, mantendo tom emocional.\n\n" + trecho
         )
         modelo_cfg = MODELOS[st.session_state.modelo_nome]
         try:
             placeholder = st.empty()
             out = ""
-            with st.spinner("Resumindo..."):
-                for parcial in gerar_resposta_stream(modelo_cfg, [
+            spinner = st.spinner("Resumindo...")
+            with spinner:
+                for parcial in gerar_resposta(modelo_cfg, [
                     {"role": "user", "content": user_prompt}
                 ]):
                     out = parcial
@@ -598,72 +546,59 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro ao resumir: {e}")
 
-# ======================================================================
-# HISTÓRICO — primeiro o da planilha, depois o da sessão
-# ======================================================================
-recentes = carregar_ultimas_interacoes(15)
-for r in recentes:
-    with st.chat_message(r.get("role", "user")):
-        st.markdown(r.get("content", ""))
+# ===============
+# HISTÓRICO DA PLANILHA + SESSÃO
+# ===============
+col_hist, = st.columns(1)
+with col_hist:
+    st.title("🌹 Mary / 🎸 Jânio — Novela Interativa")
 
+# Render histórico curto recente da planilha (somente exibição)
+historico_planilha = carregar_ultimas_interacoes(15)
+for m in historico_planilha:
+    with st.chat_message(m.get("role", "user")):
+        st.markdown(m.get("content", ""))
+
+# Render histórico da sessão atual
 for m in st.session_state.hist:
     with st.chat_message(m["role"]):
         st.markdown(m["content"]) 
 
-# Resumo ao final
+# Depois de TUDO, mostra o último resumo
 ultimo_resumo = carregar_ultimo_resumo()
 if ultimo_resumo:
     with st.chat_message("assistant"):
         st.markdown("### 🧠 Resumo do capítulo anterior\n\n" + ultimo_resumo)
 
-# ======================================================================
-# ENTRADA DO USUÁRIO + STREAM + FALLBACKS + VALIDAÇÕES + REFORÇOS
-# ======================================================================
-entrada = st.chat_input("Digite sua direção de cena…")
+# ===============
+# ENTRADA DO USUÁRIO
+# ===============
+entrada = st.chat_input("Digite sua cena / direção narrativa...")
 if entrada:
-    # salva user
+    # salva user na planilha e no estado
     st.chat_message("user").markdown(entrada)
     st.session_state.hist.append({"role": "user", "content": entrada})
     salvar_interacao("user", entrada)
 
-    # constrói histórico compacto (últimas 6 da planilha + sessão)
-    contexto_base: List[Dict[str, str]] = []
-    for r in recentes[-6:]:
-        contexto_base.append({"role": r.get("role", "user"), "content": r.get("content", "")})
-
-    # sinalização de emoção / bloqueio — injeta como fala do sistema logo antes do histórico
-    regra_intimo = ("\n⛔ Jamais antecipe encontros ou cenas íntimas sem ordem explícita do roteirista."
-                    if st.session_state.app_bloqueio_intimo else "")
-    emocao = st.session_state.app_emocao_oculta
-    sinal = {
-        "role": "system",
-        "content": (
-            BASE_SYSTEM
-            + f"\n\n🎭 Emoção oculta: {emocao}."
-            + regra_intimo
-        ),
-    }
-
+    # montar histórico para envio ao modelo (usa apenas a sessão atual + 6 últimas da planilha p/ contexto)
+    contexto_base = []
+    for m in historico_planilha[-6:]:
+        contexto_base.append({"role": m.get("role", "user"), "content": m.get("content", "")})
     contexto = contexto_base + st.session_state.hist[-8:]
-    contexto = [sinal] + contexto  # system sinalizador no topo
 
     modelo_cfg = MODELOS[st.session_state.modelo_nome]
 
+    # Gera resposta streaming com fallback
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
-
-        # 1) streaming principal
         try:
-            for parcial in gerar_resposta_stream(modelo_cfg, contexto):
+            for parcial in gerar_resposta(modelo_cfg, contexto):
                 resposta_txt = parcial
                 placeholder.markdown(resposta_txt if resposta_txt.strip() else "[Gerando…]")
-        except Exception as e:
-            placeholder.markdown(f"[Erro no streaming: {e}]")
-
-        # 2) fallback sem stream
-        if not resposta_txt.strip():
-            try:
+            # fallback se veio vazio
+            if not resposta_txt.strip():
+                # tentativa não-stream
                 prov = modelo_cfg["prov"]; model_id = modelo_cfg["id"]
                 if prov == "openrouter":
                     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -673,102 +608,33 @@ if entrada:
                     headers = {"Authorization": f"Bearer {TOGETHER_API_KEY}", "Content-Type": "application/json"}
                 payload = {
                     "model": model_id,
-                    "messages": [{"role": "system", "content": BASE_SYSTEM}] + contexto[1:],
-                    "temperature": 0.9,
-                    "max_tokens": 900,
+                    "messages": [{"role": "system", "content": BASE_SYSTEM}] + contexto,
+                    "temperature": 0.85,
+                    "max_tokens": 700,
                     "stream": False,
                 }
-                r = requests.post(url, headers=headers, json=payload, timeout=180)
+                r = requests.post(url, headers=headers, json=payload, timeout=120)
                 if r.status_code == 200:
-                    resposta_txt = r.json()["choices"][0]["message"]["content"].strip()
-                    placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+                    j = r.json()
+                    resposta_txt = j.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                 else:
-                    placeholder.markdown(f"Fallback falhou: {r.status_code} - {r.text}")
-            except Exception as e:
-                placeholder.markdown(f"[Erro no fallback: {e}]")
+                    raise RuntimeError(f"Fallback falhou: {r.status_code} - {r.text}")
+                placeholder.markdown(resposta_txt or "[Sem conteúdo]")
+        except Exception as e:
+            placeholder.markdown(f"[Erro: {e}]")
+            resposta_txt = f"[Erro: {e}]"
 
-        # 3) validação sintática + regeneração simples se necessário
-        if resposta_txt and not resposta_valida(resposta_txt):
-            st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar…")
-            try:
-                prov = modelo_cfg["prov"]; model_id = modelo_cfg["id"]
-                if prov == "openrouter":
-                    url = "https://openrouter.ai/api/v1/chat/completions"
-                    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
-                else:
-                    url = "https://api.together.xyz/v1/chat/completions"
-                    headers = {"Authorization": f"Bearer {TOGETHER_API_KEY}", "Content-Type": "application/json"}
-                regen = requests.post(
-                    url, headers=headers,
-                    json={
-                        "model": model_id,
-                        "messages": [{"role": "system", "content": BASE_SYSTEM}] + contexto[1:],
-                        "temperature": 0.9,
-                        "max_tokens": 900,
-                        "stream": False,
-                    }, timeout=180
-                )
-                if regen.status_code == 200:
-                    resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
-                    placeholder.markdown(resposta_txt)
-                else:
-                    st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
-            except Exception as e:
-                st.error(f"Erro ao regenerar: {e}")
+    # Salvar resposta (sempre)
+    st.session_state.hist.append({"role": "assistant", "content": resposta_txt})
+    salvar_interacao("assistant", resposta_txt)
 
-    # salva resposta SEMPRE
-    salvar_interacao("assistant", resposta_txt or "[Sem conteúdo]")
-    st.session_state.hist.append({"role": "assistant", "content": resposta_txt or "[Sem conteúdo]"})
-
-    # alerta de continuidade semântica (entrada do user vs resposta)
-    try:
-        alert = alerta_quebra_semantica(entrada, resposta_txt)
-        if alert:
-            st.info(alert)
-    except Exception:
-        pass
-
-    # reforça memórias usadas com base na própria resposta
-    if st.session_state.use_memoria_longa and resposta_txt:
-        try:
-            usados = [t for (t, _sc, _sim, _rr) in memoria_longa_buscar_topk(
-                query_text=resposta_txt,
-                k=st.session_state.k_memoria_longa,
-                limiar=float(st.session_state.limiar_memoria_longa),
-            )]
-            memoria_longa_reforcar(usados)
-        except Exception:
-            pass
-
-    # auto-salva um pedaço como memória longa (limita tamanho)
-    if st.session_state.use_memoria_longa and resposta_txt and len(resposta_txt) > 300:
+    # Opcional: salvar pedacinhos em memória longa automaticamente
+    if len(resposta_txt) > 300:
         try:
             salvar_memoria_longa(resposta_txt[:1200], tags="auto")
         except Exception:
             pass
 
-# ======================================================================
-# FERRAMENTAS DE ADMIN (opcionais) — exibidas no final
-# ======================================================================
-with st.expander("🛠️ Utilidades de manutenção"):
-    colA, colB, colC = st.columns(3)
-    with colA:
-        if st.button("Verificar schema 'memoria_longa_jm'", use_container_width=True):
-            st.write("Schema OK" if memoria_longa_schema_ok() else "Schema divergente (esperado: timestamp|texto|tags|embedding_json|score)")
-    with colB:
-        if st.button("Aplicar decadência (rápido)", use_container_width=True):
-            memoria_longa_decadencia(0.97)
-            st.success("Decadência aplicada.")
-    with colC:
-        if st.button("Reforçar top memórias do último output", use_container_width=True):
-            ult = next((m["content"] for m in reversed(st.session_state.hist) if m["role"] == "assistant"), "")
-            if ult:
-                usados = [t for (t, _sc, _sim, _rr) in memoria_longa_buscar_topk(ult, k=3, limiar=0.78)]
-                memoria_longa_reforcar(usados)
-                st.success("Reforço aplicado em memórias relevantes.")
-            else:
-                st.info("Sem resposta ainda nesta sessão.")
-
-# ======================================================================
+# ===============
 # FIM
-# ======================================================================
+# ===============
