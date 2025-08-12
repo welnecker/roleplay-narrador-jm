@@ -326,8 +326,8 @@ def memoria_longa_listar_registros():
 def inserir_regras_mary_e_janio(prompt_base: str) -> str:
     regras = """
 ⚖️ Regras imutáveis de coerência:
-- Mary é virgem e decidiu permanecer casta até seu encontro definitivo com Jânio. Ela pode beijar, sentir desejo, mas NÃO cede a atos sexuais (sem penetração, sexo oral ou manual explícito). Se pressionada, impõe limites com firmeza e elegância.
-- Jânio é livre para ter encontros íntimos com outras personagens quando fizer sentido na história (consensual, coerente e sem pornografia explícita).
+- Mary é virgem e decidiu permanecer casta até seu encontro definitivo com Jânio. Ela pode beijar, sentir desejo, mas NÃO cede a atos sexuais (sem penetração, sexo oral). Se pressionada, impõe limites com firmeza e elegância.
+- Jânio é livre para ter encontros íntimos com outras personagens.
 - Qualquer violação dessas regras deve ser evitada na narrativa.
 """
     return prompt_base + "\n" + regras.strip()
@@ -837,6 +837,7 @@ except Exception:
             memoria_longa_reforcar(usados)
     except Exception:
             pass
+
 
 
 
