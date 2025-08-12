@@ -65,27 +65,29 @@ def carregar_memorias():
         return [], [], []
 
 def carregar_resumo_salvo():
-    """Busca o último resumo (coluna 7) da aba 'perfil_jm'."""
+    """Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo)."""
     try:
         aba = planilha.worksheet("perfil_jm")
-        valores = aba.col_values(7)
-        for val in reversed(valores[1:]):
-            if val and val.strip():
-                return val.strip()
+        registros = aba.get_all_records()  # respeita nomes do cabeçalho
+        # pega o último registro cujo 'resumo' não está vazio
+        for r in reversed(registros):
+            txt = (r.get("resumo") or "").strip()
+            if txt:
+                return txt
         return ""
     except Exception as e:
         st.warning(f"Erro ao carregar resumo salvo: {e}")
         return ""
 
 def salvar_resumo(resumo: str):
-    """Salva um novo resumo na aba 'perfil_jm' (timestamp na coluna 6, resumo na 7)."""
+    """Salva uma nova linha em 'perfil_jm' (timestamp | resumo)."""
     try:
         aba = planilha.worksheet("perfil_jm")
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        linha = ["", "", "", "", "", timestamp, resumo]
-        aba.append_row(linha, value_input_option="RAW")
+        aba.append_row([timestamp, resumo], value_input_option="RAW")
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
+
 
 def salvar_interacao(role: str, content: str):
     """Anexa uma interação na aba 'interacoes_jm'."""
@@ -717,4 +719,5 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
