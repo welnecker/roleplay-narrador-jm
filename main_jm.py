@@ -717,8 +717,8 @@ except Exception:
 
 
         # 1) STREAM
-        stream_ok = False
-        try:
+    stream_ok = False
+    try:
             with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=300) as r:
                 if r.status_code == 200:
                     stream_ok = True
@@ -746,11 +746,11 @@ except Exception:
                             continue
                 else:
                     st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
-        except Exception as e:
+    except Exception as e:
             st.error(f"Erro no streaming: {e}")
 
         # 2) FALLBACKS se veio vazio
-        if not resposta_txt.strip():
+    if not resposta_txt.strip():
             # 2a) retry sem stream
             try:
                 r2 = requests.post(
@@ -765,7 +765,7 @@ except Exception:
             except Exception as e:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
-        if not resposta_txt.strip():
+    if not resposta_txt.strip():
             # 2b) retry sem o system extra (alguns modelos travam com system duplo)
             try:
                 r3 = requests.post(
@@ -787,10 +787,10 @@ except Exception:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
         # Flush final na tela
-        placeholder.markdown(render_tail(resposta_txt) if resposta_txt.strip() else "[Sem conteúdo]")
+    placeholder.markdown(render_tail(resposta_txt) if resposta_txt.strip() else "[Sem conteúdo]")
 
         # Validação sintática + regeneração simples
-        if not resposta_valida(resposta_txt):
+    if not resposta_valida(resposta_txt):
             st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
             try:
                 regen = requests.post(
@@ -814,18 +814,18 @@ except Exception:
                 st.error(f"Erro ao regenerar: {e}")
 
         # Validação semântica (entrada do user vs resposta)
-        if len(st.session_state.session_msgs) >= 1 and resposta_txt and resposta_txt != "[Sem conteúdo]":
+    if len(st.session_state.session_msgs) >= 1 and resposta_txt and resposta_txt != "[Sem conteúdo]":
             texto_anterior = st.session_state.session_msgs[-1]["content"]  # última entrada do user
             alerta = verificar_quebra_semantica_openai(texto_anterior, resposta_txt)
             if alerta:
                 st.info(alerta)
 
         # Salvar resposta SEMPRE (mesmo que curta)
-        salvar_interacao("assistant", resposta_txt or "[Sem conteúdo]")
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt or "[Sem conteúdo]"})
+    salvar_interacao("assistant", resposta_txt or "[Sem conteúdo]")
+    st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt or "[Sem conteúdo]"})
 
         # Reforço de memórias usadas
-        try:
+    try:
             usados = []
             topk_usadas = memoria_longa_buscar_topk(
                 query_text=resposta_txt,
@@ -835,8 +835,9 @@ except Exception:
             for t, _sc, _sim, _rr in topk_usadas:
                 usados.append(t)
             memoria_longa_reforcar(usados)
-        except Exception:
+    except Exception:
             pass
+
 
 
 
