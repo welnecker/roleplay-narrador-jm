@@ -267,6 +267,59 @@ def memoria_longa_decadencia(fator: float = 0.97):
         pass
 
 
+
+# -----------------------------------------------------------------------------
+# HELPERS – histórico fundido (Sheets + sessão) e listagem de memória longa
+# -----------------------------------------------------------------------------
+def construir_ultimas_interacoes_fundidas(n_sheet: int = 15) -> str:
+    """
+    Funde as últimas N interações do Sheets com o histórico da sessão atual,
+    remove duplicadas, e retorna um texto plano "role: content" em ordem cronológica.
+    """
+    sheet_regs = []
+    try:
+        aba = planilha.worksheet("interacoes_jm")
+        regs = aba.get_all_records()
+        sheet_regs = regs[-n_sheet:] if len(regs) > n_sheet else regs
+    except Exception:
+        sheet_regs = []
+
+    # Sessão atual -> padroniza para {role, content}
+    sess = [{"role": m.get("role", "user"), "content": m.get("content", "")}
+            for m in st.session_state.get("session_msgs", [])]
+
+    # Concatena mantendo ordem: Sheets (mais antigos) -> Sessão (mais recentes)
+    combinados = []
+    for r in sheet_regs:
+        combinados.append({"role": r.get("role", "user"), "content": r.get("content", "")})
+    for r in sess:
+        combinados.append({"role": r.get("role", "user"), "content": r.get("content", "")})
+
+    # Dedup por par (role, content) preservando a primeira ocorrência
+    vistos = set()
+    resultado = []
+    for r in combinados:
+        chave = (r["role"], r["content"])
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        if r["content"]:
+            resultado.append(f"{r['role']}: {r['content']}")
+
+    return "\n".join(resultado)
+
+
+def memoria_longa_listar_registros():
+    """Retorna todos os registros da aba memoria_longa_jm (ou [])."""
+    aba = _sheet_ensure_memoria_longa()
+    if not aba:
+        return []
+    try:
+        return aba.get_all_records()
+    except Exception:
+        return []
+
+
 # -----------------------------------------------------------------------------
 # REGRAS DE CENA (castidade de Mary / liberdade do Jânio)
 # -----------------------------------------------------------------------------
@@ -288,17 +341,14 @@ def construir_prompt_com_narrador():
     emocao = st.session_state.get("app_emocao_oculta", "nenhuma")
     resumo = st.session_state.get("resumo_capitulo", "")
 
-    # últimas 15 interações (texto plano do SHEET para garantir persistência)
-    try:
-        aba = planilha.worksheet("interacoes_jm")
-        registros = aba.get_all_records()
-        ultimas = registros[-15:] if len(registros) > 15 else registros
-        texto_ultimas = "\n".join(f"{r['role']}: {r['content']}" for r in ultimas)
-    except Exception:
-        texto_ultimas = ""
+    # HISTÓRICO FUNDIDO (Sheets + sessão), com N ajustável na sidebar
+    n_sheet = int(st.session_state.get("n_sheet_prompt", 15))
+    texto_ultimas = construir_ultimas_interacoes_fundidas(n_sheet=n_sheet)
 
-    regra_intimo = ("\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
-                    if st.session_state.get("app_bloqueio_intimo", False) else "")
+    regra_intimo = (
+        "\n⛔ Jamais antecipe encontros, conexões emocionais ou cenas íntimas sem ordem explícita do roteirista."
+        if st.session_state.get("app_bloqueio_intimo", False) else ""
+    )
 
     prompt = f"""Você é o narrador de uma história em construção. Os protagonistas são Mary e Jânio.
 
@@ -311,20 +361,26 @@ Sua função é narrar cenas com naturalidade e profundidade. Use narração em 
 
 ### 🧠 Memórias canônicas:
 Mary:
-- {("\n- ".join(mem_mary)) if mem_mary else 'Nenhuma.'}
+- {('\n- '.join(mem_mary)) if mem_mary else 'Nenhuma.'}
 
 Jânio:
-- {("\n- ".join(mem_janio)) if mem_janio else 'Nenhuma.'}
+- {('\n- '.join(mem_janio)) if mem_janio else 'Nenhuma.'}
 
 Compartilhadas:
-- {("\n- ".join(mem_all)) if mem_all else 'Nenhuma.'}
+- {('\n- '.join(mem_all)) if mem_all else 'Nenhuma.'}
 
-### 📖 Últimas interações (recorte):
+### 📖 Últimas interações (fundidas: Sheets + sessão)
 {texto_ultimas}"""
 
+    # -----------------------
     # Memória longa relevante
+    # -----------------------
+    st.session_state._ml_topk_texts = []
+    st.session_state._ml_recorrentes = []
+
     if st.session_state.get("use_memoria_longa", True):
         try:
+            # Query: resumo + última entrada do usuário
             ultima_entrada = ""
             if st.session_state.get("session_msgs"):
                 for m in reversed(st.session_state.session_msgs):
@@ -332,15 +388,54 @@ Compartilhadas:
                         ultima_entrada = m.get("content", "")
                         break
             query = (resumo or "") + "\n" + (ultima_entrada or "")
+
+            # Busca principal (Top-K por similaridade)
             k = int(st.session_state.get("k_memoria_longa", 3))
             limiar = float(st.session_state.get("limiar_memoria_longa", 0.78))
             topk = memoria_longa_buscar_topk(query_text=query, k=k, limiar=limiar)
+
+            # Busca secundária: memórias recorrentes (score alto), mesmo que a similaridade seja menor
+            recorrentes = []
+            try:
+                regs = memoria_longa_listar_registros()
+                # Seleciona as de score > 1.5 e que não estão em topk; limita 2
+                ja = {t for (t, _sc, _sim, _rr) in topk}
+                for r in regs:
+                    try:
+                        sc = float(r.get("score", 1.0) or 1.0)
+                    except Exception:
+                        sc = 1.0
+                    texto = (r.get("texto") or "").strip()
+                    if texto and sc > 1.5 and texto not in ja:
+                        recorrentes.append((texto, sc))
+                recorrentes = sorted(recorrentes, key=lambda x: x[1], reverse=True)[:2]
+            except Exception:
+                recorrentes = []
+
+            # Anexa ao prompt
             if topk:
                 linhas = [f"- {t}" for (t, _sc, _sim, _rr) in topk]
                 prompt += "\n\n### 🗃️ Memórias de longo prazo relevantes\n" + "\n".join(linhas)
+                st.session_state._ml_topk_texts = [t for (t, _sc, _sim, _rr) in topk]
+
+            if recorrentes:
+                linhas = [f"- {t} (score {sc:.2f})" for (t, sc) in recorrentes]
+                prompt += "\n\n### ♻️ Memórias recorrentes (alto score)\n" + "\n".join(linhas)
+                st.session_state._ml_recorrentes = [t for (t, _sc) in recorrentes]
+
         except Exception:
             pass
 
+    # Cola narrativa (consistência de tom e comportamento)
+    prompt += """
+    
+📌 Regras de continuidade:
+- Mantenha o tom e os comportamentos apresentados nas últimas interações.
+- As personalidades listadas nas memórias são estáveis durante a sessão.
+- Não repita descrições idênticas; evolua reações e interações naturalmente.
+- Sempre considere ações e palavras ditas anteriormente para construir a próxima cena.
+"""
+    # Regras imutáveis de coerência (Mary/Jânio)
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt.strip()
 
@@ -522,6 +617,17 @@ with st.sidebar:
 
     st.caption("Role a tela principal para ver interações anteriores.")
 
+st.markdown("---")
+st.markdown("### 🧩 Histórico no prompt")
+st.slider(
+    "Interações do Sheets (N)",
+    10, 30,
+    value=st.session_state.get("n_sheet_prompt", 15),
+    step=1,
+    key="n_sheet_prompt",
+)
+
+
 
 # -----------------------------------------------------------------------------
 # EXIBIR HISTÓRICO RECENTE (primeiro interações, depois resumo)
@@ -597,6 +703,18 @@ if entrada:
         def render_tail(t):
             # corta <think>...</think> da tela, mas NÃO altera o texto salvo
             return t
+
+        # Reforço antecipado: memórias que ENTRARAM no prompt (topk + recorrentes)
+try:
+    usados_prompt = []
+    usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
+    usados_prompt.extend(st.session_state.get("_ml_recorrentes", []))
+    usados_prompt = [t for t in usados_prompt if t]
+    if usados_prompt:
+        memoria_longa_reforcar(usados_prompt)
+except Exception:
+    pass
+
 
         # 1) STREAM
         stream_ok = False
@@ -719,5 +837,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
