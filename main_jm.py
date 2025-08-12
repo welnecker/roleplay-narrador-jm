@@ -549,6 +549,25 @@ with st.sidebar:
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
 
+    # ---- Comprimento / timeout ----
+    st.markdown("---")
+    st.markdown("### ⏱️ Comprimento/timeout")
+    st.slider(
+        "Max tokens da resposta",
+        256, 2500,
+        value=int(st.session_state.get("max_tokens_rsp", 1200)),
+        step=32,
+        key="max_tokens_rsp",
+    )
+    st.slider(
+        "Timeout (segundos)",
+        60, 600,
+        value=int(st.session_state.get("timeout_s", 300)),
+        step=10,
+        key="timeout_s",
+    )
+
+    # ---- Resumo rápido ----
     st.markdown("---")
     if st.button("📝 Gerar resumo do capítulo"):
         try:
@@ -568,7 +587,7 @@ with st.sidebar:
                     "max_tokens": 800,
                     "temperature": 0.85,
                 },
-                timeout=120,
+                timeout=int(st.session_state.get("timeout_s", 300)),
             )
             if r.status_code == 200:
                 resumo = r.json()["choices"][0]["message"]["content"].strip()
@@ -580,9 +599,9 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
 
+    # ---- Memória longa ----
     st.markdown("---")
     st.markdown("### 🗃️ Memória Longa")
-
     st.checkbox(
         "Usar memória longa no prompt",
         value=st.session_state.get("use_memoria_longa", True),
@@ -591,7 +610,7 @@ with st.sidebar:
     st.slider(
         "Top-K memórias",
         1, 5,
-        st.session_state.get("k_memoria_longa", 3),
+        int(st.session_state.get("k_memoria_longa", 3)),
         1,
         key="k_memoria_longa",
     )
@@ -602,7 +621,6 @@ with st.sidebar:
         0.01,
         key="limiar_memoria_longa",
     )
-
     if st.button("💾 Salvar última resposta como memória"):
         ultimo_assist = ""
         for m in reversed(st.session_state.get("session_msgs", [])):
@@ -615,17 +633,18 @@ with st.sidebar:
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
 
-    st.caption("Role a tela principal para ver interações anteriores.")
+    # ---- Histórico no prompt ----
+    st.markdown("---")
+    st.markdown("### 🧩 Histórico no prompt")
+    st.slider(
+        "Interações do Sheets (N)",
+        10, 30,
+        value=int(st.session_state.get("n_sheet_prompt", 15)),
+        step=1,
+        key="n_sheet_prompt",
+    )
 
-st.markdown("---")
-st.markdown("### 🧩 Histórico no prompt")
-st.slider(
-    "Interações do Sheets (N)",
-    10, 30,
-    value=st.session_state.get("n_sheet_prompt", 15),
-    step=1,
-    key="n_sheet_prompt",
-)
+    st.caption("Role a tela principal para ver interações anteriores.")
 
 
 
@@ -832,3 +851,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
