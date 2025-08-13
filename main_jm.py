@@ -18,6 +18,43 @@ import requests
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import numpy as np
+from gspread.exceptions import APIError
+
+# ---- Backoff p/ 429 do Sheets ----
+def _retry_429(callable_fn, *args, _retries=5, _base=0.6, **kwargs):
+    for i in range(_retries):
+        try:
+            return callable_fn(*args, **kwargs)
+        except APIError as e:
+            msg = str(e)
+            if "429" in msg or "quota" in msg.lower():
+                time.sleep((_base * (2 ** i)) + random.uniform(0, 0.25))
+                continue
+            raise
+    # última tentativa
+    return callable_fn(*args, **kwargs)
+
+# ---- Cache de leitura (TTL curto) ----
+@st.cache_data(ttl=45, show_spinner=False)
+def _sheet_all_records_cached(sheet_name: str):
+    ws = _ws(sheet_name, create_if_missing=False)
+    if not ws:
+        return []
+    return _retry_429(ws.get_all_records)
+
+@st.cache_data(ttl=45, show_spinner=False)
+def _sheet_all_values_cached(sheet_name: str):
+    ws = _ws(sheet_name, create_if_missing=False)
+    if not ws:
+        return []
+    return _retry_429(ws.get_all_values)
+
+def _invalidate_sheet_caches():
+    try:
+        _sheet_all_records_cached.clear()
+        _sheet_all_values_cached.clear()
+    except Exception:
+        pass
 
 # (Opcional) Embeddings OpenAI para verificação semântica/memória longa
 try:
@@ -42,7 +79,7 @@ if not st.session_state.age_ok:
     st.caption("Narrativa adulta, sensual, **sem pornografia explícita**. Confirme para prosseguir.")
     if st.checkbox("Confirmo que tenho 18 anos ou mais e desejo prosseguir."):
         st.session_state.age_ok = True
-        st.stop()
+    st.stop()
 
 # =========================
 # GOOGLE SHEETS — MODO ANTIGO
@@ -76,10 +113,10 @@ def conectar_planilha():
 planilha = conectar_planilha()
 
 # Abas esperadas
-TAB_INTERACOES = "interacoes_jm" # timestamp | role | content
-TAB_PERFIL = "perfil_jm" # timestamp | resumo
-TAB_MEMORIAS = "memorias_jm" # tipo | conteudo
-TAB_ML = "memoria_longa_jm" # texto | embedding | tags | timestamp | score
+TAB_INTERACOES = "interacoes_jm"  # timestamp | role | content
+TAB_PERFIL     = "perfil_jm"      # timestamp | resumo
+TAB_MEMORIAS   = "memorias_jm"    # tipo | conteudo
+TAB_ML         = "memoria_longa_jm"  # texto | embedding | tags | timestamp | score
 
 def _ws(name: str, create_if_missing: bool = True):
     if not planilha:
@@ -93,13 +130,13 @@ def _ws(name: str, create_if_missing: bool = True):
             ws = planilha.add_worksheet(title=name, rows=5000, cols=10)
             # cria cabeçalhos padrão
             if name == TAB_INTERACOES:
-                ws.append_row(["timestamp", "role", "content"])
+                _retry_429(ws.append_row, ["timestamp", "role", "content"])
             elif name == TAB_PERFIL:
-                ws.append_row(["timestamp", "resumo"])
+                _retry_429(ws.append_row, ["timestamp", "resumo"])
             elif name == TAB_MEMORIAS:
-                ws.append_row(["tipo", "conteudo"])
+                _retry_429(ws.append_row, ["tipo", "conteudo"])
             elif name == TAB_ML:
-                ws.append_row(["texto", "embedding", "tags", "timestamp", "score"])
+                _retry_429(ws.append_row, ["texto", "embedding", "tags", "timestamp", "score"])
             return ws
         except Exception:
             return None
@@ -109,12 +146,9 @@ def _ws(name: str, create_if_missing: bool = True):
 # =========================
 
 def carregar_memorias_brutas() -> Dict[str, List[str]]:
-    """Lê 'memorias_jm' e devolve um dict {tag_lower: [linhas]}."""
+    """Lê 'memorias_jm' e devolve um dict {tag_lower: [linhas]} com cache TTL."""
     try:
-        aba = _ws(TAB_MEMORIAS, create_if_missing=False)
-        if not aba:
-            return {}
-        regs = aba.get_all_records()
+        regs = _sheet_all_records_cached(TAB_MEMORIAS)
         buckets: Dict[str, List[str]] = {}
         for r in regs:
             tag = (r.get("tipo","") or "").strip().lower()
@@ -142,12 +176,9 @@ def persona_block(nome: str, buckets: dict, max_linhas: int = 8) -> str:
     return (f"{titulo}:\n- " + "\n- ".join(linhas_ordenadas)) if linhas_ordenadas else ""
 
 def carregar_resumo_salvo() -> str:
-    """Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo)."""
+    """Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo) com cache TTL."""
     try:
-        aba = _ws(TAB_PERFIL, create_if_missing=False)
-        if not aba:
-            return ""
-        registros = aba.get_all_records()
+        registros = _sheet_all_records_cached(TAB_PERFIL)
         for r in reversed(registros):
             txt = (r.get("resumo") or "").strip()
             if txt:
@@ -158,18 +189,31 @@ def carregar_resumo_salvo() -> str:
         return ""
 
 def salvar_resumo(resumo: str):
-    """Salva uma nova linha em 'perfil_jm' (timestamp | resumo)."""
+    """Salva uma nova linha em 'perfil_jm' (timestamp | resumo) e invalida caches."""
     try:
         aba = _ws(TAB_PERFIL)
         if not aba:
             return
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        aba.append_row([timestamp, resumo], value_input_option="RAW")
+        _retry_429(aba.append_row, [timestamp, resumo], value_input_option="RAW")
+        _invalidate_sheet_caches()
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
 
+def carregar_interacoes(n: int = 20):
+    """
+    Carrega últimas n interações (role, content) usando cache de sessão
+    para evitar leituras repetidas.
+    """
+    cache = st.session_state.get("_cache_interacoes", None)
+    if cache is None:
+        regs = _sheet_all_records_cached(TAB_INTERACOES)
+        st.session_state["_cache_interacoes"] = regs
+        cache = regs
+    return cache[-n:] if len(cache) > n else cache
+
 def salvar_interacao(role: str, content: str):
-    """Anexa uma interação na aba 'interacoes_jm'."""
+    """Append no Sheets + atualiza cache local (sem reler) com backoff 429."""
     if not planilha:
         return
     try:
@@ -177,21 +221,21 @@ def salvar_interacao(role: str, content: str):
         if not aba:
             return
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        aba.append_row([timestamp, role.strip(), content.strip()], value_input_option="RAW")
+        row = [timestamp, f"{role or ''}".strip(), f"{content or ''}".strip()]
+
+        _retry_429(aba.append_row, row, value_input_option="RAW")
+
+        # atualiza cache local
+        lst = st.session_state.get("_cache_interacoes")
+        if isinstance(lst, list):
+            lst.append({"timestamp": row[0], "role": row[1], "content": row[2]})
+        else:
+            st.session_state["_cache_interacoes"] = [{"timestamp": row[0], "role": row[1], "content": row[2]}]
+
+        _invalidate_sheet_caches()
+
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
-
-def carregar_interacoes(n: int = 20):
-    """Carrega as últimas n interações (role, content) da aba interacoes_jm."""
-    try:
-        aba = _ws(TAB_INTERACOES, create_if_missing=False)
-        if not aba:
-            return []
-        registros = aba.get_all_records()
-        return registros[-n:] if len(registros) > n else registros
-    except Exception as e:
-        st.warning(f"Erro ao carregar interações: {e}")
-        return []
 
 # =========================
 # EMBEDDINGS / SIMILARIDADE
@@ -243,7 +287,7 @@ def _deserialize_vec(s: str) -> np.ndarray:
         return np.zeros(1, dtype=float)
 
 def memoria_longa_salvar(texto: str, tags: str = "") -> bool:
-    """Salva uma memória com embedding (se possível) e score inicial."""
+    """Salva uma memória com embedding (se possível) e score inicial. Invalida cache."""
     aba = _sheet_ensure_memoria_longa()
     if not aba:
         st.warning("Aba 'memoria_longa_jm' não encontrada — crie com cabeçalhos: texto | embedding | tags | timestamp | score")
@@ -252,19 +296,17 @@ def memoria_longa_salvar(texto: str, tags: str = "") -> bool:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     linha = [texto.strip(), _serialize_vec(emb) if emb is not None else "", (tags or "").strip(), ts, 1.0]
     try:
-        aba.append_row(linha, value_input_option="RAW")
+        _retry_429(aba.append_row, linha, value_input_option="RAW")
+        _invalidate_sheet_caches()
         return True
     except Exception as e:
         st.error(f"Erro ao salvar memória longa: {e}")
         return False
 
 def memoria_longa_listar_registros():
-    """Retorna todos os registros da aba memoria_longa_jm (ou [])."""
-    aba = _sheet_ensure_memoria_longa()
-    if not aba:
-        return []
+    """Retorna todos os registros da aba memoria_longa_jm (cache TTL)."""
     try:
-        return aba.get_all_records()
+        return _sheet_all_records_cached(TAB_ML)
     except Exception:
         return []
 
@@ -273,14 +315,12 @@ def _tokenize(s: str) -> set:
 
 def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78):
     """Top-K memórias. Usa embeddings se existir; senão, Jaccard simples."""
-    aba = _sheet_ensure_memoria_longa()
-    if not aba:
-        return []
     try:
-        dados = aba.get_all_records()
+        dados = _sheet_all_records_cached(TAB_ML)
     except Exception as e:
         st.warning(f"Erro ao carregar memoria_longa_jm: {e}")
         return []
+
     q = gerar_embedding_openai(query_text) if OPENAI_OK else None
     candidatos = []
     for row in dados:
@@ -292,6 +332,7 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
             score = 1.0
         if not texto:
             continue
+
         if q is not None and emb_s:
             vec = _deserialize_vec(emb_s)
             if vec.ndim == 1 and vec.size >= 10:
@@ -303,6 +344,7 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
             s1 = _tokenize(texto)
             s2 = _tokenize(query_text)
             sim = len(s1 & s2) / max(1, len(s1 | s2))
+
         if sim >= limiar:
             rr = 0.7 * sim + 0.3 * score
             candidatos.append((texto, score, sim, rr))
@@ -310,15 +352,15 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
     return candidatos[:k]
 
 def memoria_longa_reforcar(textos_usados: list):
-    """Aumenta o score das memórias usadas (pequeno reforço)."""
+    """Aumenta o score das memórias usadas (pequeno reforço) com backoff + correção de índices."""
     aba = _sheet_ensure_memoria_longa()
     if not aba or not textos_usados:
         return
     try:
-        dados = aba.get_all_values()
+        dados = _sheet_all_values_cached(TAB_ML)
         if not dados or len(dados) < 2:
             return
-        headers = dados
+        headers = dados[0]  # <- CORREÇÃO: cabeçalho é a primeira linha
         idx_texto = headers.index("texto")
         idx_score = headers.index("score")
         for i, linha in enumerate(dados[1:], start=2):
@@ -331,9 +373,11 @@ def memoria_longa_reforcar(textos_usados: list):
                 except Exception:
                     sc = 1.0
                 sc = min(sc + 0.2, 2.0)
-                aba.update_cell(i, idx_score + 1, sc)
+                _retry_429(aba.update_cell, i, idx_score + 1, sc)
+        _invalidate_sheet_caches()
     except Exception:
         pass
+
 
 # =========================
 # ROMANCE (FASES) + MOMENTO
@@ -1104,3 +1148,4 @@ if entrada:
                 memoria_longa_reforcar(usados)
             except Exception:
                 pass
+
