@@ -8,7 +8,6 @@ import os
 import re
 import json
 import time
-import math
 import random
 from datetime import datetime
 from typing import List, Tuple, Dict, Any
@@ -17,7 +16,6 @@ import streamlit as st
 import requests
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-
 import numpy as np
 
 # (Opcional) Embeddings OpenAI para verificação semântica/memória longa
@@ -38,12 +36,10 @@ st.set_page_config(page_title="Narrador JM", page_icon="🎬", layout="wide")
 # Gate 18+
 if "age_ok" not in st.session_state:
     st.session_state.age_ok = False
-
 if not st.session_state.age_ok:
     st.title("🔞 Conteúdo adulto")
     st.caption("Narrativa adulta, sensual, **sem pornografia explícita**. Confirme para prosseguir.")
-    ok = st.checkbox("Confirmo que tenho 18 anos ou mais e desejo prosseguir.")
-    if ok:
+    if st.checkbox("Confirmo que tenho 18 anos ou mais e desejo prosseguir."):
         st.session_state.age_ok = True
     st.stop()
 
@@ -84,7 +80,6 @@ TAB_PERFIL     = "perfil_jm"         # timestamp | resumo
 TAB_MEMORIAS   = "memorias_jm"       # tipo | conteudo
 TAB_ML         = "memoria_longa_jm"  # texto | embedding | tags | timestamp | score
 
-
 def _ws(name: str, create_if_missing: bool = True):
     if not planilha:
         return None
@@ -116,7 +111,8 @@ def carregar_memorias_brutas() -> Dict[str, List[str]]:
     """Lê 'memorias_jm' e devolve um dict {tag_lower: [linhas]}."""
     try:
         aba = _ws(TAB_MEMORIAS, create_if_missing=False)
-        if not aba: return {}
+        if not aba:
+            return {}
         regs = aba.get_all_records()
         buckets: Dict[str, List[str]] = {}
         for r in regs:
@@ -148,7 +144,8 @@ def carregar_resumo_salvo() -> str:
     """Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo)."""
     try:
         aba = _ws(TAB_PERFIL, create_if_missing=False)
-        if not aba: return ""
+        if not aba:
+            return ""
         registros = aba.get_all_records()
         for r in reversed(registros):
             txt = (r.get("resumo") or "").strip()
@@ -163,7 +160,8 @@ def salvar_resumo(resumo: str):
     """Salva uma nova linha em 'perfil_jm' (timestamp | resumo)."""
     try:
         aba = _ws(TAB_PERFIL)
-        if not aba: return
+        if not aba:
+            return
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         aba.append_row([timestamp, resumo], value_input_option="RAW")
     except Exception as e:
@@ -175,7 +173,8 @@ def salvar_interacao(role: str, content: str):
         return
     try:
         aba = _ws(TAB_INTERACOES)
-        if not aba: return
+        if not aba:
+            return
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         aba.append_row([timestamp, role.strip(), content.strip()], value_input_option="RAW")
     except Exception as e:
@@ -185,7 +184,8 @@ def carregar_interacoes(n: int = 20):
     """Carrega as últimas n interações (role, content) da aba interacoes_jm."""
     try:
         aba = _ws(TAB_INTERACOES, create_if_missing=False)
-        if not aba: return []
+        if not aba:
+            return []
         registros = aba.get_all_records()
         return registros[-n:] if len(registros) > n else registros
     except Exception as e:
@@ -281,11 +281,7 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
         st.warning(f"Erro ao carregar memoria_longa_jm: {e}")
         return []
 
-    if OPENAI_OK:
-        q = gerar_embedding_openai(query_text)
-    else:
-        q = None
-
+    q = gerar_embedding_openai(query_text) if OPENAI_OK else None
     candidatos = []
     for row in dados:
         texto = (row.get("texto") or "").strip()
@@ -365,7 +361,6 @@ FASES_ROMANCE: Dict[int, Dict[str, str]] = {
         "permitidos": "beijo prolongado; dormir juntos; consumação **implícita** (fade-to-black); manhã seguinte sugerida",
         "proibidos":  "descrição explícita de atos sexuais; detalhes anatômicos; linguagem pornográfica"},
 }
-
 FLAG_FASE_TXT_PREFIX = "FLAG: mj_fase="
 
 def _fase_label(n: int) -> str:
@@ -373,7 +368,7 @@ def _fase_label(n: int) -> str:
     return f"{int(n)} — {d['nome']}"
 
 def mj_set_fase(n: int, persist: bool=True):
-    n = max(0, min(5, int(n)))
+    n = max(0, min(max(FASES_ROMANCE.keys()), int(n)))
     st.session_state.mj_fase = n
     if persist:
         try:
@@ -396,7 +391,6 @@ def mj_carregar_fase_inicial() -> int:
         pass
     st.session_state.mj_fase = 0
     return 0
-
 
 # --------- Motor de Momento ----------
 MOMENTOS = {
@@ -431,7 +425,6 @@ MOMENTOS = {
         "gatilhos": [r"\b(quarto|cama|luz baixa|porta fechada|manh[aã] seguinte)\b"],
         "proximo": 4},
 }
-
 def _momento_label(n: int) -> str:
     m = MOMENTOS.get(int(n), MOMENTOS[0])
     return f"{int(n)} — {m['nome']}"
@@ -454,7 +447,7 @@ def clamp_momento(atual: int, proposto: int, max_steps: int) -> int:
     return proposto
 
 def momento_set(n: int, persist: bool = True):
-    n = max(0, min(4, int(n)))
+    n = max(0, min(max(MOMENTOS.keys()), int(n)))
     st.session_state.momento = n
     if persist:
         try:
@@ -490,27 +483,55 @@ def viola_momento(texto: str, momento: int) -> str:
 
 
 # =========================
-# PROVEDOR DE IA
+# PROVEDORES E MODELOS
 # =========================
-def api_config_for_provider(prov: str):
-    if prov == "Together":
-        url = "https://api.together.xyz/v1/chat/completions"
-        key = st.secrets.get("TOGETHER_API_KEY", "")
-        modelos = {
-            "Llama-3.1 70B Instruct": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-            "Qwen2.5 72B Instruct": "Qwen/Qwen2.5-72B-Instruct",
-        }
-    else:
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        key = st.secrets.get("OPENROUTER_API_KEY", "")
-        modelos = {
-            "GPT-4.1 mini (OpenRouter)": "openai/gpt-4.1-mini",
-            "Llama-3.1 70B (OpenRouter)": "meta-llama/llama-3.1-70b-instruct",
-        }
-    return url, key, modelos
+MODELOS_OPENROUTER = {
+    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+}
 
-def model_id_for_together(modelo_escolhido_id: str) -> str:
-    return modelo_escolhido_id
+MODELOS_TOGETHER_UI = {
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
+}
+
+def model_id_for_together(api_ui_model_id: str) -> str:
+    key = api_ui_model_id.strip()
+    if "Qwen3-Coder-480B-A35B-Instruct-FP8" in key:
+        return "Qwen/Qwen3-Coder-480B-Instruct-FP8"
+    if key.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
+        return "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    return key
+
+def api_config_for_provider(provider: str):
+    if provider == "OpenRouter":
+        return (
+            "https://openrouter.ai/api/v1/chat/completions",
+            st.secrets.get("OPENROUTER_API_KEY", ""),
+            MODELOS_OPENROUTER,
+        )
+    else:
+        return (
+            "https://api.together.xyz/v1/chat/completions",
+            st.secrets.get("TOGETHER_API_KEY", ""),
+            MODELOS_TOGETHER_UI,
+        )
 
 
 # =========================
@@ -679,67 +700,8 @@ def resposta_valida(t: str) -> bool:
 
 
 # =========================
-# UI — SIDEBAR
+# UI — CABEÇALHO E CONTROLES
 # =========================
-with st.sidebar:
-    st.title("🧭 Painel do Roteirista")
-
-   # -----------------------------------------------------------------------------
-# PROVEDORES E MODELOS
-# -----------------------------------------------------------------------------
-MODELOS_OPENROUTER = {
-    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
-    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
-}
-
-MODELOS_TOGETHER_UI = {
-    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
-}
-
-def model_id_for_together(api_ui_model_id: str) -> str:
-    # normaliza algumas variações comuns de UI → endpoint
-    key = api_ui_model_id.strip()
-    if "Qwen3-Coder-480B-A35B-Instruct-FP8" in key:
-        return "Qwen/Qwen3-Coder-480B-Instruct-FP8"
-    if key.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
-        return "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    return key
-
-def api_config_for_provider(provider: str):
-    if provider == "OpenRouter":
-        return (
-            "https://openrouter.ai/api/v1/chat/completions",
-            st.secrets.get("OPENROUTER_API_KEY", ""),
-            MODELOS_OPENROUTER,
-        )
-    else:
-        return (
-            "https://api.together.xyz/v1/chat/completions",
-            st.secrets.get("TOGETHER_API_KEY", ""),
-            MODELOS_TOGETHER_UI,
-        )
-
-
-# -----------------------------------------------------------------------------
-# UI – CABEÇALHO E CONTROLES
-# -----------------------------------------------------------------------------
 st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 st.markdown("---")
@@ -761,6 +723,14 @@ if "app_emocao_oculta" not in st.session_state:
     st.session_state.app_emocao_oculta = "nenhuma"
 if "mj_fase" not in st.session_state:
     st.session_state.mj_fase = mj_carregar_fase_inicial()
+if "momento" not in st.session_state:
+    st.session_state.momento = momento_carregar()
+if "max_avancos_por_cena" not in st.session_state:
+    st.session_state.max_avancos_por_cena = 1
+if "nsfw_max_level" not in st.session_state:
+    st.session_state.nsfw_max_level = 2
+if "estilo_escrita" not in st.session_state:
+    st.session_state.estilo_escrita = "AÇÃO"
 
 # Linha de opções rápidas
 col1, col2 = st.columns([3, 2])
@@ -784,15 +754,15 @@ with col2:
     st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
 
 
-# -----------------------------------------------------------------------------
-# Sidebar – Provedor, modelos, resumo, memória longa e ROMANCE MANUAL
-# -----------------------------------------------------------------------------
+# =========================
+# SIDEBAR — Provedor, modelo, resumo, memória, romance manual
+# =========================
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
 
+    # Provedor/modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
-
     if not api_key:
         st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
 
@@ -800,25 +770,22 @@ with st.sidebar:
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
 
-    # ---- Comprimento / timeout ----
+    st.markdown("---")
+    st.markdown("### ✍️ Estilo & NSFW")
+    st.selectbox(
+        "Estilo de escrita",
+        ["AÇÃO", "ROMANCE LENTO", "NOIR"],
+        index=["AÇÃO","ROMANCE LENTO","NOIR"].index(st.session_state.get("estilo_escrita","AÇÃO")),
+        key="estilo_escrita",
+    )
+    st.slider("Nível de calor (0=leve, 2=sensual)", 0, 2, value=int(st.session_state.get("nsfw_max_level",2)), key="nsfw_max_level")
+
     st.markdown("---")
     st.markdown("### ⏱️ Comprimento/timeout")
-    st.slider(
-        "Max tokens da resposta",
-        256, 2500,
-        value=int(st.session_state.get("max_tokens_rsp", 1200)),
-        step=32,
-        key="max_tokens_rsp",
-    )
-    st.slider(
-        "Timeout (segundos)",
-        60, 600,
-        value=int(st.session_state.get("timeout_s", 300)),
-        step=10,
-        key="timeout_s",
-    )
+    st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp", 1200)), step=32, key="max_tokens_rsp")
+    st.slider("Timeout (segundos)", 60, 600, value=int(st.session_state.get("timeout_s", 300)), step=10, key="timeout_s")
 
-    # ---- Resumo rápido ----
+    # Resumo rápido
     st.markdown("---")
     if st.button("📝 Gerar resumo do capítulo"):
         try:
@@ -832,12 +799,7 @@ with st.sidebar:
             r = requests.post(
                 api_url,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": model_id_call,
-                    "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 800,
-                    "temperature": 0.85,
-                },
+                json={"model": model_id_call, "messages": [{"role": "user", "content": prompt_resumo}], "max_tokens": 800, "temperature": 0.85},
                 timeout=int(st.session_state.get("timeout_s", 300)),
             )
             if r.status_code == 200:
@@ -850,28 +812,12 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
 
-    # ---- Memória longa ----
+    # Memória longa
     st.markdown("---")
     st.markdown("### 🗃️ Memória Longa")
-    st.checkbox(
-        "Usar memória longa no prompt",
-        value=st.session_state.get("use_memoria_longa", True),
-        key="use_memoria_longa",
-    )
-    st.slider(
-        "Top-K memórias",
-        1, 5,
-        int(st.session_state.get("k_memoria_longa", 3)),
-        1,
-        key="k_memoria_longa",
-    )
-    st.slider(
-        "Limiar de similaridade",
-        0.50, 0.95,
-        float(st.session_state.get("limiar_memoria_longa", 0.78)),
-        0.01,
-        key="limiar_memoria_longa",
-    )
+    st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
+    st.slider("Top-K memórias", 1, 5, int(st.session_state.get("k_memoria_longa", 3)), 1, key="k_memoria_longa")
+    st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
     if st.button("💾 Salvar última resposta como memória"):
         ultimo_assist = ""
         for m in reversed(st.session_state.get("session_msgs", [])):
@@ -884,46 +830,49 @@ with st.sidebar:
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
 
-    # ---- Histórico no prompt ----
+    # Histórico no prompt
     st.markdown("---")
     st.markdown("### 🧩 Histórico no prompt")
-    st.slider(
-        "Interações do Sheets (N)",
-        10, 30,
-        value=int(st.session_state.get("n_sheet_prompt", 15)),
-        step=1,
-        key="n_sheet_prompt",
-    )
+    st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
 
-    # ---- ROMANCE MANUAL ----
+    # ROMANCE MANUAL
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio (manual)")
     fase_default = mj_carregar_fase_inicial()
-    fase_escolhida = st.select_slider(
-        "Fase do romance",
-        options=[0,1,2,3,4],
-        value=int(st.session_state.get("mj_fase", fase_default)),
-        format_func=_fase_label,
-        key="ui_mj_fase"
-    )
+    options_fase = sorted(FASES_ROMANCE.keys())
+    max_phase = max(options_fase)
+    fase_ui_val = int(st.session_state.get("mj_fase", fase_default))
+    fase_ui_val = max(min(fase_ui_val, max_phase), min(options_fase))
+    fase_escolhida = st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
     if fase_escolhida != st.session_state.get("mj_fase", fase_default):
         mj_set_fase(fase_escolhida, persist=True)
 
     col_a, col_b = st.columns(2)
     with col_a:
         if st.button("➕ Avançar 1 passo"):
-            mj_set_fase(min(4, int(st.session_state.get("mj_fase", 0)) + 1), persist=True)
+            mj_set_fase(min(st.session_state.get("mj_fase", 0) + 1, max_phase), persist=True)
     with col_b:
         if st.button("↺ Reiniciar (0)"):
             mj_set_fase(0, persist=True)
+
+    st.slider("Micropassos por cena", 1, 3, value=int(st.session_state.get("max_avancos_por_cena", 1)), key="max_avancos_por_cena")
+
+    st.markdown("### 🎚️ Momento (manual)")
+    options_momento = sorted(MOMENTOS.keys())
+    mom_default = momento_carregar()
+    mom_ui_val = int(st.session_state.get("momento", mom_default))
+    mom_ui_val = max(min(mom_ui_val, max(options_momento)), min(options_momento))
+    mom_ui = st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
+    if mom_ui != st.session_state.get("momento", mom_default):
+        momento_set(mom_ui, persist=True)
 
     st.caption("Regra: 1 microavanço por cena. A fase só muda quando você decidir.")
     st.caption("Role a tela principal para ver interações anteriores.")
 
 
-# -----------------------------------------------------------------------------
-# EXIBIR HISTÓRICO RECENTE (primeiro interações, depois resumo)
-# -----------------------------------------------------------------------------
+# =========================
+# EXIBIR HISTÓRICO (depois resumo)
+# =========================
 with st.container():
     interacoes = carregar_interacoes(n=20)
     for r in interacoes:
@@ -936,17 +885,28 @@ with st.container():
             with st.chat_message("assistant"):
                 st.markdown(content)
 
-# Resumo no fim da tela
 if st.session_state.get("resumo_capitulo"):
     with st.expander("🧠 Resumo do capítulo (mais recente)"):
         st.markdown(st.session_state.resumo_capitulo)
 
 
-# -----------------------------------------------------------------------------
+# =========================
 # ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together) + FALLBACKS
-# -----------------------------------------------------------------------------
+# =========================
 entrada = st.chat_input("Digite sua direção de cena...")
 if entrada:
+    # Atualiza Momento sugerido (opcional e seguro)
+    try:
+        mom_atual = int(st.session_state.get("momento", momento_carregar()))
+        mom_sug = detectar_momento_sugerido(entrada, fallback=mom_atual)
+        mom_novo = clamp_momento(mom_atual, mom_sug, int(st.session_state.get("max_avancos_por_cena",1)))
+        if st.session_state.get("app_bloqueio_intimo", False):
+            # não retrocede automaticamente; apenas sobe até no máx. 1 passo
+            mom_novo = clamp_momento(mom_atual, mom_sug, 1)
+        momento_set(mom_novo, persist=True)
+    except Exception:
+        pass
+
     # salva a entrada e mantém histórico de sessão
     salvar_interacao("user", entrada)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
@@ -976,10 +936,7 @@ if entrada:
     # mensagens
     system_pt = {
         "role": "system",
-        "content": (
-            "Responda em português do Brasil. Evite conteúdo meta. "
-            "Mostre apenas a narrativa final ao leitor."
-        ),
+        "content": ("Responda em português do Brasil. Evite conteúdo meta. Mostre apenas a narrativa final ao leitor."),
     }
     messages = [system_pt, {"role": "system", "content": prompt}] + historico
 
@@ -991,15 +948,6 @@ if entrada:
         "stream": True,
     }
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
-
-    # --- filtro anti-meta (aplica na exibição e no salvamento) ---
-    def render_tail(t: str) -> str:
-        import re
-        if not t: return ""
-        t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$','', t, flags=re.IGNORECASE|re.MULTILINE)
-        t = re.sub(r'<\s*think\s*>.*?<\s*/\s*think\s*>', '', t, flags=re.IGNORECASE|re.DOTALL)
-        t = re.sub(r'\n{3,}', '\n\n', t)
-        return t.strip()
 
     with st.chat_message("assistant"):
         placeholder = st.empty()
@@ -1040,7 +988,10 @@ if entrada:
                                 continue
                             resposta_txt += delta
                             if time.time() - last_update > 0.10:
-                                placeholder.markdown(render_tail(resposta_txt) + "▌")
+                                out = render_tail(resposta_txt)
+                                # Sanitização NSFW conforme nível
+                                out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level",2)), action="corte-eliptico")
+                                placeholder.markdown(out + "▌")
                                 last_update = time.time()
                         except Exception:
                             continue
@@ -1050,7 +1001,7 @@ if entrada:
             st.error(f"Erro no streaming: {e}")
 
         # 2) FALLBACKS se veio vazio
-        visible_txt = render_tail(resposta_txt).strip()
+        visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",2)), action="corte-eliptico")
         if not visible_txt:
             # 2a) retry sem stream
             try:
@@ -1064,7 +1015,7 @@ if entrada:
                         resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
                     except Exception:
                         resposta_txt = ""
-                    visible_txt = render_tail(resposta_txt).strip()
+                    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",2)), action="corte-eliptico")
                 else:
                     st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
             except Exception as e:
@@ -1089,7 +1040,7 @@ if entrada:
                         resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
                     except Exception:
                         resposta_txt = ""
-                    visible_txt = render_tail(resposta_txt).strip()
+                    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",2)), action="corte-eliptico")
                 else:
                     st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
             except Exception as e:
@@ -1098,18 +1049,26 @@ if entrada:
         # 3) Exibição final (texto filtrado)
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
-        # 4) Validação semântica (entrada do user vs resposta) usando texto visível
+        # 4) Validação de momento (aviso leve, não bloqueia)
+        try:
+            viol = viola_momento(visible_txt, int(st.session_state.get("momento", 0)))
+            if viol and st.session_state.get("app_bloqueio_intimo", False):
+                st.info(f"⚠️ {viol}")
+        except Exception:
+            pass
+
+        # 5) Validação semântica (entrada do user vs resposta) usando texto visível
         if len(st.session_state.session_msgs) >= 1 and visible_txt and visible_txt != "[Sem conteúdo]":
             texto_anterior = st.session_state.session_msgs[-1]["content"]
             alerta = verificar_quebra_semantica_openai(texto_anterior, visible_txt)
             if alerta:
                 st.info(alerta)
 
-        # 5) Salvar resposta SEMPRE (usa o texto limpo/visível)
+        # 6) Salvar resposta SEMPRE (usa o texto limpo/visível)
         salvar_interacao("assistant", visible_txt or "[Sem conteúdo]")
         st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt or "[Sem conteúdo]"})
 
-        # 6) Reforço de memórias usadas (pós-resposta) com base no texto visível
+        # 7) Reforço de memórias usadas (pós-resposta) com base no texto visível
         try:
             usados = []
             topk_usadas = memoria_longa_buscar_topk(
