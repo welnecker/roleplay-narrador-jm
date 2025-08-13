@@ -358,20 +358,20 @@ def radar_contexto(max_itens=3):
 # -----------------------------------------------------------------------------
 FASES_ROMANCE = {
     0: {"nome": "Estranhos",
-        "permitidos": "olhares; near-miss (mesmo café/rua/ônibus); detalhe do ambiente",
-        "proibidos":  "troca de nomes; toques; conversa pessoal"},
+        "permitidos": "troca de nomes; toques; conversa pessoal",
+        "proibidos":  "Violência"},
     1: {"nome": "Percepção",
-        "permitidos": "cumprimento neutro; pergunta impessoal curta",
-        "proibidos":  "contato físico; confidências"},
-    2: {"nome": "Conhecidos",
-        "permitidos": "troca de nomes; pequena ajuda (porta/caneta/horário); 1 pergunta pessoal leve",
-        "proibidos":  "toque prolongado; encontro a sós planejado"},
-    3: {"nome": "Amizade",
-        "permitidos": "conversa de 10–20 min; caminhar juntos em local público; troca de contatos; 1 gesto de afeto leve (mão/ombro) com consentimento",
-        "proibidos":  "beijos; carícias intimistas"},
-    4: {"nome": "Confiança / Quase",
         "permitidos": "confidências; abraço com consentimento expresso; marcar encontro futuro claro",
-        "proibidos":  "sexo; sexo oral/manual; pressa ou “provas de amor” físicas"},
+        "proibidos":  "Violência"},
+    2: {"nome": "Conhecidos",
+        "permitidos": "toque prolongado; encontro a sós planejado",
+        "proibidos":  "Violência"},
+    3: {"nome": "Amizade",
+        "permitidos": "beijos; carícias intimistas",
+        "proibidos":  "Violência"},
+    4: {"nome": "Confiança / Quase",
+        "permitidos": "sexo; sexo oral/manual; pressa ou “provas de amor” físicas",
+        "proibidos":  "Violência"},
 }
 
 FLAG_FASE_TXT_PREFIX = "FLAG: mj_fase="
@@ -414,9 +414,9 @@ def mj_set_fase(n: int, persist: bool = True):
 def inserir_regras_mary_e_janio(prompt_base: str) -> str:
     regras = """
 ⚖️ Regras imutáveis de coerência:
-- Mary é virgem e decidiu permanecer casta até seu encontro definitivo com Jânio. Ela pode beijar, sentir desejo, mas NÃO cede a atos sexuais (sem penetração, sexo oral). Se pressionada, impõe limites com firmeza e elegância.
-- Jânio não pressiona; respeita limites e prioriza o vínculo. 
-- Sem sexo explícito. Priorize emoção, escolha e consequência.
+- Mary é virgem e decidiu permanecer casta até seu encontro definitivo com Jânio. com outros, ela pode beijar, sentir desejo, mas NÃO cede a atos sexuais (sem penetração, sexo oral). Se pressionada, impõe limites com firmeza e elegância.
+- Jânio pressiona; deseja e prioriza o contato. 
+- com sexo explícito. Priorize emoção, prazer e paixão.
 """
     return prompt_base + "\n" + regras.strip()
 
@@ -530,7 +530,7 @@ Sua função é narrar cenas com naturalidade e profundidade. Use narração em 
 - Proibidos nesta fase: {fdata['proibidos']}
 - **Regra por cena:** avance no máximo **um** micro-passo compatível com a fase atual.
 - Se a direção do roteirista pedir além da fase, **negocie** ou **adicie** com elegância (sem travar a cena).
-- Finalize com **microconquista + gancho** (palavra, gesto ou plano marcado), sem sexo explícito.
+- Finalize com **microconquista + gancho** (palavra, gesto ou plano marcado), com sexo explícito.
 
 📌 Regras de continuidade:
 - Mantenha o tom e os comportamentos apresentados nas últimas interações.
@@ -1008,3 +1008,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
