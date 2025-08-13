@@ -986,7 +986,7 @@ with main_col:
                             resposta_txt += delta
                             if time.time() - last_update > 0.10:
                                 out = render_tail(resposta_txt)
-                                # NSFW conforme nível (até 3)
+                                # Sanitização NSFW liberada: usa nível configurado (até 3)
                                 out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level", 3)), action="livre")
                                 placeholder.markdown(out + "▌")
                                 last_update = time.time()
