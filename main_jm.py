@@ -678,9 +678,16 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Micropassos:** avance no máximo **{int(st.session_state.get("max_avancos_por_cena",1))}** subpasso(s) rumo a: {proximo_nome}.
 - Se o roteirista pedir salto maior, **negocie**: nomeie limites, peça consentimento, e **prepare** a transição (não pule etapas).
 
+### Formato OBRIGATÓRIO da cena
+- **Inclua DIÁLOGOS diretos** com travessão (—) intercalados com ação. Mínimo: **4 falas** no total.
+- Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
+- **Inclua pensamentos internos** em itálico com `*...*`: **1 de Mary e 1 de Jânio**.
+- Mostre, não explique; evite “disse/ele disse” demais — use gestos, pausas e respiração.
+- Sem títulos de seção, sem “Microconquista:”/“Gancho:”.
+
 ### Regra de saída
 - Narre em **terceira pessoa**; não fale com "você".
-- Não exiba rótulos/meta (ex.: "Microconquista:", "Gancho:").
+- **É obrigatório** haver fala e pensamento conforme o formato.
 - Entregue uma cena coesa e finalizada; feche com um gancho implícito.
 """.strip()
 
@@ -734,6 +741,16 @@ def resposta_valida(t: str) -> bool:
     if len(t.strip()) < 5:
         return False
     return True
+
+def precisa_reforcar_dialogo(texto: str) -> bool:
+    if not texto:
+        return True
+    # conta linhas de fala iniciadas por travessão ou aspas
+    n_dialog = len(re.findall(r'(^|\n)\s*(—|")', texto))
+    # conta pensamentos em itálico *...*
+    n_thoughts = len(re.findall(r'\*[^*\n]{4,}\*', texto))
+    return (n_dialog < 4) or (n_thoughts < 2)
+
 
 # =========================
 # UI — CABEÇALHO E CONTROLES
@@ -1134,4 +1151,5 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
