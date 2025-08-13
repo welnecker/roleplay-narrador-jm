@@ -935,7 +935,7 @@ with st.sidebar:
     mom_ui_val = max(min(mom_ui_val, max(options_momento)), min(options_momento))
     mom_ui = st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
     if mom_ui != st.session_state.get("momento", mom_default):
-        momento_set(mom_ui, persist=True)
+        momento_set(mom_ui, persist=False)
 
     st.caption("Regra: 1 microavanço por cena. A fase só muda quando você decidir.")
     st.caption("Role a tela principal para ver interações anteriores.")
@@ -973,7 +973,7 @@ if entrada:
         mom_novo = clamp_momento(mom_atual, mom_sug, int(st.session_state.get("max_avancos_por_cena", 1)))
         if st.session_state.get("app_bloqueio_intimo", False):
             mom_novo = clamp_momento(mom_atual, mom_sug, 1)
-        momento_set(mom_novo, persist=True)
+        momento_set(mom_novo, persist=False)
     except Exception:
         pass
 
@@ -1166,4 +1166,5 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
