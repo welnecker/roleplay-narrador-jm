@@ -69,17 +69,17 @@ except Exception:
 # CONFIG BÁSICA DO APP
 # =========================
 
-st.set_page_config(page_title="Narrador JM", page_icon="🎬", layout="wide")
+#st.set_page_config(page_title="Narrador JM", page_icon="🎬", layout="wide")
 
 # Gate 18+
-if "age_ok" not in st.session_state:
-    st.session_state.age_ok = False
-if not st.session_state.age_ok:
-    st.title("🔞 Conteúdo adulto")
-    st.caption("Narrativa adulta, sensual, **sem pornografia explícita**. Confirme para prosseguir.")
-    if st.checkbox("Confirmo que tenho 18 anos ou mais e desejo prosseguir."):
-        st.session_state.age_ok = True
-    st.stop()
+#if "age_ok" not in st.session_state:
+ #   st.session_state.age_ok = False
+#if not st.session_state.age_ok:
+ #   st.title("🔞 Conteúdo adulto")
+  #  st.caption("Narrativa adulta, sensual, **sem pornografia explícita**. Confirme para prosseguir.")
+   # if st.checkbox("Confirmo que tenho 18 anos ou mais e desejo prosseguir."):
+    #    st.session_state.age_ok = True
+    #st.stop()
 
 # =========================
 # GOOGLE SHEETS — MODO ANTIGO
@@ -1148,4 +1148,5 @@ if entrada:
                 memoria_longa_reforcar(usados)
             except Exception:
                 pass
+
 
