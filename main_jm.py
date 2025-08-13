@@ -1,4 +1,5 @@
 # main.py
+
 # ============================================================
 # Narrador JM — Roleplay adulto (sem pornografia explícita)
 # Compatível com o método antigo: GOOGLE_CREDS_JSON + oauth2client
@@ -27,10 +28,10 @@ except Exception:
     OPENAI_CLIENT = None
     OPENAI_OK = False
 
-
 # =========================
 # CONFIG BÁSICA DO APP
 # =========================
+
 st.set_page_config(page_title="Narrador JM", page_icon="🎬", layout="wide")
 
 # Gate 18+
@@ -41,20 +42,20 @@ if not st.session_state.age_ok:
     st.caption("Narrativa adulta, sensual, **sem pornografia explícita**. Confirme para prosseguir.")
     if st.checkbox("Confirmo que tenho 18 anos ou mais e desejo prosseguir."):
         st.session_state.age_ok = True
-    st.stop()
-
+        st.stop()
 
 # =========================
 # GOOGLE SHEETS — MODO ANTIGO
 # =========================
+
 PLANILHA_ID_PADRAO = st.secrets.get("SPREADSHEET_ID", "").strip() or "1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM"
 
 def conectar_planilha():
     """
     Conecta via GOOGLE_CREDS_JSON (modo antigo/estável).
     Espera:
-      - st.secrets["GOOGLE_CREDS_JSON"]: string JSON do service account
-      - (opcional) st.secrets["SPREADSHEET_ID"]: ID da planilha
+    - st.secrets["GOOGLE_CREDS_JSON"]: string JSON do service account
+    - (opcional) st.secrets["SPREADSHEET_ID"]: ID da planilha
     """
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
@@ -75,10 +76,10 @@ def conectar_planilha():
 planilha = conectar_planilha()
 
 # Abas esperadas
-TAB_INTERACOES = "interacoes_jm"     # timestamp | role | content
-TAB_PERFIL     = "perfil_jm"         # timestamp | resumo
-TAB_MEMORIAS   = "memorias_jm"       # tipo | conteudo
-TAB_ML         = "memoria_longa_jm"  # texto | embedding | tags | timestamp | score
+TAB_INTERACOES = "interacoes_jm" # timestamp | role | content
+TAB_PERFIL = "perfil_jm" # timestamp | resumo
+TAB_MEMORIAS = "memorias_jm" # tipo | conteudo
+TAB_ML = "memoria_longa_jm" # texto | embedding | tags | timestamp | score
 
 def _ws(name: str, create_if_missing: bool = True):
     if not planilha:
@@ -103,10 +104,10 @@ def _ws(name: str, create_if_missing: bool = True):
         except Exception:
             return None
 
-
 # =========================
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =========================
+
 def carregar_memorias_brutas() -> Dict[str, List[str]]:
     """Lê 'memorias_jm' e devolve um dict {tag_lower: [linhas]}."""
     try:
@@ -192,10 +193,10 @@ def carregar_interacoes(n: int = 20):
         st.warning(f"Erro ao carregar interações: {e}")
         return []
 
-
 # =========================
 # EMBEDDINGS / SIMILARIDADE
 # =========================
+
 def gerar_embedding_openai(texto: str):
     if not OPENAI_OK:
         return None
@@ -224,10 +225,10 @@ def verificar_quebra_semantica_openai(texto1: str, texto2: str, limite=0.6) -> s
         return f"⚠️ Baixa continuidade narrativa (similaridade: {sim:.2f})."
     return ""
 
-
 # =========================
 # MEMÓRIA LONGA (Sheets + Embeddings/OpenAI opcional)
 # =========================
+
 def _sheet_ensure_memoria_longa():
     """Retorna a aba memoria_longa_jm se existir (não cria automaticamente)."""
     return _ws(TAB_ML, create_if_missing=False)
@@ -280,7 +281,6 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
     except Exception as e:
         st.warning(f"Erro ao carregar memoria_longa_jm: {e}")
         return []
-
     q = gerar_embedding_openai(query_text) if OPENAI_OK else None
     candidatos = []
     for row in dados:
@@ -292,7 +292,6 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
             score = 1.0
         if not texto:
             continue
-
         if q is not None and emb_s:
             vec = _deserialize_vec(emb_s)
             if vec.ndim == 1 and vec.size >= 10:
@@ -304,7 +303,6 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
             s1 = _tokenize(texto)
             s2 = _tokenize(query_text)
             sim = len(s1 & s2) / max(1, len(s1 | s2))
-
         if sim >= limiar:
             rr = 0.7 * sim + 0.3 * score
             candidatos.append((texto, score, sim, rr))
@@ -320,7 +318,7 @@ def memoria_longa_reforcar(textos_usados: list):
         dados = aba.get_all_values()
         if not dados or len(dados) < 2:
             return
-        headers = dados[0]
+        headers = dados
         idx_texto = headers.index("texto")
         idx_score = headers.index("score")
         for i, linha in enumerate(dados[1:], start=2):
@@ -337,30 +335,32 @@ def memoria_longa_reforcar(textos_usados: list):
     except Exception:
         pass
 
-
 # =========================
 # ROMANCE (FASES) + MOMENTO
 # =========================
+
 FASES_ROMANCE: Dict[int, Dict[str, str]] = {
     0: {"nome": "Estranhos",
         "permitidos": "olhares; near-miss (mesmo café/rua/ônibus); detalhe do ambiente",
-        "proibidos":  "troca de nomes; toques; conversa pessoal"},
+        "proibidos": "troca de nomes; toques; conversa pessoal"},
     1: {"nome": "Percepção",
         "permitidos": "cumprimento neutro; pergunta impessoal curta",
-        "proibidos":  "contato físico; confidências"},
+        "proibidos": "contato físico; confidências"},
     2: {"nome": "Conhecidos",
         "permitidos": "troca de nomes; pequena ajuda; 1 pergunta pessoal leve",
-        "proibidos":  "toque prolongado; encontro a sós planejado"},
+        "proibidos": "toque prolongado; encontro a sós planejado"},
     3: {"nome": "Amizade",
         "permitidos": "conversa 10–20 min; caminhar juntos; troca de contatos; 1 gesto de afeto leve (com consentimento)",
-        "proibidos":  "beijos; carícias intimistas"},
+        "proibidos": "beijos; carícias intimistas"},
     4: {"nome": "Confiança / Quase",
         "permitidos": "confidências; abraço com consentimento expresso; marcar encontro futuro claro",
-        "proibidos":  "sexo; sexo oral/manual; pressa ou “provas de amor” físicas"},
+        "proibidos": "sexo; sexo oral/manual; pressa ou “provas de amor” físicas"},
     5: {"nome": "Compromisso / Encontro definitivo",
         "permitidos": "beijo prolongado; dormir juntos; consumação **implícita** (fade-to-black); manhã seguinte sugerida",
-        "proibidos":  "descrição explícita de atos sexuais; detalhes anatômicos; linguagem pornográfica"},
+        # Proibições originais retiradas para permitir explícito:
+        "proibidos": ""},
 }
+
 FLAG_FASE_TXT_PREFIX = "FLAG: mj_fase="
 
 def _fase_label(n: int) -> str:
@@ -415,16 +415,19 @@ MOMENTOS = {
     3: {"nome": "Consentimento explícito",
         "objetivo": "alinhamento de limites e um 'sim' claro",
         "permitidos": "nomear fronteiras; pedir/receber consentimento; decidir 'agora sim'",
-        "proibidos": "descrever ato gráfico nesta cena",
+        # Proibição removida para permitir descrição explícita:
+        "proibidos": "",
         "gatilhos": [r"\b(consento|quero|vamos juntos|tudo bem pra voc[eê])\b", r"\b(at[eé] onde)\b"],
         "proximo": 4},
     4: {"nome": "Intimidade (elíptica)",
         "objetivo": "intimidade sugerida (fade-to-black) / pós-ato implícito",
         "permitidos": "beijos longos; proximidade forte; fade-to-black; manhã seguinte implícita",
-        "proibidos": "descrição gráfica de ato sexual ou anatomia",
+        # Proibição removida para permitir descrição gráfica:
+        "proibidos": "",
         "gatilhos": [r"\b(quarto|cama|luz baixa|porta fechada|manh[aã] seguinte)\b"],
         "proximo": 4},
 }
+
 def _momento_label(n: int) -> str:
     m = MOMENTOS.get(int(n), MOMENTOS[0])
     return f"{int(n)} — {m['nome']}"
@@ -435,8 +438,7 @@ def detectar_momento_sugerido(texto: str, fallback: int = 0) -> int:
         for gx in MOMENTOS[i]["gatilhos"]:
             if re.search(gx, t, flags=re.IGNORECASE):
                 return i
-    if re.search(r"\b(tirar roupa|nu[a$o]?|penetra|sexo|boquete)\b", t, flags=re.IGNORECASE):
-        return min(3, fallback)  # força parar em consentimento
+    # Removido o freio por termos explícitos: não força parada.
     return fallback
 
 def clamp_momento(atual: int, proposto: int, max_steps: int) -> int:
@@ -472,19 +474,13 @@ def momento_carregar() -> int:
     return 0
 
 def viola_momento(texto: str, momento: int) -> str:
-    t = (texto or "").lower()
-    if momento <= 1 and re.search(r"\b(l[ií]ngua|tirar roupa|suti[aã]|seio|penetra|boquete)\b", t):
-        return "Ato íntimo precoce antes de revelação/consentimento."
-    if momento == 2 and re.search(r"\b(tirar roupa|suti[aã]|seio|penetra|boquete)\b", t):
-        return "Ato íntimo antes de consentimento explícito."
-    if momento == 3 and re.search(r"\b(penetra|boquete|sexo explicitamente descrito)\b", t):
-        return "Descrição de ato em cena — finalize com decisão/consentimento e corte elíptico."
+    # Não bloquear/censurar conteúdo explícito por momento.
     return ""
-
 
 # =========================
 # PROVEDORES E MODELOS
 # =========================
+
 MODELOS_OPENROUTER = {
     "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
@@ -533,12 +529,13 @@ def api_config_for_provider(provider: str):
             MODELOS_TOGETHER_UI,
         )
 
-
 # =========================
 # PROMPT BUILDER
 # =========================
+
 def inserir_regras_mary_e_janio(prompt_base: str) -> str:
-    calor = int(st.session_state.get("steam_level", st.session_state.get("nsfw_max_level", 1)))
+    # padrão elevado para 3 (explícito)
+    calor = int(st.session_state.get("steam_level", st.session_state.get("nsfw_max_level", 3)))
     regras = f"""
 ⚖️ Regras de coerência:
 - Narre em terceira pessoa; não se dirija ao leitor como "você".
@@ -548,8 +545,9 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 """.strip()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     if fase >= 5:
+        # liberar explícito em fase 5
         regras += """
-- Intimidade pode ser sugerida com corte elíptico (fade-to-black); sem descrição explícita de atos sexuais."""
+- Intimidade pode ser descrita com detalhes explícitos (sem necessidade de corte)."""
     else:
         regras += """
 - Sem consumação em cena; foque em progressão coerente."""
@@ -558,14 +556,11 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 def construir_prompt_com_narrador() -> str:
     memos = carregar_memorias_brutas()
     perfil = carregar_resumo_salvo()
-
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
-
     momento_atual = int(st.session_state.get("momento", momento_carregar()))
-    mdata = MOMENTOS.get(momento_atual, MOMENTOS[0])
+    mdata = MOMENTOS.get(momento_atual, MOMENTOS)
     proximo_nome = MOMENTOS[mdata["proximo"]]["nome"]
-
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
 
     # Histórico do Sheets
@@ -620,8 +615,8 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 ### Estilo
 - Use o estilo **{estilo}**:
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
- ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
- ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
+("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
+("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
 
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
@@ -648,15 +643,15 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
 
-
 # =========================
 # FILTROS DE SAÍDA
 # =========================
+
 def render_tail(t: str) -> str:
     if not t: return ""
-    # remove rótulos meta e <think>
+    # remove rótulos meta e
     t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$', '', t, flags=re.IGNORECASE | re.MULTILINE)
-    t = re.sub(r'<\s*think\s*>.*?<\s*/\s*think\s*>', '', t, flags=re.IGNORECASE | re.DOTALL)
+    t = re.sub(r'&lt;\s*think\s*&gt;.*?&lt;\s*/\s*think\s*&gt;', '', t, flags=re.IGNORECASE | re.DOTALL)
     t = re.sub(r'\n{3,}', '\n\n', t).strip()
     return t
 
@@ -668,7 +663,7 @@ EXPL_PAT = re.compile(
 
 def classify_nsfw_level(t: str) -> int:
     if EXPL_PAT.search(t or ""):
-        return 3  # explícito
+        return 3 # explícito
     if re.search(r"\b(cintura|pesco[cç]o|costas|beijo prolongado|respira[cç][aã]o curta)\b", (t or ""), re.IGNORECASE):
         return 2
     if re.search(r"\b(olhar|aproximar|toque|m[aã]os dadas|beijo)\b", (t or ""), re.IGNORECASE):
@@ -676,18 +671,16 @@ def classify_nsfw_level(t: str) -> int:
     return 0
 
 def sanitize_explicit(t: str, max_level: int, action: str) -> str:
+    # Liberação: se o conteúdo for de nível <= max_level, retorna tal como está.
     lvl = classify_nsfw_level(t)
     if lvl <= max_level:
         return t
-    if action.lower().startswith("corte"):
-        return re.sub(r"\s+$", "", t) + "\n\n[A luz baixa. O que vem depois fica fora de quadro.]"
-    # Reescrita leve: remove linhas explícitas
-    t = re.sub(r"^.*" + EXPL_PAT.pattern + r".*$", "", t, flags=re.IGNORECASE | re.MULTILINE)
-    t = re.sub(r'\n{3,}', '\n\n', t).strip()
+    # Se extrapolar o máximo definido, não cortar por padrão (liberar NSFW). Apenas retorna sem censura.
     return t
 
 def redact_for_logs(t: str) -> str:
     if not t: return ""
+    # Mantém ofuscação no log se desejar (opcional). Pode deixar como estava:
     t = re.sub(EXPL_PAT, "[…]", t, flags=re.IGNORECASE)
     return re.sub(r'\n{3,}', '\n\n', t).strip()
 
@@ -698,10 +691,10 @@ def resposta_valida(t: str) -> bool:
         return False
     return True
 
-
 # =========================
 # UI — CABEÇALHO E CONTROLES
 # =========================
+
 st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 st.markdown("---")
@@ -728,7 +721,8 @@ if "momento" not in st.session_state:
 if "max_avancos_por_cena" not in st.session_state:
     st.session_state.max_avancos_por_cena = 1
 if "nsfw_max_level" not in st.session_state:
-    st.session_state.nsfw_max_level = 2
+    # padrão elevado para 3 (explícito)
+    st.session_state.nsfw_max_level = 3
 if "estilo_escrita" not in st.session_state:
     st.session_state.estilo_escrita = "AÇÃO"
 
@@ -753,19 +747,17 @@ with col2:
     st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloqueio_intimo", False)
     st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
 
-
 # =========================
 # SIDEBAR — Provedor, modelo, resumo, memória, romance manual
 # =========================
+
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
-
     # Provedor/modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
     if not api_key:
         st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
-
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
@@ -778,7 +770,8 @@ with st.sidebar:
         index=["AÇÃO","ROMANCE LENTO","NOIR"].index(st.session_state.get("estilo_escrita","AÇÃO")),
         key="estilo_escrita",
     )
-    st.slider("Nível de calor (0=leve, 2=sensual)", 0, 2, value=int(st.session_state.get("nsfw_max_level",2)), key="nsfw_max_level")
+    # Elevar slider para aceitar 3
+    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level",3)), key="nsfw_max_level")
 
     st.markdown("---")
     st.markdown("### ⏱️ Comprimento/timeout")
@@ -838,6 +831,7 @@ with st.sidebar:
     # ROMANCE MANUAL
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio (manual)")
+
     fase_default = mj_carregar_fase_inicial()
     options_fase = sorted(FASES_ROMANCE.keys())
     max_phase = max(options_fase)
@@ -869,10 +863,10 @@ with st.sidebar:
     st.caption("Regra: 1 microavanço por cena. A fase só muda quando você decidir.")
     st.caption("Role a tela principal para ver interações anteriores.")
 
-
 # =========================
 # EXIBIR HISTÓRICO (depois resumo)
 # =========================
+
 with st.container():
     interacoes = carregar_interacoes(n=20)
     for r in interacoes:
@@ -884,16 +878,16 @@ with st.container():
         else:
             with st.chat_message("assistant"):
                 st.markdown(content)
-
-if st.session_state.get("resumo_capitulo"):
-    with st.expander("🧠 Resumo do capítulo (mais recente)"):
-        st.markdown(st.session_state.resumo_capitulo)
-
+    if st.session_state.get("resumo_capitulo"):
+        with st.expander("🧠 Resumo do capítulo (mais recente)"):
+            st.markdown(st.session_state.resumo_capitulo)
 
 # =========================
 # ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together) + FALLBACKS
 # =========================
+
 entrada = st.chat_input("Digite sua direção de cena...")
+
 if entrada:
     # Atualiza Momento sugerido (opcional e seguro)
     try:
@@ -947,11 +941,12 @@ if entrada:
         "temperature": 0.9,
         "stream": True,
     }
+
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
     with st.chat_message("assistant"):
         placeholder = st.empty()
-        resposta_txt = ""     # texto bruto vindo do stream
+        resposta_txt = "" # texto bruto vindo do stream
         last_update = time.time()
 
         # Reforço antecipado: memórias que ENTRARAM no prompt (topk + recorrentes)
@@ -989,8 +984,8 @@ if entrada:
                             resposta_txt += delta
                             if time.time() - last_update > 0.10:
                                 out = render_tail(resposta_txt)
-                                # Sanitização NSFW conforme nível
-                                out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level",2)), action="corte-eliptico")
+                                # Sanitização NSFW liberada: usa nível configurado (até 3)
+                                out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level",3)), action="livre")
                                 placeholder.markdown(out + "▌")
                                 last_update = time.time()
                         except Exception:
@@ -1001,7 +996,8 @@ if entrada:
             st.error(f"Erro no streaming: {e}")
 
         # 2) FALLBACKS se veio vazio
-        visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",2)), action="corte-eliptico")
+        visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",3)), action="livre")
+
         if not visible_txt:
             # 2a) retry sem stream
             try:
@@ -1015,7 +1011,7 @@ if entrada:
                         resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
                     except Exception:
                         resposta_txt = ""
-                    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",2)), action="corte-eliptico")
+                    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",3)), action="livre")
                 else:
                     st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
             except Exception as e:
@@ -1040,13 +1036,13 @@ if entrada:
                         resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
                     except Exception:
                         resposta_txt = ""
-                    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",2)), action="corte-eliptico")
+                    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",3)), action="livre")
                 else:
                     st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # 3) Exibição final (texto filtrado)
+        # 3) Exibição final (texto filtrado de acordo com o nível)
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
         # 4) Validação de momento (aviso leve, não bloqueia)
@@ -1064,7 +1060,7 @@ if entrada:
             if alerta:
                 st.info(alerta)
 
-        # 6) Salvar resposta SEMPRE (usa o texto limpo/visível)
+        # 6) Salvar resposta SEMPRE (usa o texto visível)
         salvar_interacao("assistant", visible_txt or "[Sem conteúdo]")
         st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt or "[Sem conteúdo]"})
 
