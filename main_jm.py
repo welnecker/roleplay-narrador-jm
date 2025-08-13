@@ -801,15 +801,18 @@ if st.session_state.get("resumo_capitulo"):
 # -----------------------------------------------------------------------------
 entrada = st.chat_input("Digite sua direção de cena...")
 if entrada:
+    # salva a entrada e mantém histórico de sessão
     salvar_interacao("user", entrada)
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
+    # constrói prompt principal
     prompt = construir_prompt_com_narrador()
 
-    # Histórico curto (somente sessão atual; o prompt já inclui últimas do sheet)
+    # histórico curto (somente sessão atual; o prompt já inclui últimas do sheet)
     historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
                  for m in st.session_state.session_msgs]
 
+    # provedor + modelo
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
@@ -820,6 +823,7 @@ if entrada:
         auth = st.secrets["OPENROUTER_API_KEY"]
         model_to_call = st.session_state.modelo_escolhido_id
 
+    # mensagens
     system_pt = {
         "role": "system",
         "content": (
@@ -838,13 +842,25 @@ if entrada:
     }
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
+    # --- filtro anti-meta (aplica na exibição e no salvamento) ---
+    def render_tail(t: str) -> str:
+        import re
+        if not t:
+            return ""
+        # remove rótulos tipo "Microconquista:" / "Gancho:" (com ou sem **)
+        t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$',
+                   '', t, flags=re.IGNORECASE | re.MULTILINE)
+        # oculta blocos de raciocínio do modelo se vierem em <think>...</think>
+        t = re.sub(r'<\s*think\s*>.*?<\s*/\s*think\s*>', '',
+                   t, flags=re.IGNORECASE | re.DOTALL)
+        # compacta quebras múltiplas
+        t = re.sub(r'\n{3,}', '\n\n', t)
+        return t.strip()
+
     with st.chat_message("assistant"):
         placeholder = st.empty()
-        resposta_txt = ""
+        resposta_txt = ""     # texto bruto vindo do stream
         last_update = time.time()
-
-        def render_tail(t: str) -> str:
-            return t  # se quiser ocultar <think>, filtre aqui
 
         # Reforço antecipado: memórias que ENTRARAM no prompt (topk + recorrentes)
         try:
@@ -859,8 +875,10 @@ if entrada:
 
         # 1) STREAM
         try:
-            with requests.post(endpoint, headers=headers, json=payload, stream=True,
-                               timeout=int(st.session_state.get("timeout_s", 300))) as r:
+            with requests.post(
+                endpoint, headers=headers, json=payload, stream=True,
+                timeout=int(st.session_state.get("timeout_s", 300))
+            ) as r:
                 if r.status_code == 200:
                     for raw in r.iter_lines(decode_unicode=False):
                         if not raw:
@@ -877,18 +895,21 @@ if entrada:
                             if not delta:
                                 continue
                             resposta_txt += delta
+                            # atualiza na tela com o texto já filtrado (anti-meta)
                             if time.time() - last_update > 0.10:
                                 placeholder.markdown(render_tail(resposta_txt) + "▌")
                                 last_update = time.time()
                         except Exception:
                             continue
                 else:
-                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: "
+                             f"{r.status_code} - {r.text}")
         except Exception as e:
             st.error(f"Erro no streaming: {e}")
 
-        # 2) FALLBACKS se veio vazio
-        if not resposta_txt.strip():
+        # 2) FALLBACKS se veio vazio ou falhou
+        visible_txt = render_tail(resposta_txt).strip()
+        if not visible_txt:
             # 2a) retry sem stream
             try:
                 r2 = requests.post(
@@ -897,13 +918,17 @@ if entrada:
                     timeout=int(st.session_state.get("timeout_s", 300))
                 )
                 if r2.status_code == 200:
-                    resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
+                    try:
+                        resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
+                    visible_txt = render_tail(resposta_txt).strip()
                 else:
                     st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
             except Exception as e:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
-        if not resposta_txt.strip():
+        if not visible_txt:
             # 2b) retry sem o system extra (alguns modelos travam com system duplo)
             try:
                 r3 = requests.post(
@@ -918,17 +943,21 @@ if entrada:
                     timeout=int(st.session_state.get("timeout_s", 300))
                 )
                 if r3.status_code == 200:
-                    resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
+                    try:
+                        resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
+                    visible_txt = render_tail(resposta_txt).strip()
                 else:
                     st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # Flush final na tela
-        placeholder.markdown(render_tail(resposta_txt) if resposta_txt.strip() else "[Sem conteúdo]")
+        # 3) Exibição final (texto filtrado) — evita rótulos/meta
+        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
-        # Validação sintática + regeneração simples
-        if resposta_txt.strip() and not resposta_valida(resposta_txt):
+        # 4) Validação sintática + regeneração simples (se necessário)
+        if visible_txt and not resposta_valida(visible_txt):
             st.warning("⚠️ Resposta corrompida detectada. Tentando regenerar...")
             try:
                 regen = requests.post(
@@ -944,29 +973,33 @@ if entrada:
                     timeout=int(st.session_state.get("timeout_s", 300)),
                 )
                 if regen.status_code == 200:
-                    resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
-                    placeholder.markdown(render_tail(resposta_txt))
+                    try:
+                        resposta_txt = regen.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
+                    visible_txt = render_tail(resposta_txt) if resposta_txt else "[Sem conteúdo]"
+                    placeholder.markdown(visible_txt)
                 else:
                     st.error(f"Erro ao regenerar: {regen.status_code} - {regen.text}")
             except Exception as e:
                 st.error(f"Erro ao regenerar: {e}")
 
-        # Validação semântica (entrada do user vs resposta)
-        if len(st.session_state.session_msgs) >= 1 and resposta_txt and resposta_txt != "[Sem conteúdo]":
+        # 5) Validação semântica (entrada do user vs resposta) usando texto visível
+        if len(st.session_state.session_msgs) >= 1 and visible_txt and visible_txt != "[Sem conteúdo]":
             texto_anterior = st.session_state.session_msgs[-1]["content"]  # última entrada do user
-            alerta = verificar_quebra_semantica_openai(texto_anterior, resposta_txt)
+            alerta = verificar_quebra_semantica_openai(texto_anterior, visible_txt)
             if alerta:
                 st.info(alerta)
 
-        # Salvar resposta SEMPRE (mesmo que curta)
-        salvar_interacao("assistant", resposta_txt or "[Sem conteúdo]")
-        st.session_state.session_msgs.append({"role": "assistant", "content": resposta_txt or "[Sem conteúdo]"})
+        # 6) Salvar resposta SEMPRE (usa o texto limpo/visível)
+        salvar_interacao("assistant", visible_txt or "[Sem conteúdo]")
+        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt or "[Sem conteúdo]"})
 
-        # Reforço de memórias usadas (pós-resposta)
+        # 7) Reforço de memórias usadas (pós-resposta) com base no texto visível
         try:
             usados = []
             topk_usadas = memoria_longa_buscar_topk(
-                query_text=resposta_txt,
+                query_text=visible_txt,
                 k=int(st.session_state.k_memoria_longa),
                 limiar=float(st.session_state.limiar_memoria_longa),
             )
