@@ -684,167 +684,329 @@ def resposta_valida(t: str) -> bool:
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
 
-    # Provedor e modelo
+   # -----------------------------------------------------------------------------
+# PROVEDORES E MODELOS
+# -----------------------------------------------------------------------------
+MODELOS_OPENROUTER = {
+    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+}
+
+MODELOS_TOGETHER_UI = {
+    "🧠 Qwen3 Coder 480B (Together)": "togethercomputer/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
+}
+
+def model_id_for_together(api_ui_model_id: str) -> str:
+    # normaliza algumas variações comuns de UI → endpoint
+    key = api_ui_model_id.strip()
+    if "Qwen3-Coder-480B-A35B-Instruct-FP8" in key:
+        return "Qwen/Qwen3-Coder-480B-Instruct-FP8"
+    if key.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
+        return "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    return key
+
+def api_config_for_provider(provider: str):
+    if provider == "OpenRouter":
+        return (
+            "https://openrouter.ai/api/v1/chat/completions",
+            st.secrets.get("OPENROUTER_API_KEY", ""),
+            MODELOS_OPENROUTER,
+        )
+    else:
+        return (
+            "https://api.together.xyz/v1/chat/completions",
+            st.secrets.get("TOGETHER_API_KEY", ""),
+            MODELOS_TOGETHER_UI,
+        )
+
+
+# -----------------------------------------------------------------------------
+# UI – CABEÇALHO E CONTROLES
+# -----------------------------------------------------------------------------
+st.title("🎬 Narrador JM")
+st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
+st.markdown("---")
+
+# Estado inicial
+if "resumo_capitulo" not in st.session_state:
+    st.session_state.resumo_capitulo = carregar_resumo_salvo()
+if "session_msgs" not in st.session_state:
+    st.session_state.session_msgs = []
+if "use_memoria_longa" not in st.session_state:
+    st.session_state.use_memoria_longa = True
+if "k_memoria_longa" not in st.session_state:
+    st.session_state.k_memoria_longa = 3
+if "limiar_memoria_longa" not in st.session_state:
+    st.session_state.limiar_memoria_longa = 0.78
+if "app_bloqueio_intimo" not in st.session_state:
+    st.session_state.app_bloqueio_intimo = False
+if "app_emocao_oculta" not in st.session_state:
+    st.session_state.app_emocao_oculta = "nenhuma"
+if "mj_fase" not in st.session_state:
+    st.session_state.mj_fase = mj_carregar_fase_inicial()
+
+# Linha de opções rápidas
+col1, col2 = st.columns([3, 2])
+with col1:
+    st.markdown("#### 📖 Último resumo salvo:")
+    st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
+with col2:
+    st.markdown("#### ⚙️ Opções")
+    st.checkbox(
+        "Bloquear avanços íntimos sem ordem",
+        value=st.session_state.app_bloqueio_intimo,
+        key="ui_bloqueio_intimo",
+    )
+    st.selectbox(
+        "🎭 Emoção oculta",
+        ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
+        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
+        key="ui_app_emocao_oculta",
+    )
+    st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloqueio_intimo", False)
+    st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
+
+
+# -----------------------------------------------------------------------------
+# Sidebar – Provedor, modelos, resumo, memória longa e ROMANCE MANUAL
+# -----------------------------------------------------------------------------
+with st.sidebar:
+    st.title("🧭 Painel do Roteirista")
+
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
 
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
-    st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
+    if not api_key:
+        st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
 
+    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
+    modelo_escolhido_id_ui = modelos_map[modelo_nome]
+    st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
+
+    # ---- Comprimento / timeout ----
     st.markdown("---")
-    st.markdown("### 📝 Resumo rápido")
-    if st.button("Gerar resumo do capítulo"):
+    st.markdown("### ⏱️ Comprimento/timeout")
+    st.slider(
+        "Max tokens da resposta",
+        256, 2500,
+        value=int(st.session_state.get("max_tokens_rsp", 1200)),
+        step=32,
+        key="max_tokens_rsp",
+    )
+    st.slider(
+        "Timeout (segundos)",
+        60, 600,
+        value=int(st.session_state.get("timeout_s", 300)),
+        step=10,
+        key="timeout_s",
+    )
+
+    # ---- Resumo rápido ----
+    st.markdown("---")
+    if st.button("📝 Gerar resumo do capítulo"):
         try:
             inter = carregar_interacoes(n=6)
             texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
-            prompt_resumo = "Resuma com tom de novela brasileira:\n\n" + texto + "\n\nResumo:"
-            model_id_call = st.session_state.modelo_escolhido_id
+            prompt_resumo = (
+                "Resuma o seguinte trecho como um capítulo de novela brasileiro, mantendo tom e emoções.\n\n"
+                + texto + "\n\nResumo:"
+            )
+            model_id_call = model_id_for_together(modelo_escolhido_id_ui) if provedor == "Together" else modelo_escolhido_id_ui
             r = requests.post(
                 api_url,
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": model_id_call, "messages": [{"role":"user","content":prompt_resumo}],
-                      "max_tokens": 800, "temperature": 0.85},
-                timeout=120,
+                json={
+                    "model": model_id_call,
+                    "messages": [{"role": "user", "content": prompt_resumo}],
+                    "max_tokens": 800,
+                    "temperature": 0.85,
+                },
+                timeout=int(st.session_state.get("timeout_s", 300)),
             )
             if r.status_code == 200:
                 resumo = r.json()["choices"][0]["message"]["content"].strip()
                 st.session_state.resumo_capitulo = resumo
                 salvar_resumo(resumo)
-                st.success("Resumo gerado e salvo.")
+                st.success("Resumo gerado e salvo com sucesso!")
             else:
                 st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
         except Exception as e:
-            st.error(f"Erro: {e}")
+            st.error(f"Erro ao gerar resumo: {e}")
 
+    # ---- Memória longa ----
     st.markdown("---")
     st.markdown("### 🗃️ Memória Longa")
-    st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
-    st.slider("Top-K memórias", 1, 5, st.session_state.get("k_memoria_longa", 3), 1, key="k_memoria_longa")
-    st.slider("Limiar de similaridade", 0.50, 0.95,
-              float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
+    st.checkbox(
+        "Usar memória longa no prompt",
+        value=st.session_state.get("use_memoria_longa", True),
+        key="use_memoria_longa",
+    )
+    st.slider(
+        "Top-K memórias",
+        1, 5,
+        int(st.session_state.get("k_memoria_longa", 3)),
+        1,
+        key="k_memoria_longa",
+    )
+    st.slider(
+        "Limiar de similaridade",
+        0.50, 0.95,
+        float(st.session_state.get("limiar_memoria_longa", 0.78)),
+        0.01,
+        key="limiar_memoria_longa",
+    )
     if st.button("💾 Salvar última resposta como memória"):
         ultimo_assist = ""
         for m in reversed(st.session_state.get("session_msgs", [])):
             if m.get("role") == "assistant":
-                ultimo_assist = m.get("content","").strip()
+                ultimo_assist = m.get("content", "").strip()
                 break
         if ultimo_assist:
-            ok = memoria_longa_salvar(ultimo_assist, tags="[scene]")
-            st.success("Memória salva." if ok else "Falha ao salvar.")
+            ok = memoria_longa_salvar(ultimo_assist, tags="auto")
+            st.success("Memória de longo prazo salva!" if ok else "Falha ao salvar memória.")
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
 
+    # ---- Histórico no prompt ----
+    st.markdown("---")
+    st.markdown("### 🧩 Histórico no prompt")
+    st.slider(
+        "Interações do Sheets (N)",
+        10, 30,
+        value=int(st.session_state.get("n_sheet_prompt", 15)),
+        step=1,
+        key="n_sheet_prompt",
+    )
+
+    # ---- ROMANCE MANUAL ----
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio (manual)")
     fase_default = mj_carregar_fase_inicial()
-    fase_escolhida = st.select_slider("Fase do romance", options=[0,1,2,3,4,5],
-                                      value=int(st.session_state.get("mj_fase", fase_default)),
-                                      format_func=_fase_label, key="ui_mj_fase")
+    fase_escolhida = st.select_slider(
+        "Fase do romance",
+        options=[0,1,2,3,4],
+        value=int(st.session_state.get("mj_fase", fase_default)),
+        format_func=_fase_label,
+        key="ui_mj_fase"
+    )
     if fase_escolhida != st.session_state.get("mj_fase", fase_default):
         mj_set_fase(fase_escolhida, persist=True)
 
-    st.markdown("---")
-    st.markdown("### 🎯 Momento da Cena")
-    st.checkbox("Auto sincronizar momento com a direção", value=st.session_state.get("momento_auto", True), key="momento_auto")
-    st.slider("Máx. micropassos nesta cena", 1, 3, value=int(st.session_state.get("max_avancos_por_cena", 1)),
-              step=1, key="max_avancos_por_cena")
-    mom_default = momento_carregar()
-    mom_ui = st.select_slider("Momento atual", options=[0,1,2,3,4],
-                              value=int(st.session_state.get("momento", mom_default)),
-                              format_func=_momento_label, key="ui_momento")
-    if mom_ui != st.session_state.get("momento", mom_default):
-        momento_set(mom_ui, persist=True)
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("➕ Avançar 1 passo"):
+            mj_set_fase(min(4, int(st.session_state.get("mj_fase", 0)) + 1), persist=True)
+    with col_b:
+        if st.button("↺ Reiniciar (0)"):
+            mj_set_fase(0, persist=True)
 
-    st.markdown("---")
-    st.markdown("### 🎨 Estilo")
-    st.selectbox("Estilo de escrita", ["AÇÃO", "NOIR", "ROMANCE LENTO"], key="estilo_escrita")
-
-    st.markdown("---")
-    st.markdown("### 🔒 Filtro adulto (sem pornografia)")
-    st.checkbox("Ativar filtro", value=st.session_state.get("nsfw_filter_on", True), key="nsfw_filter_on")
-    st.slider("Limite de calor (0=safe · 1=sensual · 2=forte)", 0, 2,
-              value=int(st.session_state.get("nsfw_max_level", 1)), key="nsfw_max_level")
-    st.selectbox("Se passar do limite", ["Reescrever", "Corte (fade-to-black)"], key="nsfw_action")
-
-    st.markdown("---")
-    st.markdown("### ⚙️ Parâmetros")
-    st.slider("Interações do Sheets (N)", 10, 30, value=st.session_state.get("n_sheet_prompt", 15),
-              step=1, key="n_sheet_prompt")
-    st.slider("Max tokens (resposta)", 300, 1600, value=st.session_state.get("max_tokens_rsp", 900), step=50, key="max_tokens_rsp")
-    st.slider("Timeout (s)", 60, 300, value=st.session_state.get("timeout_s", 300), step=10, key="timeout_s")
+    st.caption("Regra: 1 microavanço por cena. A fase só muda quando você decidir.")
+    st.caption("Role a tela principal para ver interações anteriores.")
 
 
-# =========================
-# EXIBIÇÃO DO HISTÓRICO
-# =========================
-st.markdown("---")
-st.markdown("### 🧩 Histórico recente")
-for r in carregar_interacoes(n=20):
-    role = r.get("role","user")
-    content = r.get("content","")
-    with st.chat_message("user" if role=="user" else "assistant"):
-        st.markdown(content)
+# -----------------------------------------------------------------------------
+# EXIBIR HISTÓRICO RECENTE (primeiro interações, depois resumo)
+# -----------------------------------------------------------------------------
+with st.container():
+    interacoes = carregar_interacoes(n=20)
+    for r in interacoes:
+        role = r.get("role", "user")
+        content = r.get("content", "")
+        if role == "user":
+            with st.chat_message("user"):
+                st.markdown(content)
+        else:
+            with st.chat_message("assistant"):
+                st.markdown(content)
 
+# Resumo no fim da tela
 if st.session_state.get("resumo_capitulo"):
     with st.expander("🧠 Resumo do capítulo (mais recente)"):
         st.markdown(st.session_state.resumo_capitulo)
 
 
-# =========================
-# ENVIO DO USUÁRIO + STREAM
-# =========================
-def resposta_valida_semantica(entrada: str, saida: str) -> str:
-    try:
-        return verificar_quebra_semantica_openai(entrada, saida)
-    except Exception:
-        return ""
-
+# -----------------------------------------------------------------------------
+# ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together) + FALLBACKS
+# -----------------------------------------------------------------------------
 entrada = st.chat_input("Digite sua direção de cena...")
 if entrada:
-    # Sincroniza Momento com a direção (se ligado)
-    if st.session_state.get("momento_auto", True):
-        mom_atual = int(st.session_state.get("momento", momento_carregar()))
-        mom_sugerido = detectar_momento_sugerido(entrada, fallback=mom_atual)
-        mom_clamped = clamp_momento(mom_atual, mom_sugerido, int(st.session_state.get("max_avancos_por_cena", 1)))
-        if mom_clamped != mom_atual:
-            momento_set(mom_clamped, persist=True)
-
+    # salva a entrada e mantém histórico de sessão
     salvar_interacao("user", entrada)
-    st.session_state.session_msgs = st.session_state.get("session_msgs", [])
     st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
+    # constrói prompt principal
     prompt = construir_prompt_com_narrador()
 
-    historico = [{"role": m.get("role","user"), "content": m.get("content","")} for m in st.session_state.session_msgs]
+    # histórico curto (somente sessão atual; o prompt já inclui últimas do sheet)
+    historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
+                 for m in st.session_state.session_msgs]
 
+    # provedor + modelo
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
-        auth = st.secrets.get("TOGETHER_API_KEY","")
-        model_to_call = st.session_state.modelo_escolhido_id
+        auth = st.secrets.get("TOGETHER_API_KEY", "")
+        model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
     else:
         endpoint = "https://openrouter.ai/api/v1/chat/completions"
-        auth = st.secrets.get("OPENROUTER_API_KEY","")
+        auth = st.secrets.get("OPENROUTER_API_KEY", "")
         model_to_call = st.session_state.modelo_escolhido_id
 
-    system_pt = {"role":"system","content":"Responda em português do Brasil. Evite conteúdo meta. Mostre apenas a narrativa final ao leitor."}
-    messages = [system_pt, {"role":"system","content":prompt}] + historico
+    if not auth:
+        st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
+        st.stop()
+
+    # mensagens
+    system_pt = {
+        "role": "system",
+        "content": (
+            "Responda em português do Brasil. Evite conteúdo meta. "
+            "Mostre apenas a narrativa final ao leitor."
+        ),
+    }
+    messages = [system_pt, {"role": "system", "content": prompt}] + historico
 
     payload = {
         "model": model_to_call,
         "messages": messages,
-        "max_tokens": int(st.session_state.get("max_tokens_rsp", 900)),
+        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
         "temperature": 0.9,
         "stream": True,
     }
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
+    # --- filtro anti-meta (aplica na exibição e no salvamento) ---
+    def render_tail(t: str) -> str:
+        import re
+        if not t: return ""
+        t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$','', t, flags=re.IGNORECASE|re.MULTILINE)
+        t = re.sub(r'<\s*think\s*>.*?<\s*/\s*think\s*>', '', t, flags=re.IGNORECASE|re.DOTALL)
+        t = re.sub(r'\n{3,}', '\n\n', t)
+        return t.strip()
+
     with st.chat_message("assistant"):
         placeholder = st.empty()
-        resposta_txt = ""
+        resposta_txt = ""     # texto bruto vindo do stream
         last_update = time.time()
 
-        # Reforço antecipado (memórias já presentes no prompt)
+        # Reforço antecipado: memórias que ENTRARAM no prompt (topk + recorrentes)
         try:
             usados_prompt = []
             usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
@@ -857,8 +1019,10 @@ if entrada:
 
         # 1) STREAM
         try:
-            with requests.post(endpoint, headers=headers, json=payload, stream=True,
-                               timeout=int(st.session_state.get("timeout_s", 300))) as r:
+            with requests.post(
+                endpoint, headers=headers, json=payload, stream=True,
+                timeout=int(st.session_state.get("timeout_s", 300))
+            ) as r:
                 if r.status_code == 200:
                     for raw in r.iter_lines(decode_unicode=False):
                         if not raw:
@@ -871,13 +1035,12 @@ if entrada:
                             break
                         try:
                             j = json.loads(data)
-                            delta = j["choices"][0]["delta"].get("content","")
+                            delta = j["choices"][0]["delta"].get("content", "")
                             if not delta:
                                 continue
                             resposta_txt += delta
                             if time.time() - last_update > 0.10:
-                                vis = render_tail(resposta_txt) + "▌"
-                                placeholder.markdown(vis)
+                                placeholder.markdown(render_tail(resposta_txt) + "▌")
                                 last_update = time.time()
                         except Exception:
                             continue
@@ -886,114 +1049,73 @@ if entrada:
         except Exception as e:
             st.error(f"Erro no streaming: {e}")
 
-        # 2) FALLBACKS + Filtro adulto
-        visible_txt = render_tail(resposta_txt) if resposta_txt.strip() else ""
-        if st.session_state.get("nsfw_filter_on", True) and visible_txt:
-            visible_txt = sanitize_explicit(
-                visible_txt,
-                int(st.session_state.get("nsfw_max_level", 1)),
-                st.session_state.get("nsfw_action", "Reescrever")
-            )
-
-        if not visible_txt.strip():
-            # retry sem stream
+        # 2) FALLBACKS se veio vazio
+        visible_txt = render_tail(resposta_txt).strip()
+        if not visible_txt:
+            # 2a) retry sem stream
             try:
-                r2 = requests.post(endpoint, headers=headers, json={**payload, "stream": False},
-                                   timeout=int(st.session_state.get("timeout_s", 300)))
+                r2 = requests.post(
+                    endpoint, headers=headers,
+                    json={**payload, "stream": False},
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
                 if r2.status_code == 200:
-                    resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
-                    visible_txt = render_tail(resposta_txt)
-                    if st.session_state.get("nsfw_filter_on", True):
-                        visible_txt = sanitize_explicit(
-                            visible_txt,
-                            int(st.session_state.get("nsfw_max_level", 1)),
-                            st.session_state.get("nsfw_action", "Reescrever")
-                        )
+                    try:
+                        resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
+                    visible_txt = render_tail(resposta_txt).strip()
                 else:
                     st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
             except Exception as e:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
-        if not visible_txt.strip():
-            # retry sem system extra
+        if not visible_txt:
+            # 2b) retry sem o system extra (alguns modelos travam com system duplo)
             try:
                 r3 = requests.post(
                     endpoint, headers=headers,
-                    json={"model": model_to_call,
-                          "messages": [{"role":"system","content":prompt}] + historico,
-                          "max_tokens": int(st.session_state.get("max_tokens_rsp", 900)),
-                          "temperature": 0.9, "stream": False},
+                    json={
+                        "model": model_to_call,
+                        "messages": [{"role": "system", "content": prompt}] + historico,
+                        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                        "temperature": 0.9,
+                        "stream": False,
+                    },
                     timeout=int(st.session_state.get("timeout_s", 300))
                 )
                 if r3.status_code == 200:
-                    resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
-                    visible_txt = render_tail(resposta_txt)
-                    if st.session_state.get("nsfw_filter_on", True):
-                        visible_txt = sanitize_explicit(
-                            visible_txt,
-                            int(st.session_state.get("nsfw_max_level", 1)),
-                            st.session_state.get("nsfw_action", "Reescrever")
-                        )
+                    try:
+                        resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
+                    visible_txt = render_tail(resposta_txt).strip()
                 else:
                     st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # 3) Checagem de Momento — reescreve se saiu do trilho
-        mom_now = int(st.session_state.get("momento", momento_carregar()))
-        motivo = viola_momento(visible_txt, mom_now)
-        if motivo:
-            st.info(f"🎯 {motivo} Reescrevendo para respeitar o momento '{_momento_label(mom_now)}'...")
-            prompt_reforco = construir_prompt_com_narrador() + f"""
+        # 3) Exibição final (texto filtrado)
+        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
-### 🔧 Reescreva agora
-- Mantenha o momento atual: {_momento_label(mom_now)}.
-- Evite o que foi sinalizado: {motivo}.
-- Entregue até {int(st.session_state.get("max_avancos_por_cena", 1))} microavanço(s) coerente(s) e feche com corte elegante.
-"""
-            try:
-                r_fix = requests.post(
-                    endpoint, headers=headers,
-                    json={"model": model_to_call,
-                          "messages": [{"role":"system","content":prompt_reforco}] + historico,
-                          "max_tokens": int(st.session_state.get("max_tokens_rsp", 900)),
-                          "temperature": 0.9, "stream": False},
-                    timeout=int(st.session_state.get("timeout_s", 300))
-                )
-                if r_fix.status_code == 200:
-                    visible_txt = render_tail(r_fix.json()["choices"][0]["message"]["content"].strip())
-                    if st.session_state.get("nsfw_filter_on", True):
-                        visible_txt = sanitize_explicit(
-                            visible_txt,
-                            int(st.session_state.get("nsfw_max_level", 1)),
-                            st.session_state.get("nsfw_action", "Reescrever")
-                        )
-                else:
-                    st.error(f"Regeneração (momento) falhou: {r_fix.status_code} - {r_fix.text}")
-            except Exception as e:
-                st.error(f"Erro ao reescrever (momento): {e}")
-
-        # 4) Exibição final
-        placeholder.markdown(visible_txt if visible_txt.strip() else "[Sem conteúdo]")
-
-        # 5) Validação semântica (opcional)
+        # 4) Validação semântica (entrada do user vs resposta) usando texto visível
         if len(st.session_state.session_msgs) >= 1 and visible_txt and visible_txt != "[Sem conteúdo]":
-            texto_anterior = st.session_state.session_msgs[-1]["content"]  # última entrada do user (antes desta resposta)
-            alerta = resposta_valida_semantica(texto_anterior, visible_txt)
+            texto_anterior = st.session_state.session_msgs[-1]["content"]
+            alerta = verificar_quebra_semantica_openai(texto_anterior, visible_txt)
             if alerta:
                 st.info(alerta)
 
-        # 6) Salvar resposta (saneada) e reforçar memórias
-        sanitized = redact_for_logs(visible_txt) or "[Sem conteúdo]"
-        salvar_interacao("assistant", sanitized)
-        st.session_state.session_msgs.append({"role":"assistant", "content": sanitized})
+        # 5) Salvar resposta SEMPRE (usa o texto limpo/visível)
+        salvar_interacao("assistant", visible_txt or "[Sem conteúdo]")
+        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt or "[Sem conteúdo]"})
 
+        # 6) Reforço de memórias usadas (pós-resposta) com base no texto visível
         try:
             usados = []
             topk_usadas = memoria_longa_buscar_topk(
-                query_text=sanitized,
-                k=int(st.session_state.get("k_memoria_longa", 3)),
-                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
+                query_text=visible_txt,
+                k=int(st.session_state.k_memoria_longa),
+                limiar=float(st.session_state.limiar_memoria_longa),
             )
             for t, _sc, _sim, _rr in topk_usadas:
                 usados.append(t)
