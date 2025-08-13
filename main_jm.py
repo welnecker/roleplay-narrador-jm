@@ -944,7 +944,7 @@ payload = {
 
 headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
-left_sp, main_col, right_sp = st.columns([1,]
+left_sp, main_col, right_sp = st.columns[1,]
 with main_col:
     with st.chat_message("assistant"):
         placeholder = st.empty()
@@ -1079,3 +1079,4 @@ with main_col:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
