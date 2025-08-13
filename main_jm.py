@@ -546,7 +546,7 @@ MODELOS_OPENROUTER = {
 }
 
 MODELOS_TOGETHER_UI = {
-    "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8", 
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
     "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
 }
@@ -1148,6 +1148,7 @@ if entrada:
                 memoria_longa_reforcar(usados)
             except Exception:
                 pass
+
 
 
 
