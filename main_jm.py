@@ -681,11 +681,10 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 ### Geografia & Montagem
 - **Não force coincidências**: se não houver ponte clara (mensagem, convite, “ensaio 18h…”, pedido do usuário), mantenha **Mary e Jânio em locais distintos** e use **montagem paralela** (A ↔ B).
 - **Comece cada bloco** com uma frase que **ancore lugar e hora** (ex.: “UFES — corredor de Pedagogia, 9h15 — …” ou “Terminal Laranjeiras, 9h18 — …”). Não use títulos; escreva isso na **primeira frase** do parágrafo.
-- **Se `montagem paralela`** (valor sugerido: {"SIM" if want_parallel else "NÃO"}):
+- **Se `montagem paralela`** (valor sugerido: {flag_parallel}):
   - Estruture em **2 blocos alternados**: primeiro Mary, depois Jânio (ou vice-versa), cada um no **seu lugar**.
   - Os blocos podem se “responder” por subtexto (mensagens, lembranças, sons à distância), mas **sem co-presença física**.
-- **Se houver ponte plausível explícita**, pode convergir para co-presença ao final da cena (apenas um encontro breve/coerente), **sem teletransporte**.
-
+- **Se houver ponte plausível explícita**, pode convergir para co-presença ao final da cena (de forma plausível), **sem teletransporte**.
 
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (—) intercalados com ação. Mínimo: **4 falas** no total.
@@ -831,6 +830,14 @@ with st.sidebar:
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
+
+        # Evitar coincidências forçadas (A/B)##########aqui
+    st.checkbox(
+        "Evitar coincidências forçadas (montagem paralela A/B)",
+        value=st.session_state.get("no_coincidencias", True),
+        key="no_coincidencias",
+    )
+
 
     st.markdown("---")
     st.markdown("### ✍️ Estilo & NSFW")
@@ -1160,6 +1167,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
