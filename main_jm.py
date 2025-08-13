@@ -678,6 +678,15 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Micropassos:** avance no máximo **{int(st.session_state.get("max_avancos_por_cena",1))}** subpasso(s) rumo a: {proximo_nome}.
 - Se o roteirista pedir salto maior, **negocie**: nomeie limites, peça consentimento, e **prepare** a transição (não pule etapas).
 
+### Geografia & Montagem
+- **Não force coincidências**: se não houver ponte clara (mensagem, convite, “ensaio 18h…”, pedido do usuário), mantenha **Mary e Jânio em locais distintos** e use **montagem paralela** (A ↔ B).
+- **Comece cada bloco** com uma frase que **ancore lugar e hora** (ex.: “UFES — corredor de Pedagogia, 9h15 — …” ou “Terminal Laranjeiras, 9h18 — …”). Não use títulos; escreva isso na **primeira frase** do parágrafo.
+- **Se `montagem paralela`** (valor sugerido: {"SIM" if want_parallel else "NÃO"}):
+  - Estruture em **2 blocos alternados**: primeiro Mary, depois Jânio (ou vice-versa), cada um no **seu lugar**.
+  - Os blocos podem se “responder” por subtexto (mensagens, lembranças, sons à distância), mas **sem co-presença física**.
+- **Se houver ponte plausível explícita**, pode convergir para co-presença ao final da cena (apenas um encontro breve/coerente), **sem teletransporte**.
+
+
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (—) intercalados com ação. Mínimo: **4 falas** no total.
 - Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
@@ -1151,5 +1160,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
