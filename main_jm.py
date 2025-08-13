@@ -689,6 +689,7 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
   - Os blocos podem se “responder” por subtexto (mensagens, lembranças, sons à distância), mas **sem co-presença física**.
 - **Se houver ponte plausível explícita**, pode convergir para co-presença ao final da cena (de forma plausível), **sem teletransporte**.
 - **Sem ponte diegética explícita, um personagem não pode saber, afirmar ou reagir a fatos que só ocorreram no bloco do outro; se houver pressentimento/ciúme, redigir sem afirmar o fato. Exemplos de ponte: mensagem, foto/story, ligação, testemunha, encontro marcado — se existir, mostre isso na cena (ex.: celular vibra e aparece um story)**.
+- **Objetos diegéticos: se a câmera não couber na situação (encontro, banho, mar, revista), mostre a ação de guarda antes e ignore o objeto até a retomada; não descreva interação física com a câmera nesses contextos**.
 
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (—) intercalados com ação. Mínimo: **4 falas** no total.
@@ -696,6 +697,7 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Inclua pensamentos internos** em itálico com `*...*`: **1 de Mary e 1 de Jânio**.
 - Mostre, não explique; evite “disse/ele disse” demais — use gestos, pausas e respiração.
 - Sem onisciência: se um bloco fizer referência a ações do outro, evidencie a ponte (mensagem/foto/terceira pessoa) na própria cena antes da referência.
+- Consistência de objetos: não inserir câmera de Jânio em encontros/banho/banho de mar; se precisar reaparecer depois, mostre a retomada de forma breve e plausível.
 - Sem títulos de seção, sem “Microconquista:”/“Gancho:”.
 
 ### Regra de saída
@@ -1168,6 +1170,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
