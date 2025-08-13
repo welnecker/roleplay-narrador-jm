@@ -688,12 +688,14 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
   - Estruture em **2 blocos alternados**: primeiro Mary, depois Jânio (ou vice-versa), cada um no **seu lugar**.
   - Os blocos podem se “responder” por subtexto (mensagens, lembranças, sons à distância), mas **sem co-presença física**.
 - **Se houver ponte plausível explícita**, pode convergir para co-presença ao final da cena (de forma plausível), **sem teletransporte**.
+- **Sem ponte diegética explícita, um personagem não pode saber, afirmar ou reagir a fatos que só ocorreram no bloco do outro; se houver pressentimento/ciúme, redigir sem afirmar o fato. Exemplos de ponte: mensagem, foto/story, ligação, testemunha, encontro marcado — se existir, mostre isso na cena (ex.: celular vibra e aparece um story)**.
 
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (—) intercalados com ação. Mínimo: **4 falas** no total.
 - Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
 - **Inclua pensamentos internos** em itálico com `*...*`: **1 de Mary e 1 de Jânio**.
 - Mostre, não explique; evite “disse/ele disse” demais — use gestos, pausas e respiração.
+- Sem onisciência: se um bloco fizer referência a ações do outro, evidencie a ponte (mensagem/foto/terceira pessoa) na própria cena antes da referência.
 - Sem títulos de seção, sem “Microconquista:”/“Gancho:”.
 
 ### Regra de saída
@@ -1166,5 +1168,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
