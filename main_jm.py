@@ -412,7 +412,7 @@ def _fase_label(n: int) -> str:
     d = FASES_ROMANCE.get(int(n), FASES_ROMANCE[0])
     return f"{int(n)} — {d['nome']}"
 
-def mj_set_fase(n: int, persist: bool=True):
+def mj_set_fase(n: int, persist: bool=False):
     n = max(0, min(max(FASES_ROMANCE.keys()), int(n)))
     st.session_state.mj_fase = n
     if persist:
@@ -1166,3 +1166,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
