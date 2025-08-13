@@ -554,8 +554,8 @@ MODELOS_TOGETHER_UI = {
 def model_id_for_together(api_ui_model_id: str) -> str:
     key = api_ui_model_id.strip()
     if "Qwen3-Coder-480B-A35B-Instruct-FP8" in key:
-        return "Qwen/Qwen3-Coder-480B-Instruct-FP8"
-    if key.lower().startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
+        return "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
+    if key.lower().startswith("mistralai/Mixtral-8x7B-Instruct-v0.1"):
         return "mistralai/Mixtral-8x7B-Instruct-v0.1"
     return key
 
@@ -1134,3 +1134,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
