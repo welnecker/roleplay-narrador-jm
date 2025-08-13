@@ -902,177 +902,180 @@ if entrada:
         pass
 
     # salva a entrada e mantém histórico de sessão
-    salvar_interacao("user", entrada)
-    st.session_state.session_msgs.append({"role": "user", "content": entrada})
+salvar_interacao("user", entrada)
+st.session_state.session_msgs.append({"role": "user", "content": entrada})
 
-    # constrói prompt principal
-    prompt = construir_prompt_com_narrador()
+# constrói prompt principal
+prompt = construir_prompt_com_narrador()
 
-    # histórico curto (somente sessão atual; o prompt já inclui últimas do sheet)
-    historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
-                 for m in st.session_state.session_msgs]
+# histórico curto (somente sessão atual; o prompt já inclui últimas do sheet)
+historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
+             for m in st.session_state.session_msgs]
 
-    # provedor + modelo
-    prov = st.session_state.get("provedor_ia", "OpenRouter")
-    if prov == "Together":
-        endpoint = "https://api.together.xyz/v1/chat/completions"
-        auth = st.secrets.get("TOGETHER_API_KEY", "")
-        model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
-    else:
-        endpoint = "https://openrouter.ai/api/v1/chat/completions"
-        auth = st.secrets.get("OPENROUTER_API_KEY", "")
-        model_to_call = st.session_state.modelo_escolhido_id
+# provedor + modelo
+prov = st.session_state.get("provedor_ia", "OpenRouter")
+if prov == "Together":
+    endpoint = "https://api.together.xyz/v1/chat/completions"
+    auth = st.secrets.get("TOGETHER_API_KEY", "")
+    model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
+else:
+    endpoint = "https://openrouter.ai/api/v1/chat/completions"
+    auth = st.secrets.get("OPENROUTER_API_KEY", "")
+    model_to_call = st.session_state.modelo_escolhido_id
 
-    if not auth:
-        st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
-        st.stop()
+if not auth:
+    st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
+    st.stop()
 
-    # mensagens
-    system_pt = {
-        "role": "system",
-        "content": ("Responda em português do Brasil. Evite conteúdo meta. Mostre apenas a narrativa final ao leitor."),
-    }
-    messages = [system_pt, {"role": "system", "content": prompt}] + historico
+# mensagens
+system_pt = {
+    "role": "system",
+    "content": ("Responda em português do Brasil. Evite conteúdo meta. Mostre apenas a narrativa final ao leitor."),
+}
+messages = [system_pt, {"role": "system", "content": prompt}] + historico
 
-    payload = {
-        "model": model_to_call,
-        "messages": messages,
-        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
-        "temperature": 0.9,
-        "stream": True,
-    }
+payload = {
+    "model": model_to_call,
+    "messages": messages,
+    "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+    "temperature": 0.9,
+    "stream": True,
+}
 
-    headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
+headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
+left_sp, main_col, right_sp = st.columns([1,]
+with main_col:
     with st.chat_message("assistant"):
         placeholder = st.empty()
-        resposta_txt = "" # texto bruto vindo do stream
+        resposta_txt = ""  # texto bruto vindo do stream
         last_update = time.time()
 
-           # Reforço antecipado: memórias que ENTRARAM no prompt (topk + recorrentes)
-    try:
-        usados_prompt = []
-        usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
-        usados_prompt.extend(st.session_state.get("_ml_recorrentes", []))
-        usados_prompt = [t for t in usados_prompt if t]
-        if usados_prompt:
-            memoria_longa_reforcar(usados_prompt)
-    except Exception:
-        pass
+        # Reforço antecipado: memórias que ENTRARAM no prompt (topk + recorrentes)
+        try:
+            usados_prompt = []
+            usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
+            usados_prompt.extend(st.session_state.get("_ml_recorrentes", []))
+            usados_prompt = [t for t in usados_prompt if t]
+            if usados_prompt:
+                memoria_longa_reforcar(usados_prompt)
+        except Exception:
+            pass
 
-    # 1) STREAM
-    try:
-        with requests.post(
-            endpoint, headers=headers, json=payload, stream=True,
-            timeout=int(st.session_state.get("timeout_s", 300))
-        ) as r:
-            if r.status_code == 200:
-                for raw in r.iter_lines(decode_unicode=False):
-                    if not raw:
-                        continue
-                    line = raw.decode("utf-8", errors="ignore").strip()
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        j = json.loads(data)
-                        delta = j["choices"]["delta"].get("content", "")
-                        if not delta:
+        # 1) STREAM
+        try:
+            with requests.post(
+                endpoint, headers=headers, json=payload, stream=True,
+                timeout=int(st.session_state.get("timeout_s", 300))
+            ) as r:
+                if r.status_code == 200:
+                    for raw in r.iter_lines(decode_unicode=False):
+                        if not raw:
                             continue
-                        resposta_txt += delta
-                        if time.time() - last_update > 0.10:
-                            out = render_tail(resposta_txt)
-                            out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level",3)), action="livre")
-                            placeholder.markdown(out + "▌")
-                            last_update = time.time()
+                        line = raw.decode("utf-8", errors="ignore").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            j = json.loads(data)
+                            delta = j["choices"]["delta"].get("content", "")
+                            if not delta:
+                                continue
+                            resposta_txt += delta
+                            if time.time() - last_update > 0.10:
+                                out = render_tail(resposta_txt)
+                                # NSFW conforme nível (até 3)
+                                out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level", 3)), action="livre")
+                                placeholder.markdown(out + "▌")
+                                last_update = time.time()
+                        except Exception:
+                            continue
+                else:
+                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+        except Exception as e:
+            st.error(f"Erro no streaming: {e}")
+
+        # 2) FALLBACKS se veio vazio
+        visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level", 3)), action="livre")
+
+        if not visible_txt:
+            # 2a) retry sem stream
+            try:
+                r2 = requests.post(
+                    endpoint, headers=headers,
+                    json={**payload, "stream": False},
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
+                if r2.status_code == 200:
+                    try:
+                        resposta_txt = r2.json()["choices"]["message"]["content"].strip()
                     except Exception:
-                        continue
-            else:
-                st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
-    except Exception as e:
-        st.error(f"Erro no streaming: {e}")
+                        resposta_txt = ""
+                    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level", 3)), action="livre")
+                else:
+                    st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
+            except Exception as e:
+                st.error(f"Fallback (sem stream) erro: {e}")
 
-    # 2) FALLBACKS se veio vazio
-    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",3)), action="livre")
+        if not visible_txt:
+            # 2b) retry sem o system extra (alguns modelos travam com system duplo)
+            try:
+                r3 = requests.post(
+                    endpoint, headers=headers,
+                    json={
+                        "model": model_to_call,
+                        "messages": [{"role": "system", "content": prompt}] + historico,
+                        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                        "temperature": 0.9,
+                        "stream": False,
+                    },
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
+                if r3.status_code == 200:
+                    try:
+                        resposta_txt = r3.json()["choices"]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
+                    visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level", 3)), action="livre")
+                else:
+                    st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
+            except Exception as e:
+                st.error(f"Fallback (prompts limpos) erro: {e}")
 
-    if not visible_txt:
-        # 2a) retry sem stream
+        # 3) Exibição final (texto filtrado de acordo com o nível)
+        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
+
+        # 4) Validação de momento (aviso leve, não bloqueia)
         try:
-            r2 = requests.post(
-                endpoint, headers=headers,
-                json={**payload, "stream": False},
-                timeout=int(st.session_state.get("timeout_s", 300))
-            )
-            if r2.status_code == 200:
-                try:
-                    resposta_txt = r2.json()["choices"]["message"]["content"].strip()
-                except Exception:
-                    resposta_txt = ""
-                visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",3)), action="livre")
-            else:
-                st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
-        except Exception as e:
-            st.error(f"Fallback (sem stream) erro: {e}")
+            viol = viola_momento(visible_txt, int(st.session_state.get("momento", 0)))
+            if viol and st.session_state.get("app_bloqueio_intimo", False):
+                st.info(f"⚠️ {viol}")
+        except Exception:
+            pass
 
-    if not visible_txt:
-        # 2b) retry sem o system extra (alguns modelos travam com system duplo)
+        # 5) Validação semântica (entrada do user vs resposta) usando texto visível
+        if len(st.session_state.session_msgs) >= 1 and visible_txt and visible_txt != "[Sem conteúdo]":
+            texto_anterior = st.session_state.session_msgs[-1]["content"]
+            alerta = verificar_quebra_semantica_openai(texto_anterior, visible_txt)
+            if alerta:
+                st.info(alerta)
+
+        # 6) Salvar resposta SEMPRE (usa o texto visível)
+        salvar_interacao("assistant", visible_txt or "[Sem conteúdo]")
+        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt or "[Sem conteúdo]"})
+
+        # 7) Reforço de memórias usadas (pós-resposta) com base no texto visível
         try:
-            r3 = requests.post(
-                endpoint, headers=headers,
-                json={
-                    "model": model_to_call,
-                    "messages": [{"role": "system", "content": prompt}] + historico,
-                    "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
-                    "temperature": 0.9,
-                    "stream": False,
-                },
-                timeout=int(st.session_state.get("timeout_s", 300))
+            usados = []
+            topk_usadas = memoria_longa_buscar_topk(
+                query_text=visible_txt,
+                k=int(st.session_state.k_memoria_longa),
+                limiar=float(st.session_state.limiar_memoria_longa),
             )
-            if r3.status_code == 200:
-                try:
-                    resposta_txt = r3.json()["choices"]["message"]["content"].strip()
-                except Exception:
-                    resposta_txt = ""
-                visible_txt = sanitize_explicit(render_tail(resposta_txt).strip(), max_level=int(st.session_state.get("nsfw_max_level",3)), action="livre")
-            else:
-                st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
-        except Exception as e:
-            st.error(f"Fallback (prompts limpos) erro: {e}")
-
-    # 3) Exibição final (texto filtrado de acordo com o nível)
-    placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
-
-    # 4) Validação de momento (aviso leve, não bloqueia)
-    try:
-        viol = viola_momento(visible_txt, int(st.session_state.get("momento", 0)))
-        if viol and st.session_state.get("app_bloqueio_intimo", False):
-            st.info(f"⚠️ {viol}")
-    except Exception:
-        pass
-
-    # 5) Validação semântica (entrada do user vs resposta) usando texto visível
-    if len(st.session_state.session_msgs) >= 1 and visible_txt and visible_txt != "[Sem conteúdo]":
-        texto_anterior = st.session_state.session_msgs[-1]["content"]
-        alerta = verificar_quebra_semantica_openai(texto_anterior, visible_txt)
-        if alerta:
-            st.info(alerta)
-
-    # 6) Salvar resposta SEMPRE (usa o texto visível)
-    salvar_interacao("assistant", visible_txt or "[Sem conteúdo]")
-    st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt or "[Sem conteúdo]"})
-
-    # 7) Reforço de memórias usadas (pós-resposta) com base no texto visível
-    try:
-        usados = []
-        topk_usadas = memoria_longa_buscar_topk(
-            query_text=visible_txt,
-            k=int(st.session_state.k_memoria_longa),
-            limiar=float(st.session_state.limiar_memoria_longa),
-        )
-        for t, _sc, _sim, _rr in topk_usadas:
-            usados.append(t)
-        memoria_longa_reforcar(usados)
-    except Exception:
-        pass
+            for t, _sc, _sim, _rr in topk_usadas:
+                usados.append(t)
+            memoria_longa_reforcar(usados)
+        except Exception:
+            pass
