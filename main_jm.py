@@ -20,7 +20,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import numpy as np
 from gspread.exceptions import APIError
 
-# ---- Backoff p/ 429 do Sheets ----
+# --- Backoff p/ 429 do Sheets ---
 def _retry_429(callable_fn, *args, _retries=5, _base=0.6, **kwargs):
     for i in range(_retries):
         try:
@@ -33,7 +33,6 @@ def _retry_429(callable_fn, *args, _retries=5, _base=0.6, **kwargs):
             raise
     return callable_fn(*args, **kwargs)
 
-# ---- Cache de leitura (TTL curto) ----
 @st.cache_data(ttl=45, show_spinner=False)
 def _sheet_all_records_cached(sheet_name: str):
     ws = _ws(sheet_name, create_if_missing=False)
@@ -55,7 +54,7 @@ def _invalidate_sheet_caches():
     except Exception:
         pass
 
-# (Opcional) Embeddings OpenAI para verificação semântica/memória longa
+# Embeddings OpenAI para verificação semântica/memória longa (opcional)
 try:
     from openai import OpenAI
     OPENAI_CLIENT = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
@@ -67,32 +66,9 @@ except Exception:
 # =========================
 # CONFIG BÁSICA DO APP
 # =========================
-
-# st.set_page_config(page_title="Narrador JM", page_icon="🎬", layout="wide")
-
-# Gate 18+ (opcional)
-# if "age_ok" not in st.session_state:
-#     st.session_state.age_ok = False
-# if not st.session_state.age_ok:
-#     st.title("🔞 Conteúdo adulto")
-#     st.caption("Narrativa adulta, sensual, sem pornografia explícita. Confirme para prosseguir.")
-#     if st.checkbox("Confirmo que tenho 18 anos ou mais e desejo prosseguir."):
-#         st.session_state.age_ok = True
-#     st.stop()
-
-# =========================
-# GOOGLE SHEETS — MODO ANTIGO
-# =========================
-
 PLANILHA_ID_PADRAO = st.secrets.get("SPREADSHEET_ID", "").strip() or "1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM"
 
 def conectar_planilha():
-    """
-    Conecta via GOOGLE_CREDS_JSON (modo antigo/estável).
-    Espera:
-    - st.secrets["GOOGLE_CREDS_JSON"]: string JSON do service account
-    - (opcional) st.secrets["SPREADSHEET_ID"]: ID da planilha
-    """
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
         if "private_key" in creds_dict:
@@ -112,10 +88,11 @@ def conectar_planilha():
 planilha = conectar_planilha()
 
 # Abas esperadas
-TAB_INTERACOES = "interacoes_jm"    # timestamp | role | content
-TAB_PERFIL     = "perfil_jm"        # timestamp | resumo
-TAB_MEMORIAS   = "memorias_jm"      # tipo | conteudo
-TAB_ML         = "memoria_longa_jm" # texto | embedding | tags | timestamp | score
+TAB_INTERACOES = "interacoes_jm"
+TAB_PERFIL     = "perfil_jm"
+TAB_MEMORIAS   = "memorias_jm"
+TAB_TEMPLATES  = "templates_jm"
+TAB_ML         = "memoria_longa_jm"
 
 def _ws(name: str, create_if_missing: bool = True):
     if not planilha:
@@ -127,7 +104,6 @@ def _ws(name: str, create_if_missing: bool = True):
             return None
         try:
             ws = planilha.add_worksheet(title=name, rows=5000, cols=10)
-            # cria cabeçalhos padrão
             if name == TAB_INTERACOES:
                 _retry_429(ws.append_row, ["timestamp", "role", "content"])
             elif name == TAB_PERFIL:
@@ -136,9 +112,12 @@ def _ws(name: str, create_if_missing: bool = True):
                 _retry_429(ws.append_row, ["tipo", "conteudo"])
             elif name == TAB_ML:
                 _retry_429(ws.append_row, ["texto", "embedding", "tags", "timestamp", "score"])
+            elif name == TAB_TEMPLATES:
+                _retry_429(ws.append_row, ["template", "etapa", "texto"])
             return ws
         except Exception:
             return None
+
 # =========================
 # TEMPLATES: Carrega do Sheets
 # =========================
@@ -167,7 +146,6 @@ def carregar_templates_planilha():
     except Exception as e:
         st.warning(f"Erro ao carregar templates do Sheets: {e}")
         return {}
-
 # =========================
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =========================
@@ -1256,6 +1234,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
