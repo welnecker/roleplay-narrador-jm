@@ -821,19 +821,11 @@ with col1:
     st.info(st.session_state.resumo_capitulo or "Nenhum resumo disponível.")
 with col2:
     st.markdown("#### ⚙️ Opções")
-    st.checkbox(
-        "Bloquear avanços íntimos sem ordem",
-        value=st.session_state.app_bloqueio_intimo,
-        key="ui_bloqueio_intimo",
+    st.write(
+        f'- Bloqueio íntimo: {"Sim" if st.session_state.get("app_bloqueio_intimo", False) else "Não"}\n'
+        f'- Emoção oculta: {st.session_state.get("app_emocao_oculta", "").capitalize()}'
     )
-    st.selectbox(
-        "🎭 Emoção oculta",
-        ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
-        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
-        key="ui_app_emocao_oculta",
-    )
-    st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloqueio_intimo", False)
-    st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
+
 
 # =========================
 # SIDEBAR — Reorganizado
@@ -1239,6 +1231,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
