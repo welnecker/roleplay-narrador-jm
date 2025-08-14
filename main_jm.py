@@ -702,23 +702,19 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Objetos diegéticos: se a câmera não couber na situação (encontro, banho, mar, revista), mostre a ação de guarda antes e ignore o objeto até a retomada; não descreva interação física com a câmera nesses contextos**.
 
 ### Formato OBRIGATÓRIO da cena
-- **Inclua DIÁLOGOS diretos** com travessão (—) intercalados com ação. Mínimo: **4 falas** no total.
+- **Inclua DIÁLOGOS diretos** com travessão (—), intercalados com ação e reação física/visual. Mínimo: **4 falas** no total.
 - Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
-- **Inclua pensamentos internos** em itálico com `*...*`: **1 de Mary e 1 de Jânio**.
-- Mostre, não explique; evite “disse/ele disse” demais — use gestos, pausas e respiração.
-- Sem onisciência: se um bloco fizer referência a ações do outro, evidencie a ponte (mensagem/foto/terceira pessoa) na própria cena antes da referência.
-- Consistência de objetos: não inserir câmera de Jânio em encontros/banho/banho de mar; se precisar reaparecer depois, mostre a retomada de forma breve e plausível.
-- Sem títulos de seção, sem “Microconquista:”/“Gancho:”.
+- **Não inclua pensamentos internos em itálico, reflexões internas ou monólogos subjetivos dos personagens.**
+- Não escreva blocos finais de créditos, microconquistas, resumos ou ganchos. Apenas narração e interação direta.
+- Mostre somente ações, gestos, expressões, descrições do ambiente, clima corporal e diálogos.
+- Sem títulos de seção, microconquista ou gancho, nem qualquer nota meta ao final.
 
 ### Regra de saída
-- Narre em **terceira pessoa**; não fale com "você".
-- **É obrigatório** haver fala e pensamento conforme o formato.
-- Entregue uma cena coesa e finalizada; feche com um gancho implícito.
+- Narre em **terceira pessoa**; nunca fale com "você".
+- Produza uma cena fechada e natural, sem inserir comentários externos ou instruções.
 """.strip()
-
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
-
 # =========================
 # FILTROS DE SAÍDA
 # =========================
@@ -1206,6 +1202,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
