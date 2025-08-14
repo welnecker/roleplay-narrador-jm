@@ -833,7 +833,6 @@ with col2:
 
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
-
     # Provedor/modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
@@ -842,7 +841,6 @@ with st.sidebar:
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
-
     st.markdown("---")
     st.markdown("### ✍️ Estilo & Progresso Dramático")
     st.selectbox(
@@ -852,21 +850,25 @@ with st.sidebar:
         key="estilo_escrita",
     )
     st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 3)), key="nsfw_max_level")
+    st.markdown("---")
 
+    # Romance Mary & Jânio - controles manuais agrupados
+    st.markdown("### 💞 Romance Mary & Jânio")
     fase_default = mj_carregar_fase_inicial()
     options_fase = sorted(FASES_ROMANCE.keys())
     fase_ui_val = int(st.session_state.get("mj_fase", fase_default))
     fase_ui_val = max(min(fase_ui_val, max(options_fase)), min(options_fase))
-    st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
-
+    fase_escolhida = st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
+    if fase_escolhida != st.session_state.get("mj_fase", fase_default):
+        mj_set_fase(fase_escolhida, persist=True)
     options_momento = sorted(MOMENTOS.keys())
     mom_default = momento_carregar()
     mom_ui_val = int(st.session_state.get("momento", mom_default))
     mom_ui_val = max(min(mom_ui_val, max(options_momento)), min(options_momento))
-    st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
-
+    mom_ui = st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
+    if mom_ui != st.session_state.get("momento", mom_default):
+        momento_set(mom_ui, persist=False)
     st.slider("Micropassos por cena", 1, 3, value=int(st.session_state.get("max_avancos_por_cena", 1)), key="max_avancos_por_cena")
-
     col_a, col_b = st.columns(2)
     with col_a:
         if st.button("➕ Avançar 1 passo"):
@@ -874,8 +876,8 @@ with st.sidebar:
     with col_b:
         if st.button("↺ Reiniciar (0)"):
             mj_set_fase(0, persist=True)
-
     st.markdown("---")
+
     st.markdown("### 🎬 Roteiros Sequenciais (Templates)")
     nomes_templates = list(st.session_state.templates_jm.keys())
     if st.button("🔄 Recarregar templates"):
@@ -902,8 +904,8 @@ with st.sidebar:
                 st.session_state.etapa_template = 0
     else:
         st.info("Nenhum template encontrado na aba templates_jm.")
-
     st.markdown("---")
+    # Controles diversos, todos ÚNICOS
     st.checkbox(
         "Evitar coincidências forçadas (montagem paralela A/B)",
         value=st.session_state.get("no_coincidencias", True),
@@ -969,6 +971,7 @@ with st.sidebar:
             st.info("Ainda não há resposta do assistente nesta sessão.")
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
+
 
     # ROMANCE MANUAL
     st.markdown("---")
@@ -1231,6 +1234,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
