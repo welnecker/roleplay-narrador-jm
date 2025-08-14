@@ -139,6 +139,34 @@ def _ws(name: str, create_if_missing: bool = True):
             return ws
         except Exception:
             return None
+# =========================
+# TEMPLATES: Carrega do Sheets
+# =========================
+def carregar_templates_planilha():
+    """Carrega todos os templates sequenciais da aba templates_jm em {template:[etapa1, etapa2,...]}"""
+    try:
+        ws = _ws(TAB_TEMPLATES, create_if_missing=False)
+        if not ws:
+            return {}
+        rows = _sheet_all_records_cached(TAB_TEMPLATES)
+        templates = {}
+        for row in rows:
+            nome = (row.get("template") or "").strip()
+            etapa_str = row.get("etapa") or "1"
+            try:
+                etapa = int(etapa_str)
+            except Exception:
+                etapa = 1
+            texto = (row.get("texto") or "").strip()
+            if nome and texto:
+                templates.setdefault(nome, []).append((etapa, texto))
+        for nome in templates:
+            templates[nome].sort(key=lambda x: x[0])
+            templates[nome] = [t[1] for t in templates[nome]]
+        return templates
+    except Exception as e:
+        st.warning(f"Erro ao carregar templates do Sheets: {e}")
+        return {}
 
 # =========================
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
@@ -821,45 +849,112 @@ with col2:
     st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
 
 # =========================
-# SIDEBAR — Provedor, modelo, resumo, memória, romance manual
+# SIDEBAR — Reorganizado
 # =========================
-
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
-
     # Provedor/modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
     if not api_key:
         st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
-
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
 
-    # Evitar coincidências forçadas (A/B)
-    st.checkbox(
-        "Evitar coincidências forçadas (montagem paralela A/B)",
-        value=st.session_state.get("no_coincidencias", True),
-        key="no_coincidencias",
-    )
-
     st.markdown("---")
-    st.markdown("### ✍️ Estilo & NSFW")
+    st.markdown("### ✍️ Estilo & Progresso Dramático")
+
+    # 1. Estilo de escrita
     st.selectbox(
         "Estilo de escrita",
         ["AÇÃO", "ROMANCE LENTO", "NOIR"],
         index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
         key="estilo_escrita",
     )
+    # 2. Nível de calor
     st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 3)), key="nsfw_max_level")
+    # 3. Fase do romance
+    fase_default = mj_carregar_fase_inicial()
+    options_fase = sorted(FASES_ROMANCE.keys())
+    fase_ui_val = int(st.session_state.get("mj_fase", fase_default))
+    fase_ui_val = max(min(fase_ui_val, max(options_fase)), min(options_fase))
+    st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
+    # 4. Momento atual
+    options_momento = sorted(MOMENTOS.keys())
+    mom_default = momento_carregar()
+    mom_ui_val = int(st.session_state.get("momento", mom_default))
+    mom_ui_val = max(min(mom_ui_val, max(options_momento)), min(options_momento))
+    st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
+    # 5. Micropassos por cena
+    st.slider("Micropassos por cena", 1, 3, value=int(st.session_state.get("max_avancos_por_cena", 1)), key="max_avancos_por_cena")
 
+    # Avanço manual fase/momento (conservado)
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("➕ Avançar 1 passo"):
+            mj_set_fase(min(st.session_state.get("mj_fase", 0) + 1, max(options_fase)), persist=True)
+    with col_b:
+        if st.button("↺ Reiniciar (0)"):
+            mj_set_fase(0, persist=True)
+
+    st.markdown("---")
+    st.markdown("### 🎬 Roteiros Sequenciais (Templates)")
+    nomes_templates = list(st.session_state.templates_jm.keys())
+    if st.button("🔄 Recarregar templates"):
+        st.session_state.templates_jm = carregar_templates_planilha()
+        st.success("Templates atualizados da planilha!")
+    if nomes_templates:
+        roteiro_escolhido = st.selectbox("Escolha o roteiro:", nomes_templates)
+        if st.button("Iniciar roteiro") or (st.session_state.template_ativo != roteiro_escolhido):
+            st.session_state.template_ativo = roteiro_escolhido
+            st.session_state.etapa_template = 0
+        if st.session_state.template_ativo:
+            etapas = st.session_state.templates_jm.get(st.session_state.template_ativo, [])
+            etap = st.session_state.etapa_template
+            if etap < len(etapas):
+                st.markdown(f"Etapa atual: {etap + 1} de {len(etapas)}")
+                if st.button("Próxima etapa (*)"):
+                    comando = etapas[etap]
+                    salvar_interacao("user", comando)
+                    st.session_state.session_msgs.append({"role": "user", "content": comando})
+                    st.session_state.etapa_template += 1
+            else:
+                st.success("Roteiro concluído!")
+                st.session_state.template_ativo = None
+                st.session_state.etapa_template = 0
+    else:
+        st.info("Nenhum template encontrado na aba templates_jm.")
+
+    st.markdown("---")
+    st.checkbox(
+        "Evitar coincidências forçadas (montagem paralela A/B)",
+        value=st.session_state.get("no_coincidencias", True),
+        key="no_coincidencias",
+    )
+    st.checkbox(
+        "Bloquear avanços íntimos sem ordem",
+        value=st.session_state.app_bloqueio_intimo,
+        key="ui_bloqueio_intimo",
+    )
+    st.selectbox(
+        "🎭 Emoção oculta",
+        ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
+        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.app_emocao_oculta),
+        key="ui_app_emocao_oculta",
+    )
+    st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloqueio_intimo", False)
+    st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
     st.markdown("---")
     st.markdown("### ⏱️ Comprimento/timeout")
     st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp", 1200)), step=32, key="max_tokens_rsp")
     st.slider("Timeout (segundos)", 60, 600, value=int(st.session_state.get("timeout_s", 300)), step=10, key="timeout_s")
+    st.markdown("---")
+    st.markdown("### 🗃️ Memória Longa")
+    st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
+    st.slider("Top-K memórias", 1, 5, int(st.session_state.get("k_memoria_longa", 3)), 1, key="k_memoria_longa")
+    st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
 
-    # Resumo rápido
     st.markdown("---")
     if st.button("📝 Gerar resumo do capítulo"):
         try:
@@ -886,12 +981,6 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
 
-    # Memória longa
-    st.markdown("---")
-    st.markdown("### 🗃️ Memória Longa")
-    st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
-    st.slider("Top-K memórias", 1, 5, int(st.session_state.get("k_memoria_longa", 3)), 1, key="k_memoria_longa")
-    st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
     if st.button("💾 Salvar última resposta como memória"):
         ultimo_assist = ""
         for m in reversed(st.session_state.get("session_msgs", [])):
@@ -903,9 +992,6 @@ with st.sidebar:
             st.success("Memória de longo prazo salva!" if ok else "Falha ao salvar memória.")
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
-
-    # Histórico no prompt
-    st.markdown("---")
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
 
@@ -1170,6 +1256,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
