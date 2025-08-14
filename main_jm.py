@@ -1,5 +1,3 @@
-# main.py
-
 # ============================================================
 # Narrador JM — Roleplay adulto (sem pornografia explícita)
 # Compatível com o método antigo: GOOGLE_CREDS_JSON + oauth2client
@@ -10,17 +8,19 @@ import re
 import json
 import time
 import random
+
 from datetime import datetime
 from typing import List, Tuple, Dict, Any
 
 import streamlit as st
 import requests
 import gspread
+
 from oauth2client.service_account import ServiceAccountCredentials
 import numpy as np
 from gspread.exceptions import APIError
 
-# --- Backoff p/ 429 do Sheets ---
+# ---- Backoff p/ 429 do Sheets ----
 def _retry_429(callable_fn, *args, _retries=5, _base=0.6, **kwargs):
     for i in range(_retries):
         try:
@@ -54,7 +54,7 @@ def _invalidate_sheet_caches():
     except Exception:
         pass
 
-# Embeddings OpenAI para verificação semântica/memória longa (opcional)
+# (Opcional) Embeddings OpenAI para verificação semântica/memória longa
 try:
     from openai import OpenAI
     OPENAI_CLIENT = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
@@ -66,7 +66,13 @@ except Exception:
 # =========================
 # CONFIG BÁSICA DO APP
 # =========================
+
 PLANILHA_ID_PADRAO = st.secrets.get("SPREADSHEET_ID", "").strip() or "1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM"
+TAB_INTERACOES = "interacoes_jm"
+TAB_PERFIL = "perfil_jm"
+TAB_MEMORIAS = "memorias_jm"
+TAB_ML = "memoria_longa_jm"
+TAB_TEMPLATES = "templates_jm"
 
 def conectar_planilha():
     try:
@@ -86,13 +92,6 @@ def conectar_planilha():
         return None
 
 planilha = conectar_planilha()
-
-# Abas esperadas
-TAB_INTERACOES = "interacoes_jm"
-TAB_PERFIL     = "perfil_jm"
-TAB_MEMORIAS   = "memorias_jm"
-TAB_TEMPLATES  = "templates_jm"
-TAB_ML         = "memoria_longa_jm"
 
 def _ws(name: str, create_if_missing: bool = True):
     if not planilha:
@@ -118,9 +117,6 @@ def _ws(name: str, create_if_missing: bool = True):
         except Exception:
             return None
 
-# =========================
-# TEMPLATES: Carrega do Sheets
-# =========================
 def carregar_templates_planilha():
     """Carrega todos os templates sequenciais da aba templates_jm em {template:[etapa1, etapa2,...]}"""
     try:
@@ -146,6 +142,14 @@ def carregar_templates_planilha():
     except Exception as e:
         st.warning(f"Erro ao carregar templates do Sheets: {e}")
         return {}
+
+# --- INICIALIZE AS VARIÁVEIS DE TEMPLATE ---
+if "templates_jm" not in st.session_state:
+    st.session_state.templates_jm = carregar_templates_planilha()
+if "template_ativo" not in st.session_state:
+    st.session_state.template_ativo = None
+if "etapa_template" not in st.session_state:
+    st.session_state.etapa_template = 0
 # =========================
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =========================
@@ -779,7 +783,7 @@ st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 st.markdown("---")
 
-# Estado inicial
+# Inicialização dos estados de sessão (inclusive dos templates)
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
 if "session_msgs" not in st.session_state:
@@ -804,8 +808,13 @@ if "nsfw_max_level" not in st.session_state:
     st.session_state.nsfw_max_level = 3
 if "estilo_escrita" not in st.session_state:
     st.session_state.estilo_escrita = "AÇÃO"
+if "templates_jm" not in st.session_state:
+    st.session_state.templates_jm = carregar_templates_planilha()
+if "template_ativo" not in st.session_state:
+    st.session_state.template_ativo = None
+if "etapa_template" not in st.session_state:
+    st.session_state.etapa_template = 0
 
-# Linha de opções rápidas
 col1, col2 = st.columns([3, 2])
 with col1:
     st.markdown("#### 📖 Último resumo salvo:")
@@ -829,8 +838,10 @@ with col2:
 # =========================
 # SIDEBAR — Reorganizado
 # =========================
+
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
+
     # Provedor/modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
@@ -842,32 +853,28 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### ✍️ Estilo & Progresso Dramático")
-
-    # 1. Estilo de escrita
     st.selectbox(
         "Estilo de escrita",
         ["AÇÃO", "ROMANCE LENTO", "NOIR"],
         index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
         key="estilo_escrita",
     )
-    # 2. Nível de calor
     st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 3)), key="nsfw_max_level")
-    # 3. Fase do romance
+
     fase_default = mj_carregar_fase_inicial()
     options_fase = sorted(FASES_ROMANCE.keys())
     fase_ui_val = int(st.session_state.get("mj_fase", fase_default))
     fase_ui_val = max(min(fase_ui_val, max(options_fase)), min(options_fase))
     st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
-    # 4. Momento atual
+
     options_momento = sorted(MOMENTOS.keys())
     mom_default = momento_carregar()
     mom_ui_val = int(st.session_state.get("momento", mom_default))
     mom_ui_val = max(min(mom_ui_val, max(options_momento)), min(options_momento))
     st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
-    # 5. Micropassos por cena
+
     st.slider("Micropassos por cena", 1, 3, value=int(st.session_state.get("max_avancos_por_cena", 1)), key="max_avancos_por_cena")
 
-    # Avanço manual fase/momento (conservado)
     col_a, col_b = st.columns(2)
     with col_a:
         if st.button("➕ Avançar 1 passo"):
@@ -932,7 +939,6 @@ with st.sidebar:
     st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
     st.slider("Top-K memórias", 1, 5, int(st.session_state.get("k_memoria_longa", 3)), 1, key="k_memoria_longa")
     st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
-
     st.markdown("---")
     if st.button("📝 Gerar resumo do capítulo"):
         try:
@@ -958,7 +964,6 @@ with st.sidebar:
                 st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
-
     if st.button("💾 Salvar última resposta como memória"):
         ultimo_assist = ""
         for m in reversed(st.session_state.get("session_msgs", [])):
@@ -1234,6 +1239,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
