@@ -841,6 +841,7 @@ with st.sidebar:
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     modelo_escolhido_id_ui = modelos_map[modelo_nome]
     st.session_state.modelo_escolhido_id = modelo_escolhido_id_ui
+
     st.markdown("---")
     st.markdown("### ✍️ Estilo & Progresso Dramático")
     st.selectbox(
@@ -850,9 +851,8 @@ with st.sidebar:
         key="estilo_escrita",
     )
     st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 3)), key="nsfw_max_level")
-    st.markdown("---")
 
-    # Romance Mary & Jânio - controles manuais agrupados
+    st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio")
     fase_default = mj_carregar_fase_inicial()
     options_fase = sorted(FASES_ROMANCE.keys())
@@ -876,8 +876,8 @@ with st.sidebar:
     with col_b:
         if st.button("↺ Reiniciar (0)"):
             mj_set_fase(0, persist=True)
-    st.markdown("---")
 
+    st.markdown("---")
     st.markdown("### 🎬 Roteiros Sequenciais (Templates)")
     nomes_templates = list(st.session_state.templates_jm.keys())
     if st.button("🔄 Recarregar templates"):
@@ -904,8 +904,8 @@ with st.sidebar:
                 st.session_state.etapa_template = 0
     else:
         st.info("Nenhum template encontrado na aba templates_jm.")
+
     st.markdown("---")
-    # Controles diversos, todos ÚNICOS
     st.checkbox(
         "Evitar coincidências forçadas (montagem paralela A/B)",
         value=st.session_state.get("no_coincidencias", True),
@@ -924,15 +924,18 @@ with st.sidebar:
     )
     st.session_state.app_bloqueio_intimo = st.session_state.get("ui_bloqueio_intimo", False)
     st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
+
     st.markdown("---")
     st.markdown("### ⏱️ Comprimento/timeout")
     st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp", 1200)), step=32, key="max_tokens_rsp")
     st.slider("Timeout (segundos)", 60, 600, value=int(st.session_state.get("timeout_s", 300)), step=10, key="timeout_s")
+
     st.markdown("---")
     st.markdown("### 🗃️ Memória Longa")
     st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
     st.slider("Top-K memórias", 1, 5, int(st.session_state.get("k_memoria_longa", 3)), 1, key="k_memoria_longa")
     st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
+
     st.markdown("---")
     if st.button("📝 Gerar resumo do capítulo"):
         try:
@@ -958,6 +961,7 @@ with st.sidebar:
                 st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
+
     if st.button("💾 Salvar última resposta como memória"):
         ultimo_assist = ""
         for m in reversed(st.session_state.get("session_msgs", [])):
@@ -969,45 +973,13 @@ with st.sidebar:
             st.success("Memória de longo prazo salva!" if ok else "Falha ao salvar memória.")
         else:
             st.info("Ainda não há resposta do assistente nesta sessão.")
+
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
 
 
-    # ROMANCE MANUAL
-    st.markdown("---")
-    st.markdown("### 💞 Romance Mary & Jânio (manual)")
 
-    fase_default = mj_carregar_fase_inicial()
-    options_fase = sorted(FASES_ROMANCE.keys())
-    max_phase = max(options_fase)
-    fase_ui_val = int(st.session_state.get("mj_fase", fase_default))
-    fase_ui_val = max(min(fase_ui_val, max_phase), min(options_fase))
-    fase_escolhida = st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
-    if fase_escolhida != st.session_state.get("mj_fase", fase_default):
-        mj_set_fase(fase_escolhida, persist=True)
-
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button("➕ Avançar 1 passo"):
-            mj_set_fase(min(st.session_state.get("mj_fase", 0) + 1, max_phase), persist=True)
-    with col_b:
-        if st.button("↺ Reiniciar (0)"):
-            mj_set_fase(0, persist=True)
-
-    st.slider("Micropassos por cena", 1, 3, value=int(st.session_state.get("max_avancos_por_cena", 1)), key="max_avancos_por_cena")
-
-    st.markdown("### 🎚️ Momento (manual)")
-    options_momento = sorted(MOMENTOS.keys())
-    mom_default = momento_carregar()
-    mom_ui_val = int(st.session_state.get("momento", mom_default))
-    mom_ui_val = max(min(mom_ui_val, max(options_momento)), min(options_momento))
-    mom_ui = st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
-    if mom_ui != st.session_state.get("momento", mom_default):
-        momento_set(mom_ui, persist=False)
-
-    st.caption("Regra: 1 microavanço por cena. A fase só muda quando você decidir.")
-    st.caption("Role a tela principal para ver interações anteriores.")
-
+   
 # =========================
 # EXIBIR HISTÓRICO (depois resumo)
 # =========================
@@ -1234,6 +1206,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
