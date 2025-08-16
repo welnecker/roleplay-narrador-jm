@@ -676,11 +676,12 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
 - Todas as cenas devem ser altamente sensoriais e físicas. Detalhe toques, apertos, tremores, suor, respiração, gradação do prazer até o limite do orgasmo e depois.
 - As falas de Mary devem ser sensuais, realistas e explícitas, sem linguagem poética ou frases floreadas.
-- Mary verbaliza desejo sexual, pede e orienta sexo e prazer sem pudor: frases diretas e sensoriais como "Me fode agora!", "Quero gozar!", "Tira minha roupa!", "Mete fundo!", "Estou molhada!", "Faz eu gritar de prazer!", "Estou gozando!", "Que delícia!", "Vai, não para!", "Me pega desse jeito!", "Põe a mão aqui!", etc.
+- Mary verbaliza desejo sexual, pede e orienta sexo e prazer sem pudor: frases diretas e sensoriais como "Me fode agora!", "Quero gozar!", "Tira minha roupa!", "Mete fundo!", "Estou molhada!", "Faz eu gritar de prazer!", "Estou gozando!", "Que delícia!", "Vai, não para!", "Me pega desse jeito!", "Põe a mão aqui!", “Goza dentro!”, “Porra, tô gozando!”, “Mais forte!” etc.
 - Não use metáforas, floreios líricos ou reflexões profundas; priorize comandos, reações corporais e escancaradas do tesão e pós-tesão.
-- Detalhe o pós-orgasmo: Mary treme, gemidos lentos e reais, pernas sem força, abraços exaustos, pele suada, respiração descontrolada, mãos ainda apertando, sorriso solto. Jânio busca ar, corpo pesado, roçando a bunda dela, pele escorregadia e úmida.
-- Mostre prazer explícito, físico e exausto: gemidos, rugidos, tremores, risos bobos, olhares de puro tesão, "Estou toda mole", "Não sinto as pernas", "Nunca gozei tão forte", "Me segura que vou desmaiar", etc.
-- Mary reage fisicamente com agarrões, mordidas, pedidos ousados e sinceros, sem vergonha. Nunca escreva desfecho seco ou cômico; sempre finalize mostrando um impacto corporal real e prazeroso.
+- No clímax, **obrigatoriamente inclua frases explosivas e altas de orgasmo**: Mary e Jânio devem gemer, gritar ou falar explicitamente seu prazer ("Estou gozando!", "Ahhh, que delícia!", "Goza dentro de mim!", "Mais forte!", etc.) antes de qualquer relaxamento ou carinho.
+- O desfecho da cena sexual sempre inclui reação explosiva: gemidos altos, frases de gozo ditas em voz alta, corpo pulsando, tremores intensos; só depois, podem relaxar exaustos, suados, abraçados, comentando o prazer ("Nunca gozei desse jeito!", "Estou toda mole", "Não sinto as pernas", etc).
+- Jamais encerre sem que pelo menos um dos personagens verbalize de forma explícita o orgasmo e a intensidade do prazer.
+- Mary reage fisicamente com agarrões, mordidas, pedidos ousados e sinceros, sem vergonha. Nunca escreva desfecho seco ou cômico; sempre finalize mostrando o impacto corporal real, prazeroso e o orgasmo verbalizado.
 
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
@@ -1205,6 +1206,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
