@@ -154,40 +154,51 @@ if "etapa_template" not in st.session_state:
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =========================
 
-def carregar_memorias_brutas() -> Dict[str, List[str]]:
-    """Lê 'memorias_jm' e devolve um dict {tag_lower: [linhas]} com cache TTL."""
+def carregar_memorias_brutas() -> Dict[str, List[dict]]:
+    """
+    Lê 'memorias_jm' e devolve um dict
+    {tag_lower: [ {"conteudo":..., "timestamp":...} ]} com cache TTL.
+    """
     try:
         regs = _sheet_all_records_cached(TAB_MEMORIAS)
-        buckets: Dict[str, List[str]] = {}
+        buckets: Dict[str, List[dict]] = {}
         for r in regs:
             tag = (r.get("tipo", "") or "").strip().lower()
             txt = (r.get("conteudo", "") or "").strip()
-            if tag and txt:
-                buckets.setdefault(tag, []).append(txt)
+            ts = r.get("timestamp", "")
+            if tag and txt and ts:
+                buckets.setdefault(tag, []).append({"conteudo": txt, "timestamp": ts})
         return buckets
     except Exception as e:
         st.warning(f"Erro ao carregar memórias: {e}")
         return {}
 
 def persona_block(nome: str, buckets: dict, max_linhas: int = 8) -> str:
-    """Monta bloco compacto da persona (ordena por prefixos úteis)."""
+    """
+    Monta bloco compacto da persona (ordena por prefixos úteis).
+    """
     tag = f"[{nome}]"
     linhas = buckets.get(tag, [])
     ordem = ["OBJ:", "TAT:", "LV:", "VOZ:", "BIO:", "ROTINA:", "LACOS:", "APS:", "CONFLITOS:"]
-
-    def peso(l):
+    def peso(linha_dict):
+        l = linha_dict["conteudo"]
         up = l.upper()
         for i, p in enumerate(ordem):
             if up.startswith(p):
                 return i
         return len(ordem)
-
+    # Ordena por prefixo útil, retorna só os conteúdos
     linhas_ordenadas = sorted(linhas, key=peso)[:max_linhas]
     titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
-    return (f"{titulo}:\n- " + "\n- ".join(linhas_ordenadas)) if linhas_ordenadas else ""
+    return (
+        f"{titulo}:\n- " +
+        "\n- ".join(linha['conteudo'] for linha in linhas_ordenadas)
+    ) if linhas_ordenadas else ""
 
 def carregar_resumo_salvo() -> str:
-    """Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo) com cache TTL."""
+    """
+    Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo) com cache TTL.
+    """
     try:
         registros = _sheet_all_records_cached(TAB_PERFIL)
         for r in reversed(registros):
@@ -200,7 +211,9 @@ def carregar_resumo_salvo() -> str:
         return ""
 
 def salvar_resumo(resumo: str):
-    """Salva uma nova linha em 'perfil_jm' (timestamp | resumo) e invalida caches."""
+    """
+    Salva uma nova linha em 'perfil_jm' (timestamp | resumo) e invalida caches.
+    """
     try:
         aba = _ws(TAB_PERFIL)
         if not aba:
@@ -224,7 +237,9 @@ def carregar_interacoes(n: int = 20):
     return cache[-n:] if len(cache) > n else cache
 
 def salvar_interacao(role: str, content: str):
-    """Append no Sheets + atualiza cache local (sem reler) com backoff 429."""
+    """
+    Append no Sheets + atualiza cache local (sem reler) com backoff 429.
+    """
     if not planilha:
         return
     try:
@@ -235,20 +250,33 @@ def salvar_interacao(role: str, content: str):
         row_role = f"{role or ''}".strip()
         row_content = f"{content or ''}".strip()
         row = [timestamp, row_role, row_content]
-
         _retry_429(aba.append_row, row, value_input_option="RAW")
-
         # atualiza cache local
         lst = st.session_state.get("_cache_interacoes")
         if isinstance(lst, list):
-            lst.append({"timestamp": row[0], "role": row[1], "content": row[2]})
+            lst.append({"timestamp": row[0], "role": row[1], "content": row})
         else:
-            st.session_state["_cache_interacoes"] = [{"timestamp": row[0], "role": row[1], "content": row[2]}]
-
+            st.session_state["_cache_interacoes"] = [{"timestamp": row, "role": row[1], "content": row}]
         _invalidate_sheet_caches()
-
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
+
+# ===== NOVO: BUSCA TEMPORAL DE MEMÓRIAS =====
+def buscar_status_persona_ate(persona_tag: str, momento_ts: str, buckets: dict) -> List[str]:
+    """
+    Busca os traços mais recentes da persona até o timestamp informado.
+    persona_tag: ex: '[mary]'
+    momento_ts: timestamp limite (ex: '2025-08-21 16:04:00')
+    buckets: dict retornado por carregar_memorias_brutas()
+    """
+    linhas = buckets.get(persona_tag.lower(), [])
+    # Ordena por timestamp crescente
+    linhas_ord = sorted(linhas, key=lambda x: x['timestamp'])
+    status_ate = []
+    for l in linhas_ord:
+        if l['timestamp'] <= momento_ts:
+            status_ate.append(l['conteudo'])
+    return status_ate
 
 # =========================
 # EMBEDDINGS / SIMILARIDADE
@@ -1206,6 +1234,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
