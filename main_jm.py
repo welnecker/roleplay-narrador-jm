@@ -276,9 +276,6 @@ def buscar_status_persona_ate(persona_tag: str, momento_ts: str, buckets: dict) 
             status_ate.append(l['conteudo'])
     return status_ate
 
-# Se usar recorrentes '[all]':
-# (memos precisa ser chamado antes)
-recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
 
 # =========================
 # EMBEDDINGS / SIMILARIDADE
@@ -637,6 +634,7 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 
 def construir_prompt_com_narrador() -> str:
     memos = carregar_memorias_brutas()
+    recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
     perfil = carregar_resumo_salvo()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
@@ -1236,6 +1234,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
