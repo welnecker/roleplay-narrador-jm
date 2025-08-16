@@ -674,6 +674,10 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
 ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
+- As falas de Mary devem ser sensuais, realistas e explícitas, sem linguagem poética ou frases floreadas.
+- Mary verbaliza com desejo, pedindo sexo, prazer e ação sem pudor: use frases diretas e sensoriais como "Me fode agora!", "Quero gozar!", "Tira minha roupa!", "Mete fundo!", "Estou molhada!", "Faz eu gritar de prazer!", "Estou gozando!", "Que delícia!", "Vai, não para!", etc.
+- Não use metáforas, floreios líricos ou reflexões profundas; priorize comandos e reações corporais.
+- Mary reage fisicamente (gemidos, gritos, agarrões, orientações do tipo "Me pega desse jeito!", "Põe a mão aqui!") e fala aberta sobre tesão, sem vergonha.
 
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
@@ -713,8 +717,8 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Narre em **terceira pessoa**; nunca fale com "você".
 - Produza uma cena fechada e natural, sem inserir comentários externos ou instruções.
 """.strip()
-    prompt = inserir_regras_mary_e_janio(prompt)
-    return prompt
+prompt = inserir_regras_mary_e_janio(prompt)
+return prompt
 # =========================
 # FILTROS DE SAÍDA
 # =========================
@@ -1202,6 +1206,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
