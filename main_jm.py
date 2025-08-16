@@ -832,8 +832,8 @@ if "momento" not in st.session_state:
     st.session_state.momento = momento_carregar()
 if "max_avancos_por_cena" not in st.session_state:
     st.session_state.max_avancos_por_cena = 1
-if "nsfw_max_level" not in st.session_state:
-    st.session_state.nsfw_max_level = 3
+#if "nsfw_max_level" not in st.session_state:
+ #   st.session_state.nsfw_max_level = 3
 if "estilo_escrita" not in st.session_state:
     st.session_state.estilo_escrita = "AÇÃO"
 if "templates_jm" not in st.session_state:
@@ -878,7 +878,7 @@ with st.sidebar:
         index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
         key="estilo_escrita",
     )
-    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 3)), key="nsfw_max_level")
+    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=3, key="nsfw_max_level")
 
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio")
@@ -1234,6 +1234,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
