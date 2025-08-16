@@ -277,6 +277,8 @@ def buscar_status_persona_ate(persona_tag: str, momento_ts: str, buckets: dict) 
         if l['timestamp'] <= momento_ts:
             status_ate.append(l['conteudo'])
     return status_ate
+    # Se usar recorrentes '[all]':
+recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
 
 # =========================
 # EMBEDDINGS / SIMILARIDADE
@@ -1234,6 +1236,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
