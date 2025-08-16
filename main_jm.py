@@ -252,7 +252,7 @@ def salvar_interacao(role: str, content: str):
         # atualiza cache local
         lst = st.session_state.get("_cache_interacoes")
         if isinstance(lst, list):
-            lst.append({"timestamp": row[0], "role": row[1], "content": row})  # <-- ERRADO ERA row!
+            lst.append({"timestamp": row, "role": row[1], "content": row})
         else:
             st.session_state["_cache_interacoes"] = [{"timestamp": row, "role": row[1], "content": row}]
         _invalidate_sheet_caches()
@@ -1234,6 +1234,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
