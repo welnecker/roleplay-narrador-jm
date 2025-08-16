@@ -252,7 +252,7 @@ def salvar_interacao(role: str, content: str):
         # atualiza cache local
         lst = st.session_state.get("_cache_interacoes")
         if isinstance(lst, list):
-            lst.append({"timestamp": row, "role": row[1], "content": row})
+            lst.append({"timestamp": timestamp, "role": row_role, "content": row_content})
         else:
             st.session_state["_cache_interacoes"] = [{"timestamp": row, "role": row[1], "content": row}]
         _invalidate_sheet_caches()
@@ -639,8 +639,8 @@ def construir_prompt_com_narrador() -> str:
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
     momento_atual = int(st.session_state.get("momento", momento_carregar()))
-    mdata = MOMENTOS.get(momento_atual, MOMENTOS)
-    proximo_nome = MOMENTOS[mdata["proximo"]]["nome"]
+mdata = MOMENTOS.get(momento_atual, MOMENTOS[0])
+proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS[0])["nome"]
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
 
     # Histórico do Sheets
@@ -667,8 +667,12 @@ def construir_prompt_com_narrador() -> str:
     else:
         st.session_state["_ml_topk_texts"] = []
 
-    recorrentes = [c for (t, lst) in memos.items() if t == "[all]" for c in lst]
-    st.session_state["_ml_recorrentes"] = recorrentes
+    recorrentes = [
+    (d.get("conteudo") or "").strip()
+    for d in memos.get("[all]", [])
+    if isinstance(d, dict) and d.get("conteudo")
+]
+st.session_state["_ml_recorrentes"] = recorrentes
 
     dossie = []
     mary = persona_block("mary", memos, 8)
@@ -689,7 +693,7 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 {dossie_txt}
 
 ### Diretrizes gerais (ALL)
-{chr(10).join(['- '+c for c in recorrentes]) if recorrentes else '(vazio)'}
+{chr(10).join(f"- {c}" for c in recorrentes) if recorrentes else "(vazio)"}
 
 ### Perfil (resumo mais recente)
 {perfil or "(vazio)"}
@@ -1234,6 +1238,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
