@@ -674,19 +674,20 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
 ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
+- Todas as cenas devem ser altamente sensoriais e físicas. Detalhe toques, apertos, tremores, suor, respiração, gradação do prazer até o limite do orgasmo e depois.
 - As falas de Mary devem ser sensuais, realistas e explícitas, sem linguagem poética ou frases floreadas.
-- Mary verbaliza com desejo, pedindo sexo, prazer e ação sem pudor: use frases diretas e sensoriais como "Me fode agora!", "Quero gozar!", "Tira minha roupa!", "Mete fundo!", "Estou molhada!", "Faz eu gritar de prazer!", "Estou gozando!", "Que delícia!", "Vai, não para!", etc.
-- Não use metáforas, floreios líricos ou reflexões profundas; priorize comandos e reações corporais.
-- Mary reage fisicamente (gemidos, gritos, agarrões, orientações do tipo "Me pega desse jeito!", "Põe a mão aqui!") e fala aberta sobre tesão, sem vergonha.
+- Mary verbaliza desejo sexual, pede e orienta sexo e prazer sem pudor: frases diretas e sensoriais como "Me fode agora!", "Quero gozar!", "Tira minha roupa!", "Mete fundo!", "Estou molhada!", "Faz eu gritar de prazer!", "Estou gozando!", "Que delícia!", "Vai, não para!", "Me pega desse jeito!", "Põe a mão aqui!", etc.
+- Não use metáforas, floreios líricos ou reflexões profundas; priorize comandos, reações corporais e escancaradas do tesão e pós-tesão.
+- Detalhe o pós-orgasmo: Mary treme, gemidos lentos e reais, pernas sem força, abraços exaustos, pele suada, respiração descontrolada, mãos ainda apertando, sorriso solto. Jânio busca ar, corpo pesado, roçando a bunda dela, pele escorregadia e úmida.
+- Mostre prazer explícito, físico e exausto: gemidos, rugidos, tremores, risos bobos, olhares de puro tesão, "Estou toda mole", "Não sinto as pernas", "Nunca gozei tão forte", "Me segura que vou desmaiar", etc.
+- Mary reage fisicamente com agarrões, mordidas, pedidos ousados e sinceros, sem vergonha. Nunca escreva desfecho seco ou cômico; sempre finalize mostrando um impacto corporal real e prazeroso.
 
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
-
 ### ⏱️ Estado do romance (manual)
 - Fase atual: {_fase_label(fase)}
 - Permitidos: {fdata['permitidos']}
 - Proibidos: {fdata['proibidos']}
-
 ### 🎯 Momento dramático (agora)
 - Momento: {_momento_label(momento_atual)}
 - Objetivo da cena: {mdata['objetivo']}
@@ -694,7 +695,6 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Evite/adiar: {mdata['proibidos']}
 - **Micropassos:** avance no máximo **{int(st.session_state.get("max_avancos_por_cena",1))}** subpasso(s) rumo a: {proximo_nome}.
 - Se o roteirista pedir salto maior, **negocie**: nomeie limites, peça consentimento, e **prepare** a transição (não pule etapas).
-
 ### Geografia & Montagem
 - **Não force coincidências**: se não houver ponte clara (mensagem, convite, “ensaio 18h…”, pedido do usuário), mantenha **Mary e Jânio em locais distintos** e use **montagem paralela** (A ↔ B).
 - **Comece cada bloco** com uma frase que **ancore lugar e hora** (ex.: “UFES — corredor de Pedagogia, 9h15 — …” ou “Terminal Laranjeiras, 9h18 — …”). Não use títulos; escreva isso na **primeira frase** do parágrafo.
@@ -704,7 +704,6 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Se houver ponte plausível explícita**, pode convergir para co-presença ao final da cena (de forma plausível), **sem teletransporte**.
 - **Sem ponte diegética explícita, um personagem não pode saber, afirmar ou reagir a fatos que só ocorreram no bloco do outro; se houver pressentimento/ciúme, redigir sem afirmar o fato. Exemplos de ponte: mensagem, foto/story, ligação, testemunha, encontro marcado — se existir, mostre isso na cena (ex.: celular vibra e aparece um story)**.
 - **Objetos diegéticos: se a câmera não couber na situação (encontro, banho, mar, revista), mostre a ação de guarda antes e ignore o objeto até a retomada; não descreva interação física com a câmera nesses contextos**.
-
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (—), intercalados com ação e reação física/visual. Mínimo: **4 falas** no total.
 - Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
@@ -712,13 +711,13 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Não escreva blocos finais de créditos, microconquistas, resumos ou ganchos. Apenas narração e interação direta.
 - Mostre somente ações, gestos, expressões, descrições do ambiente, clima corporal e diálogos.
 - Sem títulos de seção, microconquista ou gancho, nem qualquer nota meta ao final.
-
 ### Regra de saída
 - Narre em **terceira pessoa**; nunca fale com "você".
 - Produza uma cena fechada e natural, sem inserir comentários externos ou instruções.
 """.strip()
-    prompt = inserir_regras_mary_e_janio(prompt)
+prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
+
 # =========================
 # FILTROS DE SAÍDA
 # =========================
@@ -1206,6 +1205,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
