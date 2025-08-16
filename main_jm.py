@@ -150,10 +150,9 @@ if "template_ativo" not in st.session_state:
     st.session_state.template_ativo = None
 if "etapa_template" not in st.session_state:
     st.session_state.etapa_template = 0
-# =========================
+# =====
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
-# =========================
-
+# =====
 def carregar_memorias_brutas() -> Dict[str, List[dict]]:
     """
     Lê 'memorias_jm' e devolve um dict
@@ -187,7 +186,6 @@ def persona_block(nome: str, buckets: dict, max_linhas: int = 8) -> str:
             if up.startswith(p):
                 return i
         return len(ordem)
-    # Ordena por prefixo útil, retorna só os conteúdos
     linhas_ordenadas = sorted(linhas, key=peso)[:max_linhas]
     titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
     return (
@@ -261,7 +259,7 @@ def salvar_interacao(role: str, content: str):
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
-# ===== NOVO: BUSCA TEMPORAL DE MEMÓRIAS =====
+# = NOVO: BUSCA TEMPORAL DE MEMÓRIAS =
 def buscar_status_persona_ate(persona_tag: str, momento_ts: str, buckets: dict) -> List[str]:
     """
     Busca os traços mais recentes da persona até o timestamp informado.
@@ -277,7 +275,9 @@ def buscar_status_persona_ate(persona_tag: str, momento_ts: str, buckets: dict) 
         if l['timestamp'] <= momento_ts:
             status_ate.append(l['conteudo'])
     return status_ate
-    # Se usar recorrentes '[all]':
+
+# Se usar recorrentes '[all]':
+# (memos precisa ser chamado antes)
 recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
 
 # =========================
@@ -1236,6 +1236,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
