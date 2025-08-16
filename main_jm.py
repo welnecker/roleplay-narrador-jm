@@ -632,15 +632,16 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 - Sem consumação em cena; foque em progressão coerente."""
     return prompt_base + "\n" + regras
 
+
 def construir_prompt_com_narrador() -> str:
     memos = carregar_memorias_brutas()
-   # recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
+    # recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
     perfil = carregar_resumo_salvo()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
     momento_atual = int(st.session_state.get("momento", momento_carregar()))
-mdata = MOMENTOS.get(momento_atual, MOMENTOS[0])
-proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS[0])["nome"]
+    mdata = MOMENTOS.get(momento_atual, MOMENTOS[0])
+    proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS[0])["nome"]
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
 
     # Histórico do Sheets
@@ -667,12 +668,13 @@ proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS[0])["nome"]
     else:
         st.session_state["_ml_topk_texts"] = []
 
+    # >>> INDENTAÇÃO CORRETA AQUI <<<
     recorrentes = [
-    (d.get("conteudo") or "").strip()
-    for d in memos.get("[all]", [])
-    if isinstance(d, dict) and d.get("conteudo")
-]
-st.session_state["_ml_recorrentes"] = recorrentes
+        (d.get("conteudo") or "").strip()
+        for d in memos.get("[all]", [])
+        if isinstance(d, dict) and d.get("conteudo")
+    ]
+    st.session_state["_ml_recorrentes"] = recorrentes
 
     dossie = []
     mary = persona_block("mary", memos, 8)
@@ -742,7 +744,7 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
 - **Não inclua pensamentos internos em itálico, reflexões internas ou monólogos subjetivos dos personagens.**
 - Não escreva blocos finais de créditos, microconquistas, resumos ou ganchos. Apenas narração e interação direta.
-- Mostre somente ações, gestos, expressões, descrições do ambiente, clima corporal e diálogos.
+- Mostre somente ações, gestos, expressões do ambiente, clima corporal e diálogos.
 - Sem títulos de seção, microconquista ou gancho, nem qualquer nota meta ao final.
 ### Regra de saída
 - Narre em **terceira pessoa**; nunca fale com "você".
@@ -1238,6 +1240,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
