@@ -717,8 +717,8 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Narre em **terceira pessoa**; nunca fale com "você".
 - Produza uma cena fechada e natural, sem inserir comentários externos ou instruções.
 """.strip()
-prompt = inserir_regras_mary_e_janio(prompt)
-return prompt
+    prompt = inserir_regras_mary_e_janio(prompt)
+    return prompt
 # =========================
 # FILTROS DE SAÍDA
 # =========================
@@ -1206,7 +1206,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
-
 
 
 
