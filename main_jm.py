@@ -718,6 +718,74 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
     return prompt_base + "\n" + regras
 
 
+def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True) -> str:
+    """
+    Gera 1–3 frases sensoriais sobre Mary.
+      level: 0=off, 1=leve, 2=marcado, 3=ousado
+      n: quantidade de frases
+      hair_on: garante ao menos 1 frase sobre os cabelos (negros, volumosos, levemente ondulados)
+    """
+    if level <= 0 or n <= 0:
+        return ""
+
+    # Base
+    base_leve = [
+        "Mary caminha com ritmo seguro; há algo hipnótico no balanço dos quadris.",
+        "O olhar de Mary prende fácil: direto, firme, cativante.",
+        "O perfume de Mary chega antes dela, discreto e morno.",
+        "O sorriso aparece quando quer; breve, afiado, certeiro.",
+    ]
+    base_marcado = [
+        "Os quadris de Mary balançam num compasso que chama atenção sem pedir licença.",
+        "Enquanto caminha, os seios balançam de leve sob o tecido.",
+        "O tecido roça nas pernas e denuncia o passo: firme, íntimo, decidido.",
+        "O olhar de Mary é um convite silencioso — confiante e difícil de sustentar por muito tempo.",
+    ]
+    base_ousado = [
+        "O balanço dos quadris de Mary é quase cruel: entra na cabeça e não sai.",
+        "Os seios acompanham a passada num movimento suave que acende o ambiente.",
+        "O olhar de Mary encosta na pele de quem cruza com ela: quente, demorado, insinuante.",
+        "O perfume fica na memória como um toque atrás da nuca.",
+    ]
+
+    # Frases específicas de cabelo (negros, volumosos, levemente ondulados)
+    hair_leve = [
+        "Os cabelos de Mary — negros, volumosos, levemente ondulados — descansam nos ombros e acompanham o passo.",
+        "Os cabelos negros, volumosos e levemente ondulados moldam o rosto quando ela vira de leve.",
+    ]
+    hair_marcado = [
+        "Cabelos negros, volumosos, levemente ondulados, fazem um arco quando ela vira o rosto, reforçando o balanço do corpo.",
+        "Os cabelos, negros e volumosos, ondulam de leve a cada passada e criam uma moldura hipnótica.",
+    ]
+    hair_ousado = [
+        "Os cabelos negros, volumosos e levemente ondulados deslizam pela clavícula como um toque que fica.",
+        "O balanço dos cabelos negros — volumosos, levemente ondulados — marca o compasso do corpo de Mary.",
+    ]
+
+    pool = []
+    hair_pool = []
+    if level == 1:
+        pool = base_leve
+        hair_pool = hair_leve
+    elif level == 2:
+        pool = base_leve + base_marcado
+        hair_pool = hair_leve + hair_marcado
+    else:  # level >= 3
+        pool = base_leve + base_marcado + base_ousado
+        hair_pool = hair_leve + hair_marcado + hair_ousado
+
+    n_eff = max(1, min(n, len(pool)))
+    frases = random.sample(pool, k=n_eff)
+
+    if hair_on and hair_pool:
+        hair_line = random.choice(hair_pool)
+        if hair_line not in frases:
+            frases.insert(0, hair_line)
+            if len(frases) > n_eff:
+                frases = frases[:n_eff]
+
+    return " ".join(frases)
+
 def construir_prompt_com_narrador() -> str:
     memos = carregar_memorias_brutas()
     # recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
@@ -729,7 +797,13 @@ def construir_prompt_com_narrador() -> str:
     proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS[0])["nome"]
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
 
-    # Histórico do Sheets
+    
+    # Camada sensorial de Mary (para o 1º parágrafo da cena)
+    _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
+    _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
+    _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
+    mary_sens_txt = gerar_mary_sensorial(_sens_level, n=_sens_n) if _sens_on else ""
+# Histórico do Sheets
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r['role']}: {r['content']}" for r in hist) if hist else "(sem histórico)"
@@ -812,6 +886,11 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - O desfecho da cena sexual sempre inclui reação explosiva: gemidos altos, frases de gozo ditas em voz alta, corpo pulsando, tremores intensos; só depois, podem relaxar exaustos, suados, abraçados, comentando o prazer ("Nunca gozei desse jeito!", "Estou toda mole", "Não sinto as pernas", etc).
 - Jamais encerre sem que pelo menos um dos personagens verbalize de forma explícita o orgasmo e a intensidade do prazer.
 - Mary reage fisicamente com agarrões, mordidas, pedidos ousados e sinceros, sem vergonha. Nunca escreva desfecho seco ou cômico; sempre finalize mostrando o impacto corporal real, prazeroso e o orgasmo verbalizado.
+
+### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
+{mary_sens_txt or "- Comece com 1–2 frases curtas sobre o caminhar, olhar, perfume e cabelos (negros, volumosos, levemente ondulados) de Mary; pode mencionar o balanço suave dos seios sob o tecido (sem vulgaridade)."}
+- Aplique essa camada ANTES do primeiro diálogo.
+- Frases curtas, diretas, físicas; evite metáforas rebuscadas.
 
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
@@ -1336,7 +1415,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
-
 
 
 
