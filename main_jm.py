@@ -310,7 +310,7 @@ def verificar_quebra_semantica_openai(texto1: str, texto2: str, limite=0.6) -> s
     return ""
 
 # =========================
-# MEMÓRIA LONGA (Sheets + Embeddings/OpenAI opcional)
+# MEMÓRIA LONGA (Sheets + Embeddings/OpenAI opcional) — TIME-AWARE
 # =========================
 
 def _sheet_ensure_memoria_longa():
@@ -353,19 +353,26 @@ def memoria_longa_listar_registros():
 def _tokenize(s: str) -> set:
     return set(re.findall(r"[a-zà-ú0-9]+", (s or "").lower()))
 
-def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78):
-    """Top-K memórias. Usa embeddings se existir; senão, Jaccard simples."""
+def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78, ate_ts=None):
+    """
+    Top-K memórias (time-aware). Usa embeddings se existir; senão, Jaccard simples.
+    Se 'ate_ts' for informado (formato 'YYYY-MM-DD HH:MM:SS'), ignora registros com
+    timestamp > ate_ts (ou seja, memórias 'do futuro' em relação ao histórico atual).
+    Retorna lista de tuplas (texto, score, sim, rr).
+    """
     try:
-        dados = _sheet_all_records_cached(TAB_ML)
+        dados = _sheet_all_records_cached(TAB_ML)  # [{'texto','embedding','tags','timestamp','score'}, ...]
     except Exception as e:
         st.warning(f"Erro ao carregar memoria_longa_jm: {e}")
         return []
 
     q = gerar_embedding_openai(query_text) if OPENAI_OK else None
     candidatos = []
+
     for row in dados:
         texto = (row.get("texto") or "").strip()
         emb_s = (row.get("embedding") or "").strip()
+        row_ts = (row.get("timestamp") or "").strip()
         try:
             score = float(row.get("score", 1.0) or 1.0)
         except Exception:
@@ -373,14 +380,18 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
         if not texto:
             continue
 
+        # --- Corte temporal: ignora memórias mais novas que o corte (se fornecido)
+        if ate_ts and row_ts and row_ts > ate_ts:
+            continue  # strings no formato YYYY-MM-DD HH:MM:SS são comparáveis lexicograficamente
+
+        # Similaridade por embedding (quando disponível), senão fallback lexical
         if q is not None and emb_s:
             vec = _deserialize_vec(emb_s)
-            if vec.ndim == 1 and vec.size >= 10:
+            if vec.ndim == 1 and vec.size >= 10 and np.linalg.norm(vec) > 0 and np.linalg.norm(q) > 0:
                 sim = float(np.dot(q, vec) / (np.linalg.norm(q) * np.linalg.norm(vec)))
             else:
                 sim = 0.0
         else:
-            # fallback lexical
             s1 = _tokenize(texto)
             s2 = _tokenize(query_text)
             sim = len(s1 & s2) / max(1, len(s1 | s2))
@@ -388,6 +399,7 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78)
         if sim >= limiar:
             rr = 0.7 * sim + 0.3 * score
             candidatos.append((texto, score, sim, rr))
+
     candidatos.sort(key=lambda x: x[3], reverse=True)
     return candidatos[:k]
 
@@ -649,14 +661,23 @@ def construir_prompt_com_narrador() -> str:
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r['role']}: {r['content']}" for r in hist) if hist else "(sem histórico)"
 
-    # Memória longa Top-K (texto apenas; se não houver, "(nenhuma)")
+    # >>> CORTE TEMPORAL (até o timestamp da última interação)
+    if hist:
+        # Se você já tem _parse_ts(), pode usar: ate_ts = _parse_ts(hist[-1].get("timestamp", ""))
+        ate_ts = hist[-1].get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    else:
+        ate_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Memória longa Top-K (texto apenas; se não houver, "(nenhuma)") — respeitando o tempo
     ml_topk_txt = "(nenhuma)"
+    st.session_state["_ml_topk_texts"] = []
     if st.session_state.get("use_memoria_longa", True) and hist:
         try:
             topk = memoria_longa_buscar_topk(
                 query_text=hist[-1]["content"],
                 k=int(st.session_state.get("k_memoria_longa", 3)),
                 limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
+                ate_ts=ate_ts,  # << corte temporal aplicado aqui
             )
             if topk:
                 ml_topk_txt = "\n".join([f"- {t}" for (t, _sc, _sim, _rr) in topk])
@@ -668,17 +689,19 @@ def construir_prompt_com_narrador() -> str:
     else:
         st.session_state["_ml_topk_texts"] = []
 
-    # >>> INDENTAÇÃO CORRETA AQUI <<<
+    # Diretrizes [all] respeitando o tempo (<= ate_ts)
     recorrentes = [
         (d.get("conteudo") or "").strip()
         for d in memos.get("[all]", [])
-        if isinstance(d, dict) and d.get("conteudo")
+        if isinstance(d, dict) and d.get("conteudo") and (not d.get("timestamp") or d.get("timestamp") <= ate_ts)
     ]
     st.session_state["_ml_recorrentes"] = recorrentes
 
+    # Dossiê temporal (somente memórias até ate_ts)
     dossie = []
-    mary = persona_block("mary", memos, 8)
-    janio = persona_block("janio", memos, 8)
+    # Requer a função persona_block_temporal(nome, memos, ate_ts, max_linhas)
+    mary = persona_block_temporal("mary", memos, ate_ts, 8)
+    janio = persona_block_temporal("janio", memos, ate_ts, 8)
     if mary:
         dossie.append(mary)
     if janio:
@@ -1240,6 +1263,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
