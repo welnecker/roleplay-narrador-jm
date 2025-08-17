@@ -70,7 +70,7 @@ except Exception:
 PLANILHA_ID_PADRAO = st.secrets.get("SPREADSHEET_ID", "").strip() or "1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM"
 TAB_INTERACOES = "interacoes_jm"
 TAB_PERFIL = "perfil_jm"
-TAB_MEMORIAS = "memorias_jm"
+TAB_MEMORIAS = "memoria_jm"
 TAB_ML = "memoria_longa_jm"
 TAB_TEMPLATES = "templates_jm"
 
@@ -153,19 +153,43 @@ if "etapa_template" not in st.session_state:
 # =====
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =====
+
+# Observação 1: o código espera TAB_MEMORIAS = "memoria_jm"
+# Ex.: TAB_MEMORIAS = "memoria_jm"
+
+def _normalize_tag(raw: str) -> str:
+    """Normaliza 'tipo' para o formato com colchetes: [all], [mary], [janio], etc."""
+    t = (raw or "").strip().lower()
+    if not t:
+        return ""
+    return t if t.startswith("[") else f"[{t}]"
+
+def _parse_ts(s: str) -> str:
+    """
+    Normaliza timestamp para 'YYYY-MM-DD HH:MM:SS'; se vier vazio/ruim, usa 'agora'.
+    Importante: strings nesse formato são comparáveis lexicograficamente.
+    """
+    s = (s or "").strip()
+    try:
+        datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+        return s
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 def carregar_memorias_brutas() -> Dict[str, List[dict]]:
     """
-    Lê 'memorias_jm' e devolve um dict
-    {tag_lower: [ {"conteudo":..., "timestamp":...} ]} com cache TTL.
+    Lê 'memoria_jm' (cabeçalho: tipo | conteudo | timestamp) e devolve
+    {tag: [ {"conteudo":..., "timestamp":...} ]} com tags normalizadas ([all],[mary],[janio]) e
+    timestamp padronizado.
     """
     try:
-        regs = _sheet_all_records_cached(TAB_MEMORIAS)
+        regs = _sheet_all_records_cached(TAB_MEMORIAS)  # espera "memoria_jm"
         buckets: Dict[str, List[dict]] = {}
         for r in regs:
-            tag = (r.get("tipo", "") or "").strip().lower()
-            txt = (r.get("conteudo", "") or "").strip()
-            ts = r.get("timestamp", "")
-            if tag and txt and ts:
+            tag = _normalize_tag(r.get("tipo"))
+            txt = (r.get("conteudo") or "").strip()
+            ts = _parse_ts(r.get("timestamp"))
+            if tag and txt:
                 buckets.setdefault(tag, []).append({"conteudo": txt, "timestamp": ts})
         return buckets
     except Exception as e:
@@ -175,10 +199,12 @@ def carregar_memorias_brutas() -> Dict[str, List[dict]]:
 def persona_block(nome: str, buckets: dict, max_linhas: int = 8) -> str:
     """
     Monta bloco compacto da persona (ordena por prefixos úteis).
+    Observação 2: usa tags no formato [mary], [janio].
     """
     tag = f"[{nome}]"
     linhas = buckets.get(tag, [])
     ordem = ["OBJ:", "TAT:", "LV:", "VOZ:", "BIO:", "ROTINA:", "LACOS:", "APS:", "CONFLITOS:"]
+
     def peso(linha_dict):
         l = linha_dict["conteudo"]
         up = l.upper()
@@ -186,11 +212,11 @@ def persona_block(nome: str, buckets: dict, max_linhas: int = 8) -> str:
             if up.startswith(p):
                 return i
         return len(ordem)
+
     linhas_ordenadas = sorted(linhas, key=peso)[:max_linhas]
     titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
     return (
-        f"{titulo}:\n- " +
-        "\n- ".join(linha['conteudo'] for linha in linhas_ordenadas)
+        f"{titulo}:\n- " + "\n- ".join(linha['conteudo'] for linha in linhas_ordenadas)
     ) if linhas_ordenadas else ""
 
 def carregar_resumo_salvo() -> str:
@@ -237,6 +263,7 @@ def carregar_interacoes(n: int = 20):
 def salvar_interacao(role: str, content: str):
     """
     Append no Sheets + atualiza cache local (sem reler) com backoff 429.
+    (Observação 3: garante timestamp no padrão e corrige o else do cache.)
     """
     if not planilha:
         return
@@ -244,37 +271,46 @@ def salvar_interacao(role: str, content: str):
         aba = _ws(TAB_INTERACOES)
         if not aba:
             return
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Observação 3 (formato)
         row_role = f"{role or ''}".strip()
         row_content = f"{content or ''}".strip()
         row = [timestamp, row_role, row_content]
         _retry_429(aba.append_row, row, value_input_option="RAW")
+
         # atualiza cache local
         lst = st.session_state.get("_cache_interacoes")
         if isinstance(lst, list):
             lst.append({"timestamp": timestamp, "role": row_role, "content": row_content})
         else:
-            st.session_state["_cache_interacoes"] = [{"timestamp": row, "role": row[1], "content": row}]
+            # (fix) cria corretamente a primeira entrada do cache
+            st.session_state["_cache_interacoes"] = [{
+                "timestamp": timestamp,
+                "role": row_role,
+                "content": row_content,
+            }]
+
         _invalidate_sheet_caches()
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
-# = NOVO: BUSCA TEMPORAL DE MEMÓRIAS =
+# = BUSCA TEMPORAL DE MEMÓRIAS =
 def buscar_status_persona_ate(persona_tag: str, momento_ts: str, buckets: dict) -> List[str]:
     """
     Busca os traços mais recentes da persona até o timestamp informado.
-    persona_tag: ex: '[mary]'
-    momento_ts: timestamp limite (ex: '2025-08-21 16:04:00')
+    persona_tag: ex: '[mary]' (será normalizado)
+    momento_ts: timestamp limite (ex: '2025-08-21 16:04:00'; será normalizado)
     buckets: dict retornado por carregar_memorias_brutas()
     """
-    linhas = buckets.get(persona_tag.lower(), [])
-    # Ordena por timestamp crescente
-    linhas_ord = sorted(linhas, key=lambda x: x['timestamp'])
-    status_ate = []
-    for l in linhas_ord:
-        if l['timestamp'] <= momento_ts:
-            status_ate.append(l['conteudo'])
-    return status_ate
+    tag = _normalize_tag(persona_tag)
+    limite = _parse_ts(momento_ts)
+    linhas = buckets.get(tag, [])
+
+    # filtra até o limite e ordena por timestamp (strings já normalizadas)
+    linhas_filtradas = [l for l in linhas if (l.get("timestamp") or "") <= limite]
+    linhas_ord = sorted(linhas_filtradas, key=lambda x: x.get("timestamp", ""))
+
+    return [l.get("conteudo", "") for l in linhas_ord if l.get("conteudo")]
+
 
 
 # =========================
@@ -1263,6 +1299,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
