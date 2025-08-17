@@ -108,7 +108,7 @@ def _ws(name: str, create_if_missing: bool = True):
             elif name == TAB_PERFIL:
                 _retry_429(ws.append_row, ["timestamp", "resumo"])
             elif name == TAB_MEMORIAS:
-                _retry_429(ws.append_row, ["tipo", "conteudo"])
+                _retry_429(ws.append_row, ["tipo", "conteudo", "timestamp"])
             elif name == TAB_ML:
                 _retry_429(ws.append_row, ["texto", "embedding", "tags", "timestamp", "score"])
             elif name == TAB_TEMPLATES:
@@ -188,7 +188,7 @@ def carregar_memorias_brutas() -> Dict[str, List[dict]]:
         for r in regs:
             tag = _normalize_tag(r.get("tipo"))
             txt = (r.get("conteudo") or "").strip()
-            ts = _parse_ts(r.get("timestamp"))
+            ts = (r.get("timestamp") or "").strip()
             if tag and txt:
                 buckets.setdefault(tag, []).append({"conteudo": txt, "timestamp": ts})
         return buckets
@@ -219,6 +219,40 @@ def persona_block(nome: str, buckets: dict, max_linhas: int = 8) -> str:
         f"{titulo}:\n- " + "\n- ".join(linha['conteudo'] for linha in linhas_ordenadas)
     ) if linhas_ordenadas else ""
 
+
+def persona_block_temporal(nome: str, buckets: dict, ate_ts: str, max_linhas: int = 8) -> str:
+    """
+    Versão temporal do bloco de persona.
+    Usa apenas memórias com timestamp <= ate_ts (se houver timestamp).
+    Mantém compatibilidade com registros sem timestamp (são incluídos).
+    """
+    tag = f"[{nome}]"
+    linhas = []
+    for d in buckets.get(tag, []) or []:
+        if not isinstance(d, dict):
+            continue
+        c = (d.get("conteudo") or "").strip()
+        ts = (d.get("timestamp") or "").strip()  # pode estar vazio
+        if not c:
+            continue
+        # Se houver timestamp e corte temporal, exclui memórias "do futuro"
+        if ts and ate_ts and ts > ate_ts:
+            continue
+        linhas.append((ts, c))
+
+    # Ordena por timestamp crescente (strings ISO ordenam lexicograficamente)
+    # Registros sem timestamp ("") ficam no início.
+    linhas.sort(key=lambda x: x[0])
+
+    # Pega as últimas N (mais recentes até o corte)
+    ult = [c for _, c in linhas][-max_linhas:]
+    if not ult:
+        return ""
+
+    titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
+    return f"{titulo}:\n- " + "\n- ".join(ult)
+
+
 def carregar_resumo_salvo() -> str:
     """
     Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo) com cache TTL.
@@ -234,6 +268,7 @@ def carregar_resumo_salvo() -> str:
         st.warning(f"Erro ao carregar resumo salvo: {e}")
         return ""
 
+
 def salvar_resumo(resumo: str):
     """
     Salva uma nova linha em 'perfil_jm' (timestamp | resumo) e invalida caches.
@@ -248,6 +283,7 @@ def salvar_resumo(resumo: str):
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
 
+
 def carregar_interacoes(n: int = 20):
     """
     Carrega últimas n interações (role, content) usando cache de sessão
@@ -259,6 +295,7 @@ def carregar_interacoes(n: int = 20):
         st.session_state["_cache_interacoes"] = regs
         cache = regs
     return cache[-n:] if len(cache) > n else cache
+
 
 def salvar_interacao(role: str, content: str):
     """
@@ -700,7 +737,7 @@ def construir_prompt_com_narrador() -> str:
     # >>> CORTE TEMPORAL (até o timestamp da última interação)
     if hist:
         # Se você já tem _parse_ts(), pode usar: ate_ts = _parse_ts(hist[-1].get("timestamp", ""))
-        ate_ts = hist[-1].get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        ate_ts = _parse_ts(hist[-1].get("timestamp", "")) if hist else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     else:
         ate_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1299,6 +1336,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
