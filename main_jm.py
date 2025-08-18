@@ -950,7 +950,7 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Micropassos:** avance no máximo **{int(st.session_state.get("max_avancos_por_cena",1))}** subpasso(s) rumo a: {proximo_nome}.
 - Se o roteirista pedir salto maior, **negocie**: nomeie limites, peça consentimento, e **prepare** a transição (não pule etapas).
 ### Geografia & Montagem
-- **Não force coincidências**: se não houver ponte clara (mensagem, convite, "ensaio 18h...", pedido do usuário), mantenha **Mary e Jânio em locais distintos** e utilize **montagem paralela** (A ↔ B).
+- **Não force coincidências**: se não houver ponte clara (mensagem, convite, "ensaio 18h...", pedido do usuário), mantenha **Mary e Jânio em locais distintos** e utilize **montagem paralela** (A/B).
 - **Comece cada bloco** com uma frase que **ancore lugar e hora** (exemplo: "UFES — corredor de Pedagogia, 9h15 — ..." ou "Terminal Laranjeiras, 9h18 — ..."). Não use títulos; escreva essa informação na **primeira frase** do parágrafo.
 - **Se montagem paralela** (valor sugerido: {flag_parallel}):
   - Estruture em **2 blocos alternados**: primeiro Mary, depois Jânio (ou vice-versa), cada um em **seu lugar**.
@@ -958,6 +958,7 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Se houver ponte plausível explícita**, pode convergir para co-presença ao final da cena (de forma plausível), **sem teletransporte**.
 - **Sem ponte diegética explícita, um personagem não pode saber, afirmar ou reagir a fatos que só ocorreram no bloco do outro; se houver pressentimento ou ciúme, redija sem afirmar o fato. Exemplos de ponte: mensagem, foto/story, ligação, testemunha, encontro marcado — se existir, mostre isso na cena (exemplo: celular vibra e mostra um story)**.
 - **Objetos diegéticos: caso a câmera não se encaixe na situação (encontro, banho, mar, revista), mostre a ação de guardar antes e ignore o objeto até a retomada; não descreva interação física com a câmera nesses contextos**.
+
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (—), intercalados com ação e reação física/visual. Mínimo: **4 falas** no total.
 - Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
@@ -1462,6 +1463,7 @@ if entrada:
             pass
 
 #
+
 
 
 
