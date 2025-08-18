@@ -716,6 +716,7 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 - Jânio não pressiona; respeita o ritmo de Mary.
 - Linguagem sensual proporcional ao nível de calor ({calor}).
 """.strip()
+
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     if fase >= 5:
         regras += """
@@ -723,7 +724,33 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
     else:
         regras += """
 - Sem consumação em cena; foque em progressão coerente."""
+
+    # Novos dials
+    modo_sintonia = bool(st.session_state.get("modo_sintonia", False))
+    ritmo = int(st.session_state.get("ritmo_cena", 1))  # 0..3
+
+    if modo_sintonia:
+        regras += """
+- Sintonia ativa: Mary conduz com escuta; evita atropelos; espelha respiração/pausas do parceiro.
+- Prefira convites e perguntas a comandos; checagens frequentes de conforto.
+- Se surgir ansiedade, desacelerar, respirar junto, retomar contato visual."""
+
+    # Ritmo alvo
+    if ritmo <= 0:
+        regras += """
+- Ritmo: muito lento — pausas longas, silêncio confortável, toques contidos e graduais."""
+    elif ritmo == 1:
+        regras += """
+- Ritmo: lento — saborear o momento; alternar aproximação com pausa; nada de pressa."""
+    elif ritmo == 2:
+        regras += """
+- Ritmo: médio — equilíbrio entre iniciativa e espera, sem urgência."""
+    else:
+        regras += """
+- Ritmo: rápido — quando houver sinal claro de ambos; ainda assim, checar conforto."""
+
     return prompt_base + "\n" + regras
+
 
 
 def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True) -> str:
@@ -829,13 +856,29 @@ def construir_prompt_com_narrador() -> str:
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
-    mary_sens_txt = gerar_mary_sensorial(_sens_level, n=_sens_n) if _sens_on else ""
+    mary_sens_txt = gerar_mary_sensorial(
+        _sens_level,
+        n=_sens_n,
+        sintonia=bool(st.session_state.get("modo_sintonia", False))
+    ) if _sens_on else ""
+
 
     # Histórico
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r['role']}: {r['content']}" for r in hist) if hist else "(sem histórico)"
     pergunta_user = hist[-1]["content"] if hist and hist[-1].get("role") == "user" else ""
+    # Liga sintonia quando a última entrada pede calma/devagar (sem sobrescrever escolha manual da sidebar)
+    try:
+        slow_re = r"\b(devagar|sem\s+pressa|com\s+calma|calma|apreciar|desfrutar)\b"
+        if re.search(slow_re, (pergunta_user or ""), flags=re.IGNORECASE):
+            st.session_state["modo_sintonia"] = True
+            # Se já tiver ritmo definido, mantém; senão, força "lento"
+            if "ritmo_cena" not in st.session_state:
+                st.session_state["ritmo_cena"] = 1  # 0=muito lento, 1=lento, 2=médio, 3=rápido
+    except Exception:
+        pass
+
     
     # Se quiser incluir bloco citacoes, precisa da função encontrar_memorias_relevantes
     bloco_citacoes = ""
@@ -930,6 +973,12 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 {mary_sens_txt or "- Comece com 1–2 frases curtas sobre o caminhar, olhar, perfume e cabelos (negros, volumosos, levemente ondulados) de Mary; pode mencionar o balanço suave dos seios sob o tecido (sem vulgaridade)."}
 - Aplique essa camada ANTES do primeiro diálogo.
 - Frases curtas, diretas, físicas; evite metáforas rebuscadas.
+### Sintonia & Ritmo
+- Sintonia: { "ativa" if st.session_state.get("modo_sintonia", False) else "padrão" }
+- Ritmo alvo: { ["muito lento","lento","médio","rápido"][int(st.session_state.get("ritmo_cena",1))] }
+- Mary conduz com escuta e sem atropelos: convites suaves, pausas, respiração em compasso com o parceiro.
+- Reformule comandos duros em pedidos/convites quando fizer sentido (ex.: “vem mais perto?”).
+
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
 ### ⏱️ Estado do romance (manual)
@@ -1098,6 +1147,21 @@ with st.sidebar:
         key="estilo_escrita",
     )
     st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=3, key="nsfw_max_level")
+
+    st.checkbox(
+    "Sintonia com o parceiro (modo harmônico)",
+    key="modo_sintonia",
+    value=st.session_state.get("modo_sintonia", True),
+)
+
+st.select_slider(
+    "Ritmo da cena",
+    options=[0, 1, 2, 3],
+    value=int(st.session_state.get("ritmo_cena", 1)),
+    format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
+    key="ritmo_cena",
+)
+
 
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio")
@@ -1486,6 +1550,7 @@ if entrada:
             pass
 
 #
+
 
 
 
