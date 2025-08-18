@@ -1055,8 +1055,8 @@ if "max_avancos_por_cena" not in st.session_state:
  #   st.session_state.nsfw_max_level = 3
 if "estilo_escrita" not in st.session_state:
     st.session_state.estilo_escrita = "AÇÃO"
-#if "templates_jm" not in st.session_state:
- #   st.session_state.templates_jm = carregar_templates_planilha()
+if "templates_jm" not in st.session_state:
+    st.session_state.templates_jm = carregar_templates_planilha()
 if "template_ativo" not in st.session_state:
     st.session_state.template_ativo = None
 if "etapa_template" not in st.session_state:
@@ -1484,6 +1484,7 @@ if entrada:
             pass
 
 #
+
 
 
 
