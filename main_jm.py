@@ -786,6 +786,27 @@ def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True) -> st
 
     return " ".join(frases)
 
+def encontrar_memorias_relevantes(pergunta, buckets):
+    """
+    Busca memórias relevantes conforme palavra-chave na pergunta do usuário.
+    """
+    # Palavras comuns que indicam pergunta factual
+    keywords = [
+        "nome", "integrante", "banda", "integrantes", "profissão", "rotina", "cargo", "ocupação",
+        "onde", "quem", "quando", "idade", "universidade", "curso", "história", "grupo"
+    ]
+    relevantes = []
+    pergunta_lc = (pergunta or "").lower()
+
+    # Busca por tags de persona (ex: janio, mary) e keywords
+    for tag, items in buckets.items():
+        tag_limp = tag.strip("[]")
+        # Se o nome/tag aparece na pergunta ou há palavras-chave, considera relevante
+        if any(k in pergunta_lc for k in keywords) or tag_limp in pergunta_lc:
+            relevantes.extend(items)
+    return relevantes
+
+
 def construir_prompt_com_narrador() -> str:
     memos = carregar_memorias_brutas()
     # recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
@@ -803,10 +824,21 @@ def construir_prompt_com_narrador() -> str:
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
     mary_sens_txt = gerar_mary_sensorial(_sens_level, n=_sens_n) if _sens_on else ""
-# Histórico do Sheets
+    # Histórico
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r['role']}: {r['content']}" for r in hist) if hist else "(sem histórico)"
+
+    # Detecta se a última mensagem do usuário é uma pergunta factual
+    pergunta_user = hist[-1]["content"] if hist and hist[-1].get("role") == "user" else ""
+    memorias_fatuais = encontrar_memorias_relevantes(pergunta_user, memos)
+    bloco_citacoes = ""
+    if memorias_fatuais:
+        bloco_citacoes = "\n".join([
+            f"- {m.get('conteudo', '')} (memória registrada em {m.get('timestamp','')})"
+            for m in memorias_fatuais if m.get("conteudo")
+        ])
+
 
     # >>> CORTE TEMPORAL (até o timestamp da última interação)
     if hist:
@@ -858,8 +890,20 @@ def construir_prompt_com_narrador() -> str:
     # Definição da flag para montagem paralela
     flag_parallel = bool(st.session_state.get("no_coincidencias", True))
 
+        instrucoes_citacao = ""
+    if bloco_citacoes:
+        instrucoes_citacao = (
+            "\n### FATOS OBRIGATÓRIOS PARA RESPONDER A PERGUNTA DO USUÁRIO\n"
+            "Responda de forma factual e cite explicitamente os dados abaixo na sua resposta. Não invente nem omita informações factuais relacionadas aos personagens da pergunta.\n"
+            f"{bloco_citacoes}\n"
+        )
+
+
     prompt = f"""
+{instrucoes_citacao}
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
+... # resto do prompt segue igual
+"""
 
 ### Dossiê (personas)
 {dossie_txt}
@@ -1417,6 +1461,7 @@ if entrada:
             pass
 
 #
+
 
 
 
