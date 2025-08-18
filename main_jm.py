@@ -1137,6 +1137,7 @@ with st.sidebar:
         etapas = st.session_state.templates_jm.get(roteiro_escolhido, [])
     
         # Inicia o roteiro e já dispara a 1ª etapa (se existir)
+        # Inicia o roteiro e já dispara a 1ª etapa (se existir)
         if st.button("Iniciar roteiro", key="btn_iniciar_roteiro"):
             st.session_state.template_ativo = roteiro_escolhido
             st.session_state.etapa_template = 0
@@ -1145,6 +1146,7 @@ with st.sidebar:
                 salvar_interacao("user", comando)
                 st.session_state.session_msgs.append({"role": "user", "content": comando})
                 st.session_state["_trigger_input"] = comando  # dispara geração
+                st.session_state.etapa_template = 1          # <<< evita repetir a etapa 0
     
         # Progresso / próxima etapa
         if st.session_state.get("template_ativo"):
@@ -1484,6 +1486,7 @@ if entrada:
             pass
 
 #
+
 
 
 
