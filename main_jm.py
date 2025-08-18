@@ -902,21 +902,14 @@ def construir_prompt_com_narrador() -> str:
     prompt = f"""
 {instrucoes_citacao}
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
-... # resto do prompt segue igual
-"""
-
 ### Dossiê (personas)
 {dossie_txt}
-
 ### Diretrizes gerais (ALL)
 {chr(10).join(f"- {c}" for c in recorrentes) if recorrentes else "(vazio)"}
-
 ### Perfil (resumo mais recente)
 {perfil or "(vazio)"}
-
 ### Histórico recente (planilha)
 {hist_txt}
-
 ### Estilo
 - Use o estilo **{estilo}**:
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
@@ -930,12 +923,10 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - O desfecho da cena sexual sempre inclui reação explosiva: gemidos altos, frases de gozo ditas em voz alta, corpo pulsando, tremores intensos; só depois, podem relaxar exaustos, suados, abraçados, comentando o prazer ("Nunca gozei desse jeito!", "Estou toda mole", "Não sinto as pernas", etc).
 - Jamais encerre sem que pelo menos um dos personagens verbalize de forma explícita o orgasmo e a intensidade do prazer.
 - Mary reage fisicamente com agarrões, mordidas, pedidos ousados e sinceros, sem vergonha. Nunca escreva desfecho seco ou cômico; sempre finalize mostrando o impacto corporal real, prazeroso e o orgasmo verbalizado.
-
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Comece com 1–2 frases curtas sobre o caminhar, olhar, perfume e cabelos (negros, volumosos, levemente ondulados) de Mary; pode mencionar o balanço suave dos seios sob o tecido (sem vulgaridade)."}
 - Aplique essa camada ANTES do primeiro diálogo.
 - Frases curtas, diretas, físicas; evite metáforas rebuscadas.
-
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
 ### ⏱️ Estado do romance (manual)
@@ -958,7 +949,6 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Se houver ponte plausível explícita**, pode convergir para co-presença ao final da cena (de forma plausível), **sem teletransporte**.
 - **Sem ponte diegética explícita, um personagem não pode saber, afirmar ou reagir a fatos que só ocorreram no bloco do outro; se houver pressentimento ou ciúme, redija sem afirmar o fato. Exemplos de ponte: mensagem, foto/story, ligação, testemunha, encontro marcado - se existir, mostre isso na cena (exemplo: celular vibra e mostra um story)**.
 - **Objetos diegéticos: caso a câmera não se encaixe na situação (encontro, banho, mar, revista), mostre a ação de guardar antes e ignore o objeto até a retomada; não descreva interação física com a câmera nesses contextos**.
-
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (-), intercalados com ação e reação física/visual. Exemplo de travessão: - Ele disse ...
 - Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
@@ -970,10 +960,8 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Narre em **terceira pessoa**; nunca fale com "você".
 - Produza uma cena fechada e natural, sem inserir comentários externos ou instruções.
 """.strip()
-
-
-    prompt = inserir_regras_mary_e_janio(prompt)
-    return prompt
+prompt = inserir_regras_mary_e_janio(prompt)
+return prompt
 
 # =========================
 # FILTROS DE SAÍDA
@@ -1464,6 +1452,7 @@ if entrada:
             pass
 
 #
+
 
 
 
