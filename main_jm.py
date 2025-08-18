@@ -1148,20 +1148,19 @@ with st.sidebar:
     )
     st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=3, key="nsfw_max_level")
 
+    # >>> estas duas linhas precisam estar DENTRO do with st.sidebar: (indentadas)
     st.checkbox(
-    "Sintonia com o parceiro (modo harmônico)",
-    key="modo_sintonia",
-    value=st.session_state.get("modo_sintonia", True),
-)
-
-st.select_slider(
-    "Ritmo da cena",
-    options=[0, 1, 2, 3],
-    value=int(st.session_state.get("ritmo_cena", 1)),
-    format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
-    key="ritmo_cena",
-)
-
+        "Sintonia com o parceiro (modo harmônico)",
+        key="modo_sintonia",
+        value=st.session_state.get("modo_sintonia", True),
+    )
+    st.select_slider(
+        "Ritmo da cena",
+        options=[0, 1, 2, 3],
+        value=int(st.session_state.get("ritmo_cena", 1)),
+        format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
+        key="ritmo_cena",
+    )
 
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio")
@@ -1172,6 +1171,7 @@ st.select_slider(
     fase_escolhida = st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
     if fase_escolhida != st.session_state.get("mj_fase", fase_default):
         mj_set_fase(fase_escolhida, persist=True)
+
     options_momento = sorted(MOMENTOS.keys())
     mom_default = momento_carregar()
     mom_ui_val = int(st.session_state.get("momento", mom_default))
@@ -1179,7 +1179,9 @@ st.select_slider(
     mom_ui = st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
     if mom_ui != st.session_state.get("momento", mom_default):
         momento_set(mom_ui, persist=False)
+
     st.slider("Micropassos por cena", 1, 3, value=int(st.session_state.get("max_avancos_por_cena", 1)), key="max_avancos_por_cena")
+
     col_a, col_b = st.columns(2)
     with col_a:
         if st.button("➕ Avançar 1 passo"):
@@ -1188,19 +1190,19 @@ st.select_slider(
         if st.button("↺ Reiniciar (0)"):
             mj_set_fase(0, persist=True)
 
-        st.markdown("---")
+    # <<< este markdown precisa estar no mesmo nível de colunas (fora do with col_b:)
+    st.markdown("---")
     st.markdown("### 🎬 Roteiros Sequenciais (Templates)")
     nomes_templates = list(st.session_state.templates_jm.keys())
-    
+
     if st.button("🔄 Recarregar templates"):
         st.session_state.templates_jm = carregar_templates_planilha()
         st.success("Templates atualizados da planilha!")
-    
+
     if nomes_templates:
         roteiro_escolhido = st.selectbox("Escolha o roteiro:", nomes_templates, key="sb_rota_sel")
         etapas = st.session_state.templates_jm.get(roteiro_escolhido, [])
-    
-        # Inicia o roteiro e já dispara a 1ª etapa (se existir)
+
         # Inicia o roteiro e já dispara a 1ª etapa (se existir)
         if st.button("Iniciar roteiro", key="btn_iniciar_roteiro"):
             st.session_state.template_ativo = roteiro_escolhido
@@ -1210,8 +1212,8 @@ st.select_slider(
                 salvar_interacao("user", comando)
                 st.session_state.session_msgs.append({"role": "user", "content": comando})
                 st.session_state["_trigger_input"] = comando  # dispara geração
-                st.session_state.etapa_template = 1          # <<< evita repetir a etapa 0
-    
+                st.session_state.etapa_template = 1          # evita repetir a etapa 0
+
         # Progresso / próxima etapa
         if st.session_state.get("template_ativo"):
             etapas_ativas = st.session_state.templates_jm.get(st.session_state.template_ativo, [])
@@ -1550,6 +1552,7 @@ if entrada:
             pass
 
 #
+
 
 
 
