@@ -890,7 +890,7 @@ def construir_prompt_com_narrador() -> str:
     # Definição da flag para montagem paralela
     flag_parallel = bool(st.session_state.get("no_coincidencias", True))
 
-        instrucoes_citacao = ""
+    instrucoes_citacao = ""
     if bloco_citacoes:
         instrucoes_citacao = (
             "\n### FATOS OBRIGATÓRIOS PARA RESPONDER A PERGUNTA DO USUÁRIO\n"
@@ -1461,6 +1461,7 @@ if entrada:
             pass
 
 #
+
 
 
 
