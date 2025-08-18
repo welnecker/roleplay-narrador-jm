@@ -1214,16 +1214,16 @@ with st.sidebar:
             st.info("Ainda não há resposta do assistente nesta sessão.")
 
     if st.button("🔁 Reforçar memórias biográficas"):
-    memos = carregar_memorias_brutas()
-    count = 0
-    for k in ["[mary]", "[janio]", "[all]"]:
-        for entrada in memos.get(k, []):
-            texto = entrada.get("conteudo", "").strip()
-            if texto:
-                ok = memoria_longa_salvar(texto, tags=k)
-                if ok:
-                    count += 1
-    st.success(f"{count} memórias biográficas reforçadas na memória longa!")
+        memos = carregar_memorias_brutas()
+        count = 0
+        for k in ["[mary]", "[janio]", "[all]"]:
+            for entrada in memos.get(k, []):
+                texto = entrada.get("conteudo", "").strip()
+                if texto:
+                    ok = memoria_longa_salvar(texto, tags=k)
+                    if ok:
+                        count += 1
+        st.success(f"{count} memórias biográficas reforçadas na memória longa!")
 
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
@@ -1459,6 +1459,7 @@ if entrada:
             pass
 
 #
+
 
 
 
