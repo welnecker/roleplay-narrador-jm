@@ -809,45 +809,50 @@ def encontrar_memorias_relevantes(pergunta, buckets):
 
 def construir_prompt_com_narrador() -> str:
     memos = carregar_memorias_brutas()
-    # recorrentes = [c["conteudo"] for (t, lst) in memos.items() if t == "[all]" for c in lst]
     perfil = carregar_resumo_salvo()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
     momento_atual = int(st.session_state.get("momento", momento_carregar()))
-    mdata = MOMENTOS.get(momento_atual, MOMENTOS[0])
-    proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS[0])["nome"]
+    mdata = MOMENTOS.get(momento_atual, MOMENTOS)
+    proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS)["nome"]
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
 
-    
     # Camada sensorial de Mary (para o 1º parágrafo da cena)
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
     mary_sens_txt = gerar_mary_sensorial(_sens_level, n=_sens_n) if _sens_on else ""
+
     # Histórico
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r['role']}: {r['content']}" for r in hist) if hist else "(sem histórico)"
-
-    # Detecta se a última mensagem do usuário é uma pergunta factual
     pergunta_user = hist[-1]["content"] if hist and hist[-1].get("role") == "user" else ""
-    memorias_fatuais = encontrar_memorias_relevantes(pergunta_user, memos)
+    
+    # Se quiser incluir bloco citacoes, precisa da função encontrar_memorias_relevantes
     bloco_citacoes = ""
-    if memorias_fatuais:
-        bloco_citacoes = "\n".join([
-            f"- {m.get('conteudo', '')} (memória registrada em {m.get('timestamp','')})"
-            for m in memorias_fatuais if m.get("conteudo")
-        ])
+    # Se implementar a busca de memórias factuais, descomente essa parte:
+    # memorias_fatuais = encontrar_memorias_relevantes(pergunta_user, memos)
+    # if memorias_fatuais:
+    #     bloco_citacoes = "\n".join([
+    #         f"- {m.get('conteudo', '')} (memória registrada em {m.get('timestamp','')})"
+    #         for m in memorias_fatuais if m.get("conteudo")
+    #     ])
+    instrucoes_citacao = ""
+    # if bloco_citacoes:
+    #     instrucoes_citacao = (
+    #         "\n### FATOS OBRIGATÓRIOS PARA RESPONDER A PERGUNTA DO USUÁRIO\n"
+    #         "Responda de forma factual e cite explicitamente os dados abaixo na sua resposta. Não invente nem omita informações factuais relacionadas aos personagens da pergunta.\n"
+    #         f"{bloco_citacoes}\n"
+    #     )
 
-
-    # >>> CORTE TEMPORAL (até o timestamp da última interação)
+    # CORTE TEMPORAL (até o timestamp da última interação)
     if hist:
-        # Se você já tem _parse_ts(), pode usar: ate_ts = _parse_ts(hist[-1].get("timestamp", ""))
         ate_ts = _parse_ts(hist[-1].get("timestamp", "")) if hist else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     else:
         ate_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Memória longa Top-K (texto apenas; se não houver, "(nenhuma)") — respeitando o tempo
+    # Memória longa Top-K
     ml_topk_txt = "(nenhuma)"
     st.session_state["_ml_topk_texts"] = []
     if st.session_state.get("use_memoria_longa", True) and hist:
@@ -856,7 +861,7 @@ def construir_prompt_com_narrador() -> str:
                 query_text=hist[-1]["content"],
                 k=int(st.session_state.get("k_memoria_longa", 3)),
                 limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
-                ate_ts=ate_ts,  # << corte temporal aplicado aqui
+                ate_ts=ate_ts,
             )
             if topk:
                 ml_topk_txt = "\n".join([f"- {t}" for (t, _sc, _sim, _rr) in topk])
@@ -876,9 +881,8 @@ def construir_prompt_com_narrador() -> str:
     ]
     st.session_state["_ml_recorrentes"] = recorrentes
 
-    # Dossiê temporal (somente memórias até ate_ts)
+    # Dossiê temporal
     dossie = []
-    # Requer a função persona_block_temporal(nome, memos, ate_ts, max_linhas)
     mary = persona_block_temporal("mary", memos, ate_ts, 8)
     janio = persona_block_temporal("janio", memos, ate_ts, 8)
     if mary:
@@ -887,21 +891,12 @@ def construir_prompt_com_narrador() -> str:
         dossie.append(janio)
     dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
 
-    # Definição da flag para montagem paralela
     flag_parallel = bool(st.session_state.get("no_coincidencias", True))
 
-    instrucoes_citacao = ""
-    if bloco_citacoes:
-        instrucoes_citacao = (
-            "\n### FATOS OBRIGATÓRIOS PARA RESPONDER A PERGUNTA DO USUÁRIO\n"
-            "Responda de forma factual e cite explicitamente os dados abaixo na sua resposta. Não invente nem omita informações factuais relacionadas aos personagens da pergunta.\n"
-            f"{bloco_citacoes}\n"
-        )
-
-
-    prompt = f"""
-{instrucoes_citacao}
+    # MONTAGEM DO PROMPT — peça que as aspas triplas fechem antes do .strip()
+    prompt = f"""{instrucoes_citacao}
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
+
 ### Dossiê (personas)
 {dossie_txt}
 ### Diretrizes gerais (ALL)
@@ -960,8 +955,8 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Narre em **terceira pessoa**; nunca fale com "você".
 - Produza uma cena fechada e natural, sem inserir comentários externos ou instruções.
 """.strip()
-prompt = inserir_regras_mary_e_janio(prompt)
-return prompt
+    prompt = inserir_regras_mary_e_janio(prompt)
+    return prompt
 
 # =========================
 # FILTROS DE SAÍDA
@@ -1452,6 +1447,7 @@ if entrada:
             pass
 
 #
+
 
 
 
