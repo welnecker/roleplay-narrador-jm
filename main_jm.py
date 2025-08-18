@@ -753,12 +753,18 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 
 
 
-def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True) -> str:
+def gerar_mary_sensorial(
+    level: int = 2,
+    n: int = 2,
+    hair_on: bool = True,
+    sintonia: bool = False,  # << novo parâmetro
+) -> str:
     """
     Gera 1–3 frases sensoriais sobre Mary.
       level: 0=off, 1=leve, 2=marcado, 3=ousado
       n: quantidade de frases
       hair_on: garante ao menos 1 frase sobre os cabelos (negros, volumosos, levemente ondulados)
+      sintonia: quando True, prioriza cadência calma e convites suaves (menos agressivo)
     """
     if level <= 0 or n <= 0:
         return ""
@@ -797,21 +803,43 @@ def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True) -> st
         "O balanço dos cabelos negros — volumosos, levemente ondulados — marca o compasso do corpo de Mary.",
     ]
 
-    pool = []
-    hair_pool = []
+    # Monta o pool conforme o nível
     if level == 1:
-        pool = base_leve
-        hair_pool = hair_leve
+        pool = list(base_leve)
+        hair_pool = list(hair_leve)
     elif level == 2:
-        pool = base_leve + base_marcado
-        hair_pool = hair_leve + hair_marcado
+        pool = list(base_leve) + list(base_marcado)
+        hair_pool = list(hair_leve) + list(hair_marcado)
     else:  # level >= 3
-        pool = base_leve + base_marcado + base_ousado
-        hair_pool = hair_leve + hair_marcado + hair_ousado
+        pool = list(base_leve) + list(base_marcado) + list(base_ousado)
+        hair_pool = list(hair_leve) + list(hair_marcado) + list(hair_ousado)
 
+    # Ajustes de "sintonia": filtra termos mais agressivos e adiciona frases harmônicas
+    if sintonia:
+        # Palavras/trechos que deixam o tom mais agressivo — filtramos
+        filtros = [
+            r"\bcruel\b",
+            r"\binsinuante\b",
+            r"\bacende o ambiente\b",
+        ]
+        def _ok(frase: str) -> bool:
+            return not any(re.search(p, frase, flags=re.IGNORECASE) for p in filtros)
+
+        pool = [f for f in pool if _ok(f)]
+        # Camada de harmonia/cadência
+        harmonia_add = [
+            "A respiração de Mary encontra o compasso do parceiro, sem pressa.",
+            "Ela desacelera um passo, deixando o momento guiar o ritmo.",
+            "Há pausas gentis entre olhares; tudo acontece no tempo certo.",
+            "O gesto nasce do encontro, não da urgência; Mary prefere sentir antes de conduzir.",
+        ]
+        pool.extend(harmonia_add)
+
+    # Amostra
     n_eff = max(1, min(n, len(pool)))
     frases = random.sample(pool, k=n_eff)
 
+    # Garante 1 frase de cabelo se solicitado
     if hair_on and hair_pool:
         hair_line = random.choice(hair_pool)
         if hair_line not in frases:
@@ -1552,6 +1580,7 @@ if entrada:
             pass
 
 #
+
 
 
 
