@@ -117,31 +117,32 @@ def _ws(name: str, create_if_missing: bool = True):
         except Exception:
             return None
 
-def carregar_templates_planilha():
-    """Carrega todos os templates sequenciais da aba templates_jm em {template:[etapa1, etapa2,...]}"""
-    try:
-        ws = _ws(TAB_TEMPLATES, create_if_missing=False)
-        if not ws:
+    def carregar_templates_planilha():
+        """Carrega todos os templates sequenciais da aba templates_jm em {template:[etapa1, etapa2,...]}"""
+        try:
+            ws = _ws(TAB_TEMPLATES, create_if_missing=False)
+            if not ws:
+                return {}
+            rows = _sheet_all_records_cached(TAB_TEMPLATES)
+            templates = {}
+            for row in rows:
+                r = { (k or "").strip().lower(): (v or "") for k, v in row.items() }
+                nome = r.get("template", "").strip()
+                etapa_str = r.get("etapa", "1")
+                try:
+                    etapa = int(etapa_str)
+                except Exception:
+                    etapa = 1
+                texto = r.get("texto", "").strip()
+                if nome and texto:
+                    templates.setdefault(nome, []).append((etapa, texto))
+            for nome in templates:
+                templates[nome].sort(key=lambda x: x[0])
+                templates[nome] = [t[1] for t in templates[nome]]
+            return templates
+        except Exception as e:
+            st.warning(f"Erro ao carregar templates do Sheets: {e}")
             return {}
-        rows = _sheet_all_records_cached(TAB_TEMPLATES)
-        templates = {}
-        for row in rows:
-            nome = (row.get("template") or "").strip()
-            etapa_str = row.get("etapa") or "1"
-            try:
-                etapa = int(etapa_str)
-            except Exception:
-                etapa = 1
-            texto = (row.get("texto") or "").strip()
-            if nome and texto:
-                templates.setdefault(nome, []).append((etapa, texto))
-        for nome in templates:
-            templates[nome].sort(key=lambda x: x[0])
-            templates[nome] = [t[1] for t in templates[nome]]
-        return templates
-    except Exception as e:
-        st.warning(f"Erro ao carregar templates do Sheets: {e}")
-        return {}
 
 # --- INICIALIZE AS VARIÁVEIS DE TEMPLATE ---
 if "templates_jm" not in st.session_state:
@@ -813,8 +814,8 @@ def construir_prompt_com_narrador() -> str:
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
     momento_atual = int(st.session_state.get("momento", momento_carregar()))
-    mdata = MOMENTOS.get(momento_atual, MOMENTOS)
-    proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS)["nome"]
+    mdata = MOMENTOS.get(momento_atual, MOMENTOS[0])
+    proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS[0])["nome"]
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
 
     # Camada sensorial de Mary (para o 1º parágrafo da cena)
@@ -1116,36 +1117,44 @@ with st.sidebar:
         if st.button("↺ Reiniciar (0)"):
             mj_set_fase(0, persist=True)
 
-    st.markdown("---")
+        st.markdown("---")
     st.markdown("### 🎬 Roteiros Sequenciais (Templates)")
     nomes_templates = list(st.session_state.templates_jm.keys())
+    
     if st.button("🔄 Recarregar templates"):
         st.session_state.templates_jm = carregar_templates_planilha()
         st.success("Templates atualizados da planilha!")
+    
     if nomes_templates:
-        roteiro_escolhido = st.selectbox("Escolha o roteiro:", nomes_templates)
-        iniciar_roteiro = st.button("Iniciar roteiro")
-        # Só inicia roteiro se o botão for pressionado OU se ainda não estava iniciado
-        if iniciar_roteiro or not st.session_state.get("template_ativo") or \
-           st.session_state.get("template_ativo") != roteiro_escolhido:
+        roteiro_escolhido = st.selectbox("Escolha o roteiro:", nomes_templates, key="sb_rota_sel")
+        etapas = st.session_state.templates_jm.get(roteiro_escolhido, [])
+    
+        # Inicia o roteiro e já dispara a 1ª etapa (se existir)
+        if st.button("Iniciar roteiro", key="btn_iniciar_roteiro"):
             st.session_state.template_ativo = roteiro_escolhido
             st.session_state.etapa_template = 0
+            if etapas:
+                comando = etapas[0]
+                salvar_interacao("user", comando)
+                st.session_state.session_msgs.append({"role": "user", "content": comando})
+                st.session_state["_trigger_input"] = comando  # dispara geração
     
-        if st.session_state.template_ativo:
-            etapas = st.session_state.templates_jm.get(st.session_state.template_ativo, [])
-            etap = st.session_state.etapa_template
-            if etap < len(etapas):
-                st.markdown(f"Etapa atual: {etap + 1} de {len(etapas)}")
-                if st.button("Próxima etapa (*)"):
-                    comando = etapas[etap]
+        # Progresso / próxima etapa
+        if st.session_state.get("template_ativo"):
+            etapas_ativas = st.session_state.templates_jm.get(st.session_state.template_ativo, [])
+            etap = int(st.session_state.get("etapa_template", 0))
+            if etap < len(etapas_ativas):
+                st.markdown(f"Etapa atual: {etap + 1} de {len(etapas_ativas)}")
+                if st.button("Próxima etapa (*)", key="btn_proxima_etapa"):
+                    comando = etapas_ativas[etap]
                     salvar_interacao("user", comando)
                     st.session_state.session_msgs.append({"role": "user", "content": comando})
-                    st.session_state.etapa_template += 1
+                    st.session_state.etapa_template = etap + 1
+                    st.session_state["_trigger_input"] = comando  # dispara geração
             else:
                 st.success("Roteiro concluído!")
                 st.session_state.template_ativo = None
                 st.session_state.etapa_template = 0
-
     else:
         st.info("Nenhum template encontrado na aba templates_jm.")
 
@@ -1260,6 +1269,10 @@ with st.container():
 # =========================
 
 entrada = st.chat_input("Digite sua direção de cena...")
+# Permite que botões do roteiro disparem a geração
+if not entrada:
+    entrada = st.session_state.pop("_trigger_input", None)
+
 
 if entrada:
     # 0) Atualiza Momento sugerido (opcional e seguro)
@@ -1464,6 +1477,7 @@ if entrada:
             pass
 
 #
+
 
 
 
