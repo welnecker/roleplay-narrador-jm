@@ -1124,9 +1124,13 @@ with st.sidebar:
         st.success("Templates atualizados da planilha!")
     if nomes_templates:
         roteiro_escolhido = st.selectbox("Escolha o roteiro:", nomes_templates)
-        if st.button("Iniciar roteiro") or (st.session_state.template_ativo != roteiro_escolhido):
+        iniciar_roteiro = st.button("Iniciar roteiro")
+        # Só inicia roteiro se o botão for pressionado OU se ainda não estava iniciado
+        if iniciar_roteiro or not st.session_state.get("template_ativo") or \
+           st.session_state.get("template_ativo") != roteiro_escolhido:
             st.session_state.template_ativo = roteiro_escolhido
             st.session_state.etapa_template = 0
+    
         if st.session_state.template_ativo:
             etapas = st.session_state.templates_jm.get(st.session_state.template_ativo, [])
             etap = st.session_state.etapa_template
@@ -1141,6 +1145,7 @@ with st.sidebar:
                 st.success("Roteiro concluído!")
                 st.session_state.template_ativo = None
                 st.session_state.etapa_template = 0
+
     else:
         st.info("Nenhum template encontrado na aba templates_jm.")
 
@@ -1459,6 +1464,7 @@ if entrada:
             pass
 
 #
+
 
 
 
