@@ -960,7 +960,7 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - **Objetos diegéticos: caso a câmera não se encaixe na situação (encontro, banho, mar, revista), mostre a ação de guardar antes e ignore o objeto até a retomada; não descreva interação física com a câmera nesses contextos**.
 
 ### Formato OBRIGATÓRIO da cena
-- **Inclua DIÁLOGOS diretos** com travessão (—), intercalados com ação e reação física/visual. Mínimo: **4 falas** no total.
+- **Inclua DIÁLOGOS diretos** com travessão (-), intercalados com ação e reação física/visual. Exemplo de travessão: - Ele disse ...
 - Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
 - **Não inclua pensamentos internos em itálico, reflexões internas ou monólogos subjetivos dos personagens.**
 - Não escreva blocos finais de créditos, microconquistas, resumos ou ganchos. Apenas narração e interação direta.
@@ -970,6 +970,7 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Narre em **terceira pessoa**; nunca fale com "você".
 - Produza uma cena fechada e natural, sem inserir comentários externos ou instruções.
 """.strip()
+
 
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
@@ -1463,6 +1464,7 @@ if entrada:
             pass
 
 #
+
 
 
 
