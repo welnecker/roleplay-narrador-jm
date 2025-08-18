@@ -118,39 +118,45 @@ def _ws(name: str, create_if_missing: bool = True):
             return None
 
     def carregar_templates_planilha():
-        """Carrega todos os templates sequenciais da aba templates_jm em {template:[etapa1, etapa2,...]}"""
-        try:
-            ws = _ws(TAB_TEMPLATES, create_if_missing=False)
-            if not ws:
-                return {}
-            rows = _sheet_all_records_cached(TAB_TEMPLATES)
-            templates = {}
-            for row in rows:
-                r = { (k or "").strip().lower(): (v or "") for k, v in row.items() }
-                nome = r.get("template", "").strip()
-                etapa_str = r.get("etapa", "1")
-                try:
-                    etapa = int(etapa_str)
-                except Exception:
-                    etapa = 1
-                texto = r.get("texto", "").strip()
-                if nome and texto:
-                    templates.setdefault(nome, []).append((etapa, texto))
-            for nome in templates:
-                templates[nome].sort(key=lambda x: x[0])
-                templates[nome] = [t[1] for t in templates[nome]]
-            return templates
-        except Exception as e:
-            st.warning(f"Erro ao carregar templates do Sheets: {e}")
+    """Carrega todos os templates sequenciais da aba templates_jm em {template:[etapa1, etapa2,...]}"""
+    try:
+        ws = _ws(TAB_TEMPLATES, create_if_missing=False)
+        if not ws:
             return {}
+        rows = _sheet_all_records_cached(TAB_TEMPLATES)
+        templates = {}
+        for row in rows:
+            # normaliza cabeçalhos (aceita 'Template', 'TEXTO', etc.)
+            r = {(k or "").strip().lower(): (v or "") for k, v in row.items()}
+            nome = r.get("template", "").strip()
+            etapa_str = r.get("etapa", "1")
+            try:
+                etapa = int(etapa_str)
+            except Exception:
+                etapa = 1
+            texto = r.get("texto", "").strip()
+            if nome and texto:
+                templates.setdefault(nome, []).append((etapa, texto))
+        # ordena por etapa e deixa só os textos
+        for nome in templates:
+            templates[nome].sort(key=lambda x: x[0])
+            templates[nome] = [t[1] for t in templates[nome]]
+        return templates
+    except Exception as e:
+        st.warning(f"Erro ao carregar templates do Sheets: {e}")
+        return {}
 
-# --- INICIALIZE AS VARIÁVEIS DE TEMPLATE ---
-if "templates_jm" not in st.session_state:
-    st.session_state.templates_jm = carregar_templates_planilha()
-if "template_ativo" not in st.session_state:
-    st.session_state.template_ativo = None
-if "etapa_template" not in st.session_state:
-    st.session_state.etapa_template = 0
+# --- INICIALIZE AS VARIÁVEIS DE TEMPLATE (após definir a função!) ---
+def _init_templates_once():
+    if "templates_jm" not in st.session_state:
+        st.session_state.templates_jm = carregar_templates_planilha()
+    if "template_ativo" not in st.session_state:
+        st.session_state.template_ativo = None
+    if "etapa_template" not in st.session_state:
+        st.session_state.etapa_template = 0
+
+_init_templates_once()
+
 # =====
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =====
@@ -1048,8 +1054,8 @@ if "max_avancos_por_cena" not in st.session_state:
  #   st.session_state.nsfw_max_level = 3
 if "estilo_escrita" not in st.session_state:
     st.session_state.estilo_escrita = "AÇÃO"
-if "templates_jm" not in st.session_state:
-    st.session_state.templates_jm = carregar_templates_planilha()
+#if "templates_jm" not in st.session_state:
+ #   st.session_state.templates_jm = carregar_templates_planilha()
 if "template_ativo" not in st.session_state:
     st.session_state.template_ativo = None
 if "etapa_template" not in st.session_state:
@@ -1477,6 +1483,7 @@ if entrada:
             pass
 
 #
+
 
 
 
