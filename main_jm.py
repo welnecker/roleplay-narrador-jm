@@ -564,11 +564,29 @@ def viola_momento(texto: str, momento: int) -> str:
 # =========================
 
 MODELOS_OPENROUTER = {
-    "🧠 GPT-4.1 (OpenRouter)": "openai/gpt-4.1",
-    "💬 DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
+    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
+    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
+    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
+    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
+    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
+    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
+    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
+    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
+    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
+    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
+    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
+    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
+    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
+    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
+    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
+    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
+    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
 }
+
 MODELOS_TOGETHER_UI = {
-    "👑 Mixtral 8x7B (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
 }
 
 def model_id_for_together(api_ui_model_id: str) -> str:
@@ -1344,3 +1362,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
