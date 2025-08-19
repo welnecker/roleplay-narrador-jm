@@ -765,6 +765,8 @@ def _deduzir_ancora(texto: str) -> dict:
 def construir_prompt_com_narrador() -> str:
     memos = carregar_memorias_brutas()
     perfil = carregar_resumo_salvo()
+
+    # Estado dramático
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
     momento_atual = int(st.session_state.get("momento", momento_carregar()))
@@ -772,50 +774,68 @@ def construir_prompt_com_narrador() -> str:
     proximo_nome = MOMENTOS.get(mdata.get("proximo", 0), MOMENTOS[0])["nome"]
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
 
+    # Sintonia & Ritmo (defina ANTES de gerar camada sensorial)
+    modo_sintonia = bool(st.session_state.get("modo_sintonia", True))
+    ritmo_cena = int(st.session_state.get("ritmo_cena", 1))  # 0=mt lento,1=lento,2=médio,3=rápido
+    ritmo_label = ["muito lento", "lento", "médio", "rápido"][max(0, min(3, ritmo_cena))]
+
     # Camada sensorial (Mary)
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
-    mary_sens_txt = (
-        gerar_mary_sensorial(
-            _sens_level,
-            n=_sens_n,
-            sintonia=bool(st.session_state.get("modo_sintonia", True))
-        )
-        if _sens_on else ""
-    )
+    mary_sens_txt = gerar_mary_sensorial(
+        _sens_level,
+        n=_sens_n,
+        sintonia=modo_sintonia
+    ) if _sens_on else ""
 
-    # Sintonia & Ritmo
-    modo_sintonia = bool(st.session_state.get("modo_sintonia", True))
-    ritmo_cena = int(st.session_state.get("ritmo_cena", 1))
-    ritmo_label = ["muito lento", "lento", "médio", "rápido"][max(0, min(3, ritmo_cena))]
-
-    # Histórico
+    # Histórico (últimas N)
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r.get('role','user')}: {r.get('content','')}" for r in hist) if hist else "(sem histórico)"
+
+    # Âncora de cenário a partir da última fala do usuário
+    def _last_user_text(_h):
+        if not _h: return ""
+        for r in reversed(_h):
+            if str(r.get("role","")).lower() == "user":
+                return r.get("content","")
+        return ""
+    def _deduzir_ancora(texto: str) -> dict:
+        t = (texto or "").lower()
+        if "motel" in t or "suíte" in t or "suite" in t: return {"local": "Motel — Suíte Master", "hora": "noite"}
+        if "quarto" in t: return {"local": "Quarto", "hora": "noite"}
+        if "praia" in t: return {"local": "Praia", "hora": "fim de tarde"}
+        if "bar" in t or "pub" in t: return {"local": "Bar", "hora": "noite"}
+        if "biblioteca" in t: return {"local": "Biblioteca", "hora": "tarde"}
+        if "ufes" in t: return {"local": "UFES — campus", "hora": "manhã"}
+        gat = ["cama redonda", "espelho no teto", "piscina aquecida"]
+        if any(g in t for g in gat): return {"local": "Motel — Suíte Master", "hora": "noite"}
+        return {}
+
     ultima_fala_user = _last_user_text(hist)
     ancora = _deduzir_ancora(ultima_fala_user)
-    ancora_bloco = ""
-    if ancora:
-        ancora_bloco = (
-            "### Âncora de cenário (OBRIGATÓRIA)\n"
-            f"- Local: **{ancora['local']}**\n"
-            f"- Hora: **{ancora['hora']}**\n"
-            "- Regra: mantenha a cena **neste local**; **não** troque para UFES, bar, biblioteca etc.\n"
-            "- Primeira frase deve ancorar **lugar e hora** neste formato: `Local — Hora — ...`.\n"
-        )
+    ancora_bloco = (
+        "### Âncora de cenário (OBRIGATÓRIA)\n"
+        f"- Local: **{ancora['local']}**\n"
+        f"- Hora: **{ancora['hora']}**\n"
+        "- Regra: mantenha a cena **neste local**; **não** troque para UFES, bar, biblioteca etc.\n"
+        "- Primeira frase deve ancorar **lugar e hora** neste formato: `Local — Hora — ...`.\n"
+    ) if ancora else ""
 
-    # Corte temporal
+    # Corte temporal (até o ts da última interação)
     if hist:
         ate_ts = _parse_ts(hist[-1].get("timestamp", ""))
     else:
         ate_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Virgindade (auto a partir de memoria_jm + corte temporal)
-    virg_bloco = montar_bloco_virgindade(
-        ativar=detectar_virgindade_mary(memos, ate_ts)
-    )
+    # Virgindade (não quebra se helpers não existirem)
+    try:
+        virg_bloco = montar_bloco_virgindade(
+            ativar=detectar_virgindade_mary(memos, ate_ts)
+        )
+    except Exception:
+        virg_bloco = ""
 
     # Memória longa Top-K (opcional)
     ml_topk_txt = "(nenhuma)"
@@ -823,7 +843,7 @@ def construir_prompt_com_narrador() -> str:
     if st.session_state.get("use_memoria_longa", True) and hist:
         try:
             topk = memoria_longa_buscar_topk(
-                query_text=hist[-1]["content"],
+                query_text=hist[-1].get("content",""),
                 k=int(st.session_state.get("k_memoria_longa", 3)),
                 limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
                 ate_ts=ate_ts,
@@ -831,8 +851,6 @@ def construir_prompt_com_narrador() -> str:
             if topk:
                 ml_topk_txt = "\n".join([f"- {t}" for (t, _sc, _sim, _rr) in topk])
                 st.session_state["_ml_topk_texts"] = [t for (t, *_rest) in topk]
-            else:
-                st.session_state["_ml_topk_texts"] = []
         except Exception:
             st.session_state["_ml_topk_texts"] = []
     else:
@@ -846,26 +864,28 @@ def construir_prompt_com_narrador() -> str:
     ]
     st.session_state["_ml_recorrentes"] = recorrentes
 
-    # Dossiê temporal
+    # Dossiê temporal (somente memórias <= ate_ts)
     dossie = []
     mary = persona_block_temporal("mary", memos, ate_ts, 8)
     janio = persona_block_temporal("janio", memos, ate_ts, 8)
-    if mary:
-        dossie.append(mary)
-    if janio:
-        dossie.append(janio)
+    if mary: dossie.append(mary)
+    if janio: dossie.append(janio)
     dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
 
+    # Montagem paralela
     flag_parallel = bool(st.session_state.get("no_coincidencias", True))
 
-    # Falas da Mary (planilha -> opcional)
+    # Falas de Mary (planilha) — não quebra se a função não existir
     falas_mary_bloco = ""
     if st.session_state.get("usar_falas_mary", False):
-        falas_mary = carregar_falas_mary()
+        try:
+            falas_mary = carregar_falas_mary()
+        except Exception:
+            falas_mary = []
         if falas_mary:
             falas_mary_bloco = "### Falas de Mary (usar literalmente)\n" + "\n".join(f"- {s}" for s in falas_mary)
 
-    # Sintonia & Ritmo (texto de instrução)
+    # Sintonia & Ritmo (bloco textual)
     sintonia_bloco = ""
     if modo_sintonia:
         sintonia_bloco = (
@@ -874,22 +894,23 @@ def construir_prompt_com_narrador() -> str:
             "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas. Prefira convites, sussurros, pedidos gentis.\n"
             "- Respeite pausas, respiração, olhar; o desejo é mostrado pela troca, não por imposição.\n"
         )
-        
-     # --- BLOQUEIO DE CLÍMAX (instrução no prompt) ---
+
+    # Bloqueio de clímax: instrução no prompt (além do pós-processamento)
     bloquear = bool(st.session_state.get("app_bloqueio_intimo", False))
     mom = int(st.session_state.get("momento", 0))
     climax_rules = ""
     if bloquear and mom < 3:
         climax_rules = (
             "### Proteção de avanço íntimo (ATIVA)\n"
-            "- **Sem clímax nesta cena**: não descreva orgasmo, 'gozou', 'explodiu', 'chegou lá', 'clímax', 'ejaculou'.\n"
-            "- Termine em **pausa sensorial** (respiração, silêncio, carinho), **sem finalização**.\n"
+            "- **Sem clímax nesta cena**: não descreva orgasmo ('gozou', 'clímax', 'ejaculou').\n"
+            "- Termine em **pausa sensorial** (respiração/olhar/toque leve), sem finalização.\n"
         )
 
+    # Prompt final (aspas triplas bem fechadas)
     prompt = f"""
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
 
-{ancora_bloco}{sintonia_bloco}{virg_bloco}{climax_rules}{falas_mary_bloco}### Dossiê (personas)
+{ancora_bloco}{sintonia_bloco}{climax_rules}{virg_bloco}{falas_mary_bloco}### Dossiê (personas)
 {dossie_txt}
 
 ### Diretrizes gerais (ALL)
@@ -906,13 +927,13 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
 ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
-- Todas as cenas devem ser sensoriais e físicas (toques, temperatura, respiração).
-- Falas: naturais e críveis; se “Sintonia” estiver ativa, evite imperativos ríspidos.
+- Cenas sensoriais (toques, temperatura, respiração). Evite vulgaridade gratuita.
+- Quando **modo_sintonia** estiver ativo, evite imperativos agressivos; prefira convites e cadência calma.
 
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Comece com 1–2 frases sobre caminhar/olhar/perfume/cabelos (negros, volumosos, levemente ondulados)."}
-- Aplique essa camada **antes** do primeiro diálogo.
-- Frases curtas, diretas, físicas.
+- Aplique essa camada ANTES do primeiro diálogo.
+- Frases curtas, diretas, físicas; evite metáforas rebuscadas.
 
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
@@ -928,23 +949,26 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Nesta cena, **permita**: {mdata['permitidos']}
 - Evite/adiar: {mdata['proibidos']}
 - **Micropassos:** avance no máximo **{int(st.session_state.get("max_avancos_por_cena",1))}** subpasso(s) rumo a: {proximo_nome}.
+- Se o roteirista pedir salto maior, negocie consentimento e **prepare** a transição (sem teletransporte).
 
 ### Geografia & Montagem
-- Não force coincidências; use montagem paralela conforme {flag_parallel}.
-- Comece o **primeiro parágrafo** ancorando lugar e hora (“Local — Hora — …”).
+- **Sem coincidências forçadas**: se não houver ponte explícita, mantenha locais distintos e use **montagem paralela** (A/B) conforme {flag_parallel}.
+- **Primeira frase** de cada bloco deve ancorar **lugar e hora** (“Local — Hora — …”). Não use títulos.
+- Havendo ponte diegética, convergir para co-presença no final é permitido (sem teletransporte).
 
 ### Formato OBRIGATÓRIO da cena
-- Diálogos com travessão (—), intercalados com ação/reação.
-- Pelo menos 2 falas de cada (se ambos presentes).
-- Sem pensamentos em itálico, sem créditos/ganchos finais.
+- **Inclua DIÁLOGOS** com travessão (—), intercalados com ação/reação visual (mínimo 4 falas quando ambos estiverem presentes).
+- **Não inclua** pensamentos em itálico, reflexões internas ou monólogos subjetivos.
+- Sem blocos finais de créditos, microconquistas, resumos ou ganchos.
 
 ### Regra de saída
-- Narre em terceira pessoa.
-- Entregue uma cena fechada e natural.
+- Narre em **terceira pessoa**; nunca use “você”.
+- Entregue uma cena fechada e natural, sem comentários externos ou instruções.
 """.strip()
 
-prompt = inserir_regras_mary_e_janio(prompt)
-return prompt
+    # Regras adicionais (append seguro ao final)
+    prompt = inserir_regras_mary_e_janio(prompt)
+    return prompt
 
 
 # =========================
@@ -1527,6 +1551,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
