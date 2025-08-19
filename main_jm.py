@@ -864,11 +864,11 @@ def construir_prompt_com_narrador() -> str:
             "- Respeite pausas, respiração, olhar; o desejo é mostrado pela troca, não por imposição.\n"
         )
 
-   prompt = f"""
-Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
-
-{ancora_bloco}{sintonia_bloco}{virg_bloco}### Dossiê (personas)
-{dossie_txt}
+       prompt = f"""
+    Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
+    
+    {ancora_bloco}{sintonia_bloco}{virg_bloco}### Dossiê (personas)
+    {dossie_txt}
 
 ### Diretrizes gerais (ALL)
 {chr(10).join(f"- {c}" for c in recorrentes) if recorrentes else "(vazio)"}
@@ -1409,5 +1409,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
