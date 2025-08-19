@@ -74,6 +74,26 @@ TAB_MEMORIAS = "memoria_jm"
 TAB_ML = "memoria_longa_jm"
 TAB_TEMPLATES = "templates_jm"
 
+# === FALAS EXPLÍCITAS DA MARY (versão suave; troque pelas suas depois) ===
+FALAS_EXPLICITAS_MARY = [
+    "Assim amor...",
+    "Me fode gostoso.",
+    "Ahhhh. que delícia!",
+    "continua...vou gozar...",
+    "quero seu pau grosso em mim",
+    "chupa meu clitóris, por favor...",
+    "olha pra mim...me fode..",
+    "estou quase...vou gozar",
+    "fala meu nome...goza em mim...",
+    "não para...goza dentro..."
+]
+
+def _bloco_falas_explicitas() -> str:
+    if not isinstance(FALAS_EXPLICITAS_MARY, list) or not FALAS_EXPLICITAS_MARY:
+        return "- (sem exemplos)"
+    return "\n".join(f"- {f}" for f in FALAS_EXPLICITAS_MARY if isinstance(f, str) and f.strip())
+
+
 def conectar_planilha():
     try:
         creds_dict = json.loads(st.secrets["GOOGLE_CREDS_JSON"])
@@ -1031,6 +1051,8 @@ def construir_prompt_com_narrador() -> str:
             "- Se houver desejo, **mostre** pelo corpo e pela troca, não por imposição.\n"
         )
 
+    falas_exemplos = _bloco_falas_explicitas()
+
     # Montagem do prompt
     prompt = f"""
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
@@ -1054,6 +1076,11 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
 - Todas as cenas devem ser sensoriais e físicas (toques, temperatura, respiração). Evite vulgaridade.
 - Falas: naturais e críveis; evite imperativos agressivos quando **modo_sintonia** estiver ativo.
+
+### Falas de Mary — exemplos (suaves; substitua depois)
+{falas_exemplos}
+- Use-os como referência de tom; adapte ao contexto da cena.
+
 
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Comece com 1–2 frases sobre caminhar/olhar/perfume/cabelos (negros, volumosos, levemente ondulados)."}
@@ -1633,6 +1660,7 @@ if entrada:
             pass
 
 #
+
 
 
 
