@@ -874,12 +874,22 @@ def construir_prompt_com_narrador() -> str:
             "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas. Prefira convites, sussurros, pedidos gentis.\n"
             "- Respeite pausas, respiração, olhar; o desejo é mostrado pela troca, não por imposição.\n"
         )
+        
+     # --- BLOQUEIO DE CLÍMAX (instrução no prompt) ---
+    bloquear = bool(st.session_state.get("app_bloqueio_intimo", False))
+    mom = int(st.session_state.get("momento", 0))
+    climax_rules = ""
+    if bloquear and mom < 3:
+        climax_rules = (
+            "### Proteção de avanço íntimo (ATIVA)\n"
+            "- **Sem clímax nesta cena**: não descreva orgasmo, 'gozou', 'explodiu', 'chegou lá', 'clímax', 'ejaculou'.\n"
+            "- Termine em **pausa sensorial** (respiração, silêncio, carinho), **sem finalização**.\n"
+        )
 
-    # ===== Montagem do prompt (fora de qualquer if!) =====
     prompt = f"""
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
 
-{ancora_bloco}{sintonia_bloco}{virg_bloco}### Dossiê (personas)
+{ancora_bloco}{sintonia_bloco}{virg_bloco}{climax_rules}{falas_mary_bloco}### Dossiê (personas)
 {dossie_txt}
 
 ### Diretrizes gerais (ALL)
@@ -896,15 +906,13 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
 ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
-- Todas as cenas devem ser sensoriais e físicas (toques, temperatura, respiração). Evite vulgaridade.
-- Falas: naturais e críveis; evite imperativos agressivos quando **modo_sintonia** estiver ativo.
+- Todas as cenas devem ser sensoriais e físicas (toques, temperatura, respiração).
+- Falas: naturais e críveis; se “Sintonia” estiver ativa, evite imperativos ríspidos.
 
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Comece com 1–2 frases sobre caminhar/olhar/perfume/cabelos (negros, volumosos, levemente ondulados)."}
-- Aplique essa camada ANTES do primeiro diálogo.
-- Frases curtas, diretas, físicas; evite metáforas rebuscadas.
-
-{falas_mary_bloco}
+- Aplique essa camada **antes** do primeiro diálogo.
+- Frases curtas, diretas, físicas.
 
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
@@ -920,26 +928,23 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Nesta cena, **permita**: {mdata['permitidos']}
 - Evite/adiar: {mdata['proibidos']}
 - **Micropassos:** avance no máximo **{int(st.session_state.get("max_avancos_por_cena",1))}** subpasso(s) rumo a: {proximo_nome}.
-- Se o roteirista pedir salto maior, **negocie**: peça consentimento e **prepare** a transição (sem teletransporte).
 
 ### Geografia & Montagem
-- **Não force coincidências**: sem ponte explícita, mantenha locais distintos e use **montagem paralela** (A/B) conforme {flag_parallel}.
-- **Comece cada bloco** com uma frase que **ancore lugar e hora** (ex.: “Local — Hora — …”). Não use títulos; escreva isso na **primeira frase** do parágrafo.
-- Se houver ponte diegética, convergir para co-presença no final é permitido (sem teletransporte).
+- Não force coincidências; use montagem paralela conforme {flag_parallel}.
+- Comece o **primeiro parágrafo** ancorando lugar e hora (“Local — Hora — …”).
 
 ### Formato OBRIGATÓRIO da cena
-- **Inclua DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação física/visual (mínimo 4 falas).
-- Garanta **pelo menos 2 falas de Mary e 2 de Jânio** (quando ambos estiverem na cena).
-- **Não inclua** pensamentos em itálico, reflexões internas ou monólogos subjetivos.
-- Sem blocos finais de créditos, microconquistas, resumos ou ganchos.
+- Diálogos com travessão (—), intercalados com ação/reação.
+- Pelo menos 2 falas de cada (se ambos presentes).
+- Sem pensamentos em itálico, sem créditos/ganchos finais.
 
 ### Regra de saída
-- Narre em **terceira pessoa**; nunca fale com "você".
-- Produza uma cena fechada e natural, sem comentários externos ou instruções.
+- Narre em terceira pessoa.
+- Entregue uma cena fechada e natural.
 """.strip()
 
-    prompt = inserir_regras_mary_e_janio(prompt)
-    return prompt
+prompt = inserir_regras_mary_e_janio(prompt)
+return prompt
 
 
 # =========================
@@ -1015,7 +1020,7 @@ if "k_memoria_longa" not in st.session_state:
 if "limiar_memoria_longa" not in st.session_state:
     st.session_state.limiar_memoria_longa = 0.78
 if "app_bloqueio_intimo" not in st.session_state:
-    st.session_state.app_bloqueio_intimo = False
+    st.session_state.app_bloqueio_intimo = True
 if "app_emocao_oculta" not in st.session_state:
     st.session_state.app_emocao_oculta = "nenhuma"
 if "mj_fase" not in st.session_state:
@@ -1068,7 +1073,7 @@ with st.sidebar:
         index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
         key="estilo_escrita",
     )
-    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 3)), key="nsfw_max_level")
+    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 0)), key="nsfw_max_level")
 
     # Sintonia & Ritmo (DENTRO do sidebar)
     st.checkbox(
@@ -1079,7 +1084,7 @@ with st.sidebar:
     st.select_slider(
         "Ritmo da cena",
         options=[0, 1, 2, 3],
-        value=int(st.session_state.get("ritmo_cena", 1)),
+        value=int(st.session_state.get("ritmo_cena", 0)),
         format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
         key="ritmo_cena",
     )
@@ -1351,13 +1356,110 @@ if entrada:
                     st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
         except Exception as e:
             st.error(f"Erro no streaming: {e}")
+        #############################
+                # >>> ADD: Helpers de clímax (definir antes de usar)
+        CLIMAX_USER_TRIGGER = re.compile(
+            r"\b(finalmente\b.*orgasmo|explode\b.*orgasmo|cheg(a|ou)\b.*cl[ií]max|pode\b.*finalizar|libero\b.*cl[ií]max|goza(r)?\b.*agora)\b",
+            flags=re.IGNORECASE
+        )
 
+        ORGASM_OUT_PAT = re.compile(
+            r"([^.!\n]*\b(cl[ií]max|orgasmo|gozou|gozaram|ejacul[ao]u)\b[^.!?\n]*[.!?])",
+            flags=re.IGNORECASE
+        )
+
+        def _user_allows_climax(msgs: list) -> bool:
+            """
+            Retorna True se a ÚLTIMA fala do usuário libera explicitamente o clímax.
+            """
+            last_user = ""
+            for r in reversed(msgs or []):
+                if str(r.get("role","")).lower() == "user":
+                    last_user = r.get("content","")
+                    break
+            if not last_user:
+                try:
+                    hist_chk = carregar_interacoes(n=3)
+                    for r in reversed(hist_chk or []):
+                        if str(r.get("role","")).lower() == "user":
+                            last_user = r.get("content","")
+                            break
+                except Exception:
+                    pass
+            return bool(CLIMAX_USER_TRIGGER.search(last_user or ""))
+
+        def _strip_or_soften_climax(texto: str) -> str:
+            """
+            Remove frases de orgasmo/clímax e encerra com pausa natural.
+            """
+            if not texto:
+                return texto
+            texto = ORGASM_OUT_PAT.sub("", texto)
+            texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
+            if not texto.endswith((".", "…", "!", "?")):
+                texto += "…"
+            finais_possiveis = [
+                " Eles param um instante, respirando juntos, sem apressar o desfecho.",
+                " A tensão fica no ar, guardada para o próximo passo.",
+                " Eles se encostam em silêncio, deixando o resto para depois."
+            ]
+            if all(fp not in texto for fp in finais_possiveis):
+                texto += random.choice(finais_possiveis)
+            return texto
+###########################
+
+           # === Item 3 — GUARDRAIL PÓS-GERAÇÃO (bloqueio de clímax/finalização precoce) ===
         visible_txt = _render_visible(resposta_txt).strip()
+
+        # Se a proteção estiver ativa e o Momento < 3, evitamos clímax/“finalização” na saída
+        try:
+            bloquear = bool(st.session_state.get("app_bloqueio_intimo", False))
+            mom = int(st.session_state.get("momento", 0))
+        except Exception:
+            bloquear = False
+            mom = 0
+
+        if bloquear and mom < 3 and visible_txt:
+            # Palavras/expressões de clímax ou finalização explícita
+            padrao_climax = re.compile(
+                r"(?i)\b(goz(ar|ou|ando)|gozada|orgasm[oa]s?|cl[íi]max|ejacul(ou|ar)|explodiu(?: em)? orgasmo)\b"
+            )
+            padrao_finaliza = re.compile(
+                r"(?i)\b(goza dentro|me faz gozar|goza em mim|mete (fundo|com tudo)|me come (agora|logo))\b"
+            )
+
+            alterou = False
+            novas_linhas = []
+            for linha in visible_txt.splitlines():
+                # Se descreve clímax explícito, trocamos por pausa sensorial
+                if padrao_climax.search(linha):
+                    novas_linhas.append(
+                        "… eles freiam juntos, respirando alto; o momento fica em suspensão, sem finalização."
+                    )
+                    alterou = True
+                else:
+                    # Se pede “finalização” direta, converte para convite suave (sem finalizar)
+                    linha2 = padrao_finaliza.sub(
+                        "… ela muda o pedido por um beijo longo; os dois mantêm o clima, sem pressa.",
+                        linha,
+                    )
+                    if linha2 != linha:
+                        alterou = True
+                    novas_linhas.append(linha2)
+
+            visible_txt = "\n".join(novas_linhas).strip()
+            # Se houve alteração, garantimos um fechamento em pausa (sem clímax)
+            if alterou and not visible_txt.endswith(("sem pressa.", "em suspensão.", "em silêncio.")):
+                visible_txt += "\n\nEles ficam um instante em silêncio, só sentindo a respiração do outro."
+
+        # === FALLBACK 1: sem stream ===
         if not visible_txt:
             try:
-                r2 = requests.post(endpoint, headers=headers,
-                                   json={**payload, "stream": False},
-                                   timeout=int(st.session_state.get("timeout_s", 300)))
+                r2 = requests.post(
+                    endpoint, headers=headers,
+                    json={**payload, "stream": False},
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
                 if r2.status_code == 200:
                     try:
                         resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
@@ -1369,6 +1471,7 @@ if entrada:
             except Exception as e:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
+        # === FALLBACK 2: prompts limpos ===
         if not visible_txt:
             try:
                 r3 = requests.post(
@@ -1392,6 +1495,7 @@ if entrada:
                     st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
+
 
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
@@ -1423,6 +1527,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
