@@ -69,30 +69,11 @@ except Exception:
 
 PLANILHA_ID_PADRAO = st.secrets.get("SPREADSHEET_ID", "").strip() or "1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM"
 TAB_INTERACOES = "interacoes_jm"
-TAB_PERFIL = "perfil_jm"
-TAB_MEMORIAS = "memoria_jm"
-TAB_ML = "memoria_longa_jm"
-TAB_TEMPLATES = "templates_jm"
-
-# === FALAS EXPLÍCITAS DA MARY (versão suave; troque pelas suas depois) ===
-FALAS_EXPLICITAS_MARY = [
-    "Assim amor...",
-    "Me fode gostoso.",
-    "Ahhhh. que delícia!",
-    "continua...vou gozar...",
-    "quero seu pau grosso em mim",
-    "chupa meu clitóris, por favor...",
-    "olha pra mim...me fode..",
-    "estou quase...vou gozar",
-    "fala meu nome...goza em mim...",
-    "não para...goza dentro..."
-]
-
-def _bloco_falas_explicitas() -> str:
-    if not isinstance(FALAS_EXPLICITAS_MARY, list) or not FALAS_EXPLICITAS_MARY:
-        return "- (sem exemplos)"
-    return "\n".join(f"- {f}" for f in FALAS_EXPLICITAS_MARY if isinstance(f, str) and f.strip())
-
+TAB_PERFIL     = "perfil_jm"
+TAB_MEMORIAS   = "memoria_jm"
+TAB_ML         = "memoria_longa_jm"
+TAB_TEMPLATES  = "templates_jm"
+TAB_FALAS_MARY = "falas_mary_jm"   # <<< NOVA ABA: fala | timestamp
 
 def conectar_planilha():
     try:
@@ -133,11 +114,13 @@ def _ws(name: str, create_if_missing: bool = True):
                 _retry_429(ws.append_row, ["texto", "embedding", "tags", "timestamp", "score"])
             elif name == TAB_TEMPLATES:
                 _retry_429(ws.append_row, ["template", "etapa", "texto"])
+            elif name == TAB_FALAS_MARY:  # <<< cria cabeçalho
+                _retry_429(ws.append_row, ["fala", "timestamp"])
             return ws
         except Exception:
             return None
 
-# >>> A PARTIR DAQUI, FORA DE _ws (nível de topo) <<<
+# -------- templates (NÍVEL DE MÓDULO; NÃO DENTRO DE _ws !) --------
 def carregar_templates_planilha():
     """Carrega todos os templates sequenciais da aba templates_jm em {template:[etapa1, etapa2,...]}"""
     try:
@@ -147,7 +130,6 @@ def carregar_templates_planilha():
         rows = _sheet_all_records_cached(TAB_TEMPLATES)
         templates = {}
         for row in rows:
-            # normaliza cabeçalhos (aceita 'Template', 'TEXTO', etc.)
             r = {(k or "").strip().lower(): (v or "") for k, v in row.items()}
             nome = r.get("template", "").strip()
             etapa_str = r.get("etapa", "1")
@@ -158,7 +140,6 @@ def carregar_templates_planilha():
             texto = r.get("texto", "").strip()
             if nome and texto:
                 templates.setdefault(nome, []).append((etapa, texto))
-        # ordena por etapa e deixa só os textos
         for nome in templates:
             templates[nome].sort(key=lambda x: x[0])
             templates[nome] = [t[1] for t in templates[nome]]
@@ -167,7 +148,6 @@ def carregar_templates_planilha():
         st.warning(f"Erro ao carregar templates do Sheets: {e}")
         return {}
 
-# --- INICIALIZE AS VARIÁVEIS DE TEMPLATE (após definir a função!) ---
 def _init_templates_once():
     if "templates_jm" not in st.session_state:
         st.session_state.templates_jm = carregar_templates_planilha()
@@ -179,25 +159,16 @@ def _init_templates_once():
 _init_templates_once()
 
 # =====
-# =====
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =====
 
-# Observação 1: o código espera TAB_MEMORIAS = "memoria_jm"
-# Ex.: TAB_MEMORIAS = "memoria_jm"
-
 def _normalize_tag(raw: str) -> str:
-    """Normaliza 'tipo' para o formato com colchetes: [all], [mary], [janio], etc."""
     t = (raw or "").strip().lower()
     if not t:
         return ""
     return t if t.startswith("[") else f"[{t}]"
 
 def _parse_ts(s: str) -> str:
-    """
-    Normaliza timestamp para 'YYYY-MM-DD HH:MM:SS'; se vier vazio/ruim, usa 'agora'.
-    Importante: strings nesse formato são comparáveis lexicograficamente.
-    """
     s = (s or "").strip()
     try:
         datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
@@ -206,18 +177,13 @@ def _parse_ts(s: str) -> str:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def carregar_memorias_brutas() -> Dict[str, List[dict]]:
-    """
-    Lê 'memoria_jm' (cabeçalho: tipo | conteudo | timestamp) e devolve
-    {tag: [ {"conteudo":..., "timestamp":...} ]} com tags normalizadas ([all],[mary],[janio]) e
-    timestamp padronizado.
-    """
     try:
-        regs = _sheet_all_records_cached(TAB_MEMORIAS)  # espera "memoria_jm"
+        regs = _sheet_all_records_cached(TAB_MEMORIAS)
         buckets: Dict[str, List[dict]] = {}
         for r in regs:
             tag = _normalize_tag(r.get("tipo"))
             txt = (r.get("conteudo") or "").strip()
-            ts = (r.get("timestamp") or "").strip()
+            ts  = (r.get("timestamp") or "").strip()
             if tag and txt:
                 buckets.setdefault(tag, []).append({"conteudo": txt, "timestamp": ts})
         return buckets
@@ -226,66 +192,40 @@ def carregar_memorias_brutas() -> Dict[str, List[dict]]:
         return {}
 
 def persona_block(nome: str, buckets: dict, max_linhas: int = 8) -> str:
-    """
-    Monta bloco compacto da persona (ordena por prefixos úteis).
-    Observação 2: usa tags no formato [mary], [janio].
-    """
     tag = f"[{nome}]"
     linhas = buckets.get(tag, [])
     ordem = ["OBJ:", "TAT:", "LV:", "VOZ:", "BIO:", "ROTINA:", "LACOS:", "APS:", "CONFLITOS:"]
-
     def peso(linha_dict):
-        l = linha_dict["conteudo"]
-        up = l.upper()
+        up = (linha_dict.get("conteudo","")).upper()
         for i, p in enumerate(ordem):
             if up.startswith(p):
                 return i
         return len(ordem)
-
     linhas_ordenadas = sorted(linhas, key=peso)[:max_linhas]
     titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
-    return (
-        f"{titulo}:\n- " + "\n- ".join(linha['conteudo'] for linha in linhas_ordenadas)
-    ) if linhas_ordenadas else ""
-
+    return f"{titulo}:\n- " + "\n- ".join(l['conteudo'] for l in linhas_ordenadas) if linhas_ordenadas else ""
 
 def persona_block_temporal(nome: str, buckets: dict, ate_ts: str, max_linhas: int = 8) -> str:
-    """
-    Versão temporal do bloco de persona.
-    Usa apenas memórias com timestamp <= ate_ts (se houver timestamp).
-    Mantém compatibilidade com registros sem timestamp (são incluídos).
-    """
     tag = f"[{nome}]"
     linhas = []
     for d in buckets.get(tag, []) or []:
         if not isinstance(d, dict):
             continue
         c = (d.get("conteudo") or "").strip()
-        ts = (d.get("timestamp") or "").strip()  # pode estar vazio
+        ts = (d.get("timestamp") or "").strip()
         if not c:
             continue
-        # Se houver timestamp e corte temporal, exclui memórias "do futuro"
         if ts and ate_ts and ts > ate_ts:
             continue
         linhas.append((ts, c))
-
-    # Ordena por timestamp crescente (strings ISO ordenam lexicograficamente)
-    # Registros sem timestamp ("") ficam no início.
     linhas.sort(key=lambda x: x[0])
-
-    # Pega as últimas N (mais recentes até o corte)
     ult = [c for _, c in linhas][-max_linhas:]
     if not ult:
         return ""
-
     titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
     return f"{titulo}:\n- " + "\n- ".join(ult)
 
-
 def carregar_resumo_salvo() -> str:
-    """
-    Busca o último resumo da aba 'perfil_jm' (cabeçalho: timestamp | resumo) com cache TTL.
-    """
     try:
         registros = _sheet_all_records_cached(TAB_PERFIL)
         for r in reversed(registros):
@@ -297,11 +237,7 @@ def carregar_resumo_salvo() -> str:
         st.warning(f"Erro ao carregar resumo salvo: {e}")
         return ""
 
-
 def salvar_resumo(resumo: str):
-    """
-    Salva uma nova linha em 'perfil_jm' (timestamp | resumo) e invalida caches.
-    """
     try:
         aba = _ws(TAB_PERFIL)
         if not aba:
@@ -312,98 +248,49 @@ def salvar_resumo(resumo: str):
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
 
-
-# === PASSO 1 (NORMALIZADOR DE LINHAS DE HISTÓRICO) ===
-def _normalize_msg_row(r: Any) -> dict:
-    """Normaliza uma linha de interação para {'timestamp','role','content'}."""
-    if isinstance(r, dict):
-        d = { (k or "").strip().lower(): v for k, v in r.items() }
-        return {
-            "timestamp": str(d.get("timestamp", "") or "").strip(),
-            "role":      str(d.get("role", "user") or "user").strip(),
-            "content":   str(d.get("content", "") or "").strip(),
-        }
-    if isinstance(r, (list, tuple)) and len(r) >= 3:
-        return {
-            "timestamp": str(r[0] or "").strip(),
-            "role":      str(r[1] or "user").strip(),
-            "content":   str(r[2] or "").strip(),
-        }
-    # fallback
-    return {"timestamp": "", "role": "user", "content": str(r or "").strip()}
-
-
 def carregar_interacoes(n: int = 20):
-    """
-    Carrega últimas n interações (role, content) usando cache de sessão
-    para evitar leituras repetidas. (aplica normalização básica)
-    """
     cache = st.session_state.get("_cache_interacoes", None)
     if cache is None:
         regs = _sheet_all_records_cached(TAB_INTERACOES)
-        # aplica normalização nas linhas vindas do Sheets
-        regs = [_normalize_msg_row(x) for x in regs]
         st.session_state["_cache_interacoes"] = regs
         cache = regs
-    else:
-        # garante que o cache esteja normalizado mesmo se herdou algo antigo
-        cache = [_normalize_msg_row(x) for x in cache]
-        st.session_state["_cache_interacoes"] = cache
-
     return cache[-n:] if len(cache) > n else cache
 
-
 def salvar_interacao(role: str, content: str):
-    """
-    Append no Sheets + atualiza cache local (sem reler) com backoff 429.
-    (Observação 3: garante timestamp no padrão e corrige o else do cache.)
-    """
     if not planilha:
         return
     try:
         aba = _ws(TAB_INTERACOES)
         if not aba:
             return
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Observação 3 (formato)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         row_role = f"{role or ''}".strip()
         row_content = f"{content or ''}".strip()
-        row = [timestamp, row_role, row_content]
-        _retry_429(aba.append_row, row, value_input_option="RAW")
-
-        # atualiza cache local
+        _retry_429(aba.append_row, [timestamp, row_role, row_content], value_input_option="RAW")
         lst = st.session_state.get("_cache_interacoes")
         if isinstance(lst, list):
-            # normaliza também o item adicionado agora
-            lst.append(_normalize_msg_row({"timestamp": timestamp, "role": row_role, "content": row_content}))
+            lst.append({"timestamp": timestamp, "role": row_role, "content": row_content})
         else:
-            # (fix) cria corretamente a primeira entrada do cache
-            st.session_state["_cache_interacoes"] = [
-                _normalize_msg_row({"timestamp": timestamp, "role": row_role, "content": row_content})
-            ]
-
+            st.session_state["_cache_interacoes"] = [{
+                "timestamp": timestamp, "role": row_role, "content": row_content
+            }]
         _invalidate_sheet_caches()
     except Exception as e:
         st.error(f"Erro ao salvar interação: {e}")
 
-# = BUSCA TEMPORAL DE MEMÓRIAS =
-def buscar_status_persona_ate(persona_tag: str, momento_ts: str, buckets: dict) -> List[str]:
-    """
-    Busca os traços mais recentes da persona até o timestamp informado.
-    persona_tag: ex: '[mary]' (será normalizado)
-    momento_ts: timestamp limite (ex: '2025-08-21 16:04:00'; será normalizado)
-    buckets: dict retornado por carregar_memorias_brutas()
-    """
-    tag = _normalize_tag(persona_tag)
-    limite = _parse_ts(momento_ts)
-    linhas = buckets.get(tag, [])
-
-    # filtra até o limite e ordena por timestamp (strings já normalizadas)
-    linhas_filtradas = [l for l in linhas if (l.get("timestamp") or "") <= limite]
-    linhas_ord = sorted(linhas_filtradas, key=lambda x: x.get("timestamp", ""))
-
-    return [l.get("conteudo", "") for l in linhas_ord if l.get("conteudo")]
-
-
+# ----- Falas da Mary (planilha) -----
+def carregar_falas_mary() -> List[str]:
+    try:
+        rows = _sheet_all_records_cached(TAB_FALAS_MARY)
+        falas = []
+        for r in rows:
+            f = (r.get("fala") or "").strip()
+            if f:
+                falas.append(f)
+        return falas
+    except Exception as e:
+        st.warning(f"Erro ao carregar {TAB_FALAS_MARY}: {e}")
+        return []
 
 # =========================
 # EMBEDDINGS / SIMILARIDADE
@@ -438,11 +325,10 @@ def verificar_quebra_semantica_openai(texto1: str, texto2: str, limite=0.6) -> s
     return ""
 
 # =========================
-# MEMÓRIA LONGA (Sheets + Embeddings/OpenAI opcional) — TIME-AWARE
+# MEMÓRIA LONGA (opcional)
 # =========================
 
 def _sheet_ensure_memoria_longa():
-    """Retorna a aba memoria_longa_jm se existir (não cria automaticamente)."""
     return _ws(TAB_ML, create_if_missing=False)
 
 def _serialize_vec(vec: np.ndarray) -> str:
@@ -455,7 +341,6 @@ def _deserialize_vec(s: str) -> np.ndarray:
         return np.zeros(1, dtype=float)
 
 def memoria_longa_salvar(texto: str, tags: str = "") -> bool:
-    """Salva uma memória com embedding (se possível) e score inicial. Invalida cache."""
     aba = _sheet_ensure_memoria_longa()
     if not aba:
         st.warning("Aba 'memoria_longa_jm' não encontrada — crie com cabeçalhos: texto | embedding | tags | timestamp | score")
@@ -472,7 +357,6 @@ def memoria_longa_salvar(texto: str, tags: str = "") -> bool:
         return False
 
 def memoria_longa_listar_registros():
-    """Retorna todos os registros da aba memoria_longa_jm (cache TTL)."""
     try:
         return _sheet_all_records_cached(TAB_ML)
     except Exception:
@@ -482,21 +366,13 @@ def _tokenize(s: str) -> set:
     return set(re.findall(r"[a-zà-ú0-9]+", (s or "").lower()))
 
 def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78, ate_ts=None):
-    """
-    Top-K memórias (time-aware). Usa embeddings se existir; senão, Jaccard simples.
-    Se 'ate_ts' for informado (formato 'YYYY-MM-DD HH:MM:SS'), ignora registros com
-    timestamp > ate_ts (ou seja, memórias 'do futuro' em relação ao histórico atual).
-    Retorna lista de tuplas (texto, score, sim, rr).
-    """
     try:
-        dados = _sheet_all_records_cached(TAB_ML)  # [{'texto','embedding','tags','timestamp','score'}, ...]
+        dados = _sheet_all_records_cached(TAB_ML)
     except Exception as e:
         st.warning(f"Erro ao carregar memoria_longa_jm: {e}")
         return []
-
     q = gerar_embedding_openai(query_text) if OPENAI_OK else None
     candidatos = []
-
     for row in dados:
         texto = (row.get("texto") or "").strip()
         emb_s = (row.get("embedding") or "").strip()
@@ -507,12 +383,8 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78,
             score = 1.0
         if not texto:
             continue
-
-        # --- Corte temporal: ignora memórias mais novas que o corte (se fornecido)
         if ate_ts and row_ts and row_ts > ate_ts:
-            continue  # strings no formato YYYY-MM-DD HH:MM:SS são comparáveis lexicograficamente
-
-        # Similaridade por embedding (quando disponível), senão fallback lexical
+            continue
         if q is not None and emb_s:
             vec = _deserialize_vec(emb_s)
             if vec.ndim == 1 and vec.size >= 10 and np.linalg.norm(vec) > 0 and np.linalg.norm(q) > 0:
@@ -520,19 +392,15 @@ def memoria_longa_buscar_topk(query_text: str, k: int = 3, limiar: float = 0.78,
             else:
                 sim = 0.0
         else:
-            s1 = _tokenize(texto)
-            s2 = _tokenize(query_text)
+            s1 = _tokenize(texto); s2 = _tokenize(query_text)
             sim = len(s1 & s2) / max(1, len(s1 | s2))
-
         if sim >= limiar:
             rr = 0.7 * sim + 0.3 * score
             candidatos.append((texto, score, sim, rr))
-
     candidatos.sort(key=lambda x: x[3], reverse=True)
     return candidatos[:k]
 
 def memoria_longa_reforcar(textos_usados: list):
-    """Aumenta o score das memórias usadas (pequeno reforço) com backoff + correção de índices."""
     aba = _sheet_ensure_memoria_longa()
     if not aba or not textos_usados:
         return
@@ -540,18 +408,15 @@ def memoria_longa_reforcar(textos_usados: list):
         dados = _sheet_all_values_cached(TAB_ML)
         if not dados or len(dados) < 2:
             return
-        headers = dados[0]  # cabeçalho é a primeira linha
+        headers = dados[0]
         idx_texto = headers.index("texto")
         idx_score = headers.index("score")
         for i, linha in enumerate(dados[1:], start=2):
-            if len(linha) <= max(idx_texto, idx_score):
-                continue
+            if len(linha) <= max(idx_texto, idx_score): continue
             t = (linha[idx_texto] or "").strip()
             if t in textos_usados:
-                try:
-                    sc = float(linha[idx_score] or 1.0)
-                except Exception:
-                    sc = 1.0
+                try: sc = float(linha[idx_score] or 1.0)
+                except Exception: sc = 1.0
                 sc = min(sc + 0.2, 2.0)
                 _retry_429(aba.update_cell, i, idx_score + 1, sc)
         _invalidate_sheet_caches()
@@ -577,7 +442,7 @@ FASES_ROMANCE: Dict[int, Dict[str, str]] = {
         "proibidos": "beijos; carícias intimistas"},
     4: {"nome": "Confiança / Quase",
         "permitidos": "confidências; abraço com consentimento expresso; marcar encontro futuro claro",
-        "proibidos": "sexo; sexo oral/manual; pressa ou “provas de amor” físicas"},
+        "proibidos": "pressa ou “provas de amor” físicas"},
     5: {"nome": "Compromisso / Encontro definitivo",
         "permitidos": "beijo prolongado; dormir juntos; consumação implícita (fade-to-black); manhã seguinte sugerida",
         "proibidos": ""},
@@ -614,35 +479,34 @@ def mj_carregar_fase_inicial() -> int:
     st.session_state.mj_fase = 0
     return 0
 
-# --------- Motor de Momento ----------
 MOMENTOS = {
     0: {"nome": "Aproximação logística",
-        "objetivo": "um acompanha o outro (ex.: até o píer), clima cordial",
+        "objetivo": "um acompanha o outro",
         "permitidos": "gentilezas; proximidade leve; diálogo casual",
         "proibidos": "declaração; revelações íntimas; toques prolongados",
         "gatilhos": [r"\b(p[ií]er|acompanhar|vamos embora|te levo)\b"],
         "proximo": 1},
     1: {"nome": "Declaração",
-        "objetivo": "um deles declara amor/ importância",
+        "objetivo": "um deles declara importância",
         "permitidos": "confissão afetiva; silêncio tenso; abraço curto",
-        "proibidos": "negociação sexual; tirar roupas; exploração do corpo",
+        "proibidos": "negociação sexual; tirar roupas",
         "gatilhos": [r"\b(amo voc[eê]|te amo|n[aã]o paro de pensar)\b"],
         "proximo": 2},
     2: {"nome": "Revelação sensível",
-        "objetivo": "Mary revela que é virgem / vulnerabilidade equivalente",
-        "permitidos": "dizer 'sou virgem'; estipular limites; conforto mútuo",
+        "objetivo": "Mary revela vulnerabilidade / limites",
+        "permitidos": "nomear limites; conforto mútuo",
         "proibidos": "carícias íntimas; tirar roupas",
-        "gatilhos": [r"\b(sou virgem|nunca fiz|meu limite)\b"],
+        "gatilhos": [r"\b(meu limite|prefiro ir devagar)\b"],
         "proximo": 3},
     3: {"nome": "Consentimento explícito",
         "objetivo": "alinhamento de limites e um 'sim' claro",
-        "permitidos": "nomear fronteiras; pedir/receber consentimento; decidir 'agora sim'",
+        "permitidos": "pedir/receber consentimento; decidir 'agora sim'",
         "proibidos": "",
         "gatilhos": [r"\b(consento|quero|vamos juntos|tudo bem pra voc[eê])\b", r"\b(at[eé] onde)\b"],
         "proximo": 4},
     4: {"nome": "Intimidade (elíptica)",
         "objetivo": "intimidade sugerida (fade-to-black) / pós-ato implícito",
-        "permitidos": "beijos longos; proximidade forte; fade-to-black; manhã seguinte implícita",
+        "permitidos": "beijos longos; proximidade forte; fade-to-black",
         "proibidos": "",
         "gatilhos": [r"\b(quarto|cama|luz baixa|porta fechada|manh[aã] seguinte)\b"],
         "proximo": 4},
@@ -693,130 +557,56 @@ def momento_carregar() -> int:
     return 0
 
 def viola_momento(texto: str, momento: int) -> str:
-    # Não bloquear/censurar conteúdo explícito por momento.
     return ""
 
 # =========================
-# PROVEDORES E MODELOS
+# PROVEDORES E MODELOS (enxuto)
 # =========================
 
 MODELOS_OPENROUTER = {
-    "💬 DeepSeek V3 ★★★★ ($)": "deepseek/deepseek-chat-v3-0324",
-    "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
-    "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
-    "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-    "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
-    "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
-    "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
-    "👑 EVA Llama 3.33 70B ★★★★★ (RP Pro)": "eva-unit-01/eva-llama-3.33-70b",
-    "🎭 Nous Hermes 2 Yi 34B ★★★★☆": "nousresearch/nous-hermes-2-yi-34b",
-    "🔥 MythoMax 13B ★★★☆ ($)": "gryphe/mythomax-l2-13b",
-    "💋 LLaMA3 Lumimaid 8B ★★☆ ($)": "neversleep/llama-3-lumimaid-8b",
-    "🌹 Midnight Rose 70B ★★★☆": "sophosympatheia/midnight-rose-70b",
-    "🌶️ Noromaid 20B ★★☆": "neversleep/noromaid-20b",
-    "💀 Mythalion 13B ★★☆": "pygmalionai/mythalion-13b",
-    "🐉 Anubis 70B ★★☆": "thedrummer/anubis-70b-v1.1",
-    "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
-    "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
+    "🧠 GPT-4.1 (OpenRouter)": "openai/gpt-4.1",
+    "💬 DeepSeek V3": "deepseek/deepseek-chat-v3-0324",
 }
-
 MODELOS_TOGETHER_UI = {
-    "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
+    "👑 Mixtral 8x7B (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
 }
 
 def model_id_for_together(api_ui_model_id: str) -> str:
-    key = (api_ui_model_id or "").strip()
-    if "Qwen3-Coder-480B-A35B-Instruct-FP8" in key:
-        return "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
-    low = key.lower()
-    if low.startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
-        return "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    return key or "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    return api_ui_model_id or "mistralai/Mixtral-8x7B-Instruct-v0.1"
 
 def api_config_for_provider(provider: str):
     if provider == "OpenRouter":
-        return (
-            "https://openrouter.ai/api/v1/chat/completions",
-            st.secrets.get("OPENROUTER_API_KEY", ""),
-            MODELOS_OPENROUTER,
-        )
+        return ("https://openrouter.ai/api/v1/chat/completions",
+                st.secrets.get("OPENROUTER_API_KEY", ""),
+                MODELOS_OPENROUTER)
     else:
-        return (
-            "https://api.together.xyz/v1/chat/completions",
-            st.secrets.get("TOGETHER_API_KEY", ""),
-            MODELOS_TOGETHER_UI,
-        )
+        return ("https://api.together.xyz/v1/chat/completions",
+                st.secrets.get("TOGETHER_API_KEY", ""),
+                MODELOS_TOGETHER_UI)
 
 # =========================
 # PROMPT BUILDER
 # =========================
 
 def inserir_regras_mary_e_janio(prompt_base: str) -> str:
-    # padrão elevado para 3 (explícito)
-    calor = int(st.session_state.get("steam_level", st.session_state.get("nsfw_max_level", 3)))
+    calor = int(st.session_state.get("nsfw_max_level", 3))
     regras = f"""
 ⚖️ Regras de coerência:
 - Narre em terceira pessoa; não se dirija ao leitor como "você".
 - Consentimento claro antes de qualquer gesto significativo.
-- Jânio não pressiona; respeita o ritmo de Mary.
+- Jânio respeita o ritmo de Mary.
 - Linguagem sensual proporcional ao nível de calor ({calor}).
 """.strip()
-
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     if fase >= 5:
-        regras += """
-- Intimidade pode ser descrita com detalhes explícitos (sem necessidade de corte)."""
+        regras += "\n- A intimidade pode ser sugerida sem elipses forçadas."
     else:
-        regras += """
-- Sem consumação em cena; foque em progressão coerente."""
-
-    # Novos dials
-    modo_sintonia = bool(st.session_state.get("modo_sintonia", False))
-    ritmo = int(st.session_state.get("ritmo_cena", 1))  # 0..3
-
-    if modo_sintonia:
-        regras += """
-- Sintonia ativa: Mary conduz com escuta; evita atropelos; espelha respiração/pausas do parceiro.
-- Prefira convites e perguntas a comandos; checagens frequentes de conforto.
-- Se surgir ansiedade, desacelerar, respirar junto, retomar contato visual."""
-
-    # Ritmo alvo
-    if ritmo <= 0:
-        regras += """
-- Ritmo: muito lento — pausas longas, silêncio confortável, toques contidos e graduais."""
-    elif ritmo == 1:
-        regras += """
-- Ritmo: lento — saborear o momento; alternar aproximação com pausa; nada de pressa."""
-    elif ritmo == 2:
-        regras += """
-- Ritmo: médio — equilíbrio entre iniciativa e espera, sem urgência."""
-    else:
-        regras += """
-- Ritmo: rápido — quando houver sinal claro de ambos; ainda assim, checar conforto."""
-
+        regras += "\n- Evite consumação explícita; foque em progressão coerente."
     return prompt_base + "\n" + regras
 
-
-
-def gerar_mary_sensorial(
-    level: int = 2,
-    n: int = 2,
-    hair_on: bool = True,
-    sintonia: bool = False,  # << novo parâmetro
-) -> str:
-    """
-    Gera 1–3 frases sensoriais sobre Mary.
-      level: 0=off, 1=leve, 2=marcado, 3=ousado
-      n: quantidade de frases
-      hair_on: garante ao menos 1 frase sobre os cabelos (negros, volumosos, levemente ondulados)
-      sintonia: quando True, prioriza cadência calma e convites suaves (menos agressivo)
-    """
+def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True, sintonia: bool = False) -> str:
     if level <= 0 or n <= 0:
         return ""
-
-    # Base
     base_leve = [
         "Mary caminha com ritmo seguro; há algo hipnótico no balanço dos quadris.",
         "O olhar de Mary prende fácil: direto, firme, cativante.",
@@ -830,109 +620,70 @@ def gerar_mary_sensorial(
         "O olhar de Mary é um convite silencioso — confiante e difícil de sustentar por muito tempo.",
     ]
     base_ousado = [
-        "O balanço dos quadris de Mary é quase cruel: entra na cabeça e não sai.",
-        "Os seios acompanham a passada num movimento suave que acende o ambiente.",
-        "O olhar de Mary encosta na pele de quem cruza com ela: quente, demorado, insinuante.",
+        "O balanço dos quadris de Mary fica na cabeça de quem vê.",
+        "Os seios acompanham a passada num movimento suave.",
+        "O olhar de Mary encosta na pele de quem cruza com ela: quente e demorado.",
         "O perfume fica na memória como um toque atrás da nuca.",
     ]
-
-    # Frases específicas de cabelo (negros, volumosos, levemente ondulados)
     hair_leve = [
         "Os cabelos de Mary — negros, volumosos, levemente ondulados — descansam nos ombros e acompanham o passo.",
         "Os cabelos negros, volumosos e levemente ondulados moldam o rosto quando ela vira de leve.",
     ]
     hair_marcado = [
-        "Cabelos negros, volumosos, levemente ondulados, fazem um arco quando ela vira o rosto, reforçando o balanço do corpo.",
-        "Os cabelos, negros e volumosos, ondulam de leve a cada passada e criam uma moldura hipnótica.",
+        "Cabelos negros, volumosos, levemente ondulados, fazem um arco quando ela vira o rosto.",
+        "Os cabelos, negros e volumosos, ondulam de leve a cada passada e enquadram o olhar.",
     ]
     hair_ousado = [
-        "Os cabelos negros, volumosos e levemente ondulados deslizam pela clavícula como um toque que fica.",
-        "O balanço dos cabelos negros — volumosos, levemente ondulados — marca o compasso do corpo de Mary.",
+        "Os cabelos negros, volumosos e levemente ondulados deslizam pela clavícula.",
+        "O balanço dos cabelos negros — volumosos, levemente ondulados — marca o compasso do corpo.",
     ]
-
-    # Monta o pool conforme o nível
     if level == 1:
-        pool = list(base_leve)
-        hair_pool = list(hair_leve)
+        pool = list(base_leve); hair_pool = list(hair_leve)
     elif level == 2:
-        pool = list(base_leve) + list(base_marcado)
-        hair_pool = list(hair_leve) + list(hair_marcado)
-    else:  # level >= 3
-        pool = list(base_leve) + list(base_marcado) + list(base_ousado)
-        hair_pool = list(hair_leve) + list(hair_marcado) + list(hair_ousado)
+        pool = list(base_leve) + list(base_marcado); hair_pool = list(hair_leve) + list(hair_marcado)
+    else:
+        pool = base_leve + base_marcado + base_ousado; hair_pool = hair_leve + hair_marcado + hair_ousado
 
-    # Ajustes de "sintonia": filtra termos mais agressivos e adiciona frases harmônicas
     if sintonia:
-        # Palavras/trechos que deixam o tom mais agressivo — filtramos
-        filtros = [
-            r"\bcruel\b",
-            r"\binsinuante\b",
-            r"\bacende o ambiente\b",
-        ]
-        def _ok(frase: str) -> bool:
-            return not any(re.search(p, frase, flags=re.IGNORECASE) for p in filtros)
-
+        filtros = [r"\binsinuante\b", r"\bacende o ambiente\b"]
+        def _ok(fr): return not any(re.search(p, fr, re.IGNORECASE) for p in filtros)
         pool = [f for f in pool if _ok(f)]
-        # Camada de harmonia/cadência
-        harmonia_add = [
+        pool += [
             "A respiração de Mary encontra o compasso do parceiro, sem pressa.",
             "Ela desacelera um passo, deixando o momento guiar o ritmo.",
             "Há pausas gentis entre olhares; tudo acontece no tempo certo.",
             "O gesto nasce do encontro, não da urgência; Mary prefere sentir antes de conduzir.",
         ]
-        pool.extend(harmonia_add)
-
-    # Amostra
     n_eff = max(1, min(n, len(pool)))
     frases = random.sample(pool, k=n_eff)
-
-    # Garante 1 frase de cabelo se solicitado
     if hair_on and hair_pool:
         hair_line = random.choice(hair_pool)
         if hair_line not in frases:
             frases.insert(0, hair_line)
             if len(frases) > n_eff:
                 frases = frases[:n_eff]
-
     return " ".join(frases)
 
 def encontrar_memorias_relevantes(pergunta, buckets):
-    """
-    Busca memórias relevantes conforme palavra-chave na pergunta do usuário.
-    """
-    # Palavras comuns que indicam pergunta factual
-    keywords = [
-        "nome", "integrante", "banda", "integrantes", "profissão", "rotina", "cargo", "ocupação",
-        "onde", "quem", "quando", "idade", "universidade", "curso", "história", "grupo"
-    ]
+    keywords = ["nome","integrante","banda","integrantes","profissão","rotina","cargo","ocupação",
+                "onde","quem","quando","idade","universidade","curso","história","grupo"]
     relevantes = []
     pergunta_lc = (pergunta or "").lower()
-
-    # Busca por tags de persona (ex: janio, mary) e keywords
     for tag, items in buckets.items():
         tag_limp = tag.strip("[]")
-        # Se o nome/tag aparece na pergunta ou há palavras-chave, considera relevante
         if any(k in pergunta_lc for k in keywords) or tag_limp in pergunta_lc:
             relevantes.extend(items)
     return relevantes
 
 def _last_user_text(hist):
-    """Pega o último texto do usuário no histórico normalizado."""
-    if not hist:
-        return ""
+    if not hist: return ""
     for r in reversed(hist):
         if str(r.get("role","")).lower() == "user":
             return r.get("content","")
     return ""
 
 def _deduzir_ancora(texto: str) -> dict:
-    """
-    Deduza local/hora a partir da última fala do usuário.
-    Retorna {'local': str, 'hora': str} ou {} se não detectar.
-    """
     t = (texto or "").lower()
-
-    # Palavras-chave simples -> você pode expandir conforme seus roteiros
     if "motel" in t or "suíte" in t or "suite" in t:
         return {"local": "Motel — Suíte Master", "hora": "noite"}
     if "quarto" in t:
@@ -945,15 +696,10 @@ def _deduzir_ancora(texto: str) -> dict:
         return {"local": "Biblioteca", "hora": "tarde"}
     if "ufes" in t:
         return {"local": "UFES — campus", "hora": "manhã"}
-
-    # Se mencionar “cama”, “espelho no teto”, “piscina aquecida”, assume motel
     gatilhos_motel = ["cama redonda", "espelho no teto", "piscina aquecida"]
     if any(g in t for g in gatilhos_motel):
         return {"local": "Motel — Suíte Master", "hora": "noite"}
-
     return {}
-
-
 
 def construir_prompt_com_narrador() -> str:
     memos = carregar_memorias_brutas()
@@ -969,20 +715,19 @@ def construir_prompt_com_narrador() -> str:
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
-    mary_sens_txt = gerar_mary_sensorial(_sens_level, n=_sens_n) if _sens_on else ""
+    mary_sens_txt = gerar_mary_sensorial(
+        _sens_level, n=_sens_n, sintonia=bool(st.session_state.get("modo_sintonia", True))
+    ) if _sens_on else ""
 
-    # Sintonia & Ritmo (para suavizar a condução)
+    # Sintonia & Ritmo
     modo_sintonia = bool(st.session_state.get("modo_sintonia", True))
-    ritmo_cena = int(st.session_state.get("ritmo_cena", 1))  # 0=mt lento, 1=lento, 2=médio, 3=rápido
+    ritmo_cena = int(st.session_state.get("ritmo_cena", 1))
     ritmo_label = ["muito lento", "lento", "médio", "rápido"][max(0, min(3, ritmo_cena))]
 
-    # Histórico (últimas N)
+    # Histórico
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r.get('role','user')}: {r.get('content','')}" for r in hist) if hist else "(sem histórico)"
-    pergunta_user = hist[-1].get("content","") if hist and str(hist[-1].get("role","")).lower()=="user" else ""
-
-    # Âncora de cenário (OBRIGATÓRIA) baseada na última fala do usuário
     ultima_fala_user = _last_user_text(hist)
     ancora = _deduzir_ancora(ultima_fala_user)
     ancora_bloco = ""
@@ -994,14 +739,13 @@ def construir_prompt_com_narrador() -> str:
             "- Regra: mantenha a cena **neste local**; **não** troque para UFES, bar, biblioteca etc.\n"
             "- Primeira frase deve ancorar **lugar e hora** neste formato: `Local — Hora — ...`.\n"
         )
-
-    # Corte temporal: use apenas memórias <= timestamp da última interação
+    # Corte temporal
     if hist:
         ate_ts = _parse_ts(hist[-1].get("timestamp", ""))
     else:
         ate_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Memória longa Top-K (se habilitada)
+    # Memória longa Top-K (opcional)
     ml_topk_txt = "(nenhuma)"
     st.session_state["_ml_topk_texts"] = []
     if st.session_state.get("use_memoria_longa", True) and hist:
@@ -1028,32 +772,33 @@ def construir_prompt_com_narrador() -> str:
     ]
     st.session_state["_ml_recorrentes"] = recorrentes
 
-    # Dossiê temporal (somente memórias até ate_ts)
+    # Dossiê temporal
     dossie = []
     mary = persona_block_temporal("mary", memos, ate_ts, 8)
     janio = persona_block_temporal("janio", memos, ate_ts, 8)
-    if mary:
-        dossie.append(mary)
-    if janio:
-        dossie.append(janio)
+    if mary: dossie.append(mary)
+    if janio: dossie.append(janio)
     dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
 
     flag_parallel = bool(st.session_state.get("no_coincidencias", True))
 
-    # Bloco de Sintonia & Ritmo (sobrepõe agressividade)
+    # Falas da Mary (planilha)
+    falas_mary_bloco = ""
+    if st.session_state.get("usar_falas_mary", False):
+        falas_mary = carregar_falas_mary()
+        if falas_mary:
+            falas_mary_bloco = "### Falas de Mary (usar literalmente)\n" + "\n".join(f"- {s}" for s in falas_mary)
+
+    # Sintonia & Ritmo
     sintonia_bloco = ""
     if modo_sintonia:
         sintonia_bloco = (
             "### Sintonia & Ritmo (prioritário)\n"
             f"- Ritmo da cena: **{ritmo_label}**.\n"
-            "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens/imperativos. Prefira convites, sussurros, pedidos gentis.\n"
-            "- Sinais verbais e não verbais de respeito ao tempo do outro; pausas, respiração, olhar.\n"
-            "- Se houver desejo, **mostre** pelo corpo e pela troca, não por imposição.\n"
+            "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas. Prefira convites, sussurros, pedidos gentis.\n"
+            "- Respeite pausas, respiração, olhar; o desejo é mostrado pela troca, não por imposição.\n"
         )
 
-    falas_exemplos = _bloco_falas_explicitas()
-
-    # Montagem do prompt
     prompt = f"""
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
 
@@ -1074,18 +819,14 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
 ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
-- Todas as cenas devem ser sensoriais e físicas (toques, temperatura, respiração). Evite vulgaridade.
-- Falas: naturais e críveis; evite imperativos agressivos quando **modo_sintonia** estiver ativo.
-
-### Falas de Mary — exemplos (suaves; substitua depois)
-{falas_exemplos}
-- Use-os como referência de tom; adapte ao contexto da cena.
-
+- As falas de Mary devem soar naturais, diretas e sensoriais; evite grosserias. Ajuste o tom ao **modo de sintonia** e ao **ritmo**.
 
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Comece com 1–2 frases sobre caminhar/olhar/perfume/cabelos (negros, volumosos, levemente ondulados)."}
 - Aplique essa camada ANTES do primeiro diálogo.
-- Frases curtas, diretas, físicas; evite metáforas rebuscadas.
+- Frases curtas, físicas; evite metáforas rebuscadas.
+
+{falas_mary_bloco}
 
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
@@ -1101,12 +842,12 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 - Nesta cena, **permita**: {mdata['permitidos']}
 - Evite/adiar: {mdata['proibidos']}
 - **Micropassos:** avance no máximo **{int(st.session_state.get("max_avancos_por_cena",1))}** subpasso(s) rumo a: {proximo_nome}.
-- Se o roteirista pedir salto maior, **negocie**: peça consentimento e **prepare** a transição (sem teletransporte).
+- Se o roteirista pedir salto maior, **negocie** consentimento e **prepare** a transição.
 
 ### Geografia & Montagem
-- **Não force coincidências**: sem ponte explícita, mantenha locais distintos e use **montagem paralela** (A/B) conforme {flag_parallel}.
-- **Comece cada bloco** com uma frase que **ancore lugar e hora** (ex.: “Local — Hora — …”). Não use títulos; escreva isso na **primeira frase** do parágrafo.
-- Se houver ponte diegética, convergir para co-presença no final é permitido (sem teletransporte).
+- **Não force coincidências**: sem ponte explícita, mantenha locais distintos e use **montagem paralela** (A/B) = {flag_parallel}.
+- **Comece cada bloco** com uma frase que **ancore lugar e hora** (ex.: “Local — Hora — …”). Escreva isso na primeira frase do parágrafo.
+- Havendo ponte diegética plausível, convergir ao final é permitido (sem teletransporte).
 
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação física/visual (mínimo 4 falas).
@@ -1116,12 +857,11 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 
 ### Regra de saída
 - Narre em **terceira pessoa**; nunca fale com "você".
-- Produza uma cena fechada e natural, sem comentários externos ou instruções.
+- Produza uma cena fechada e natural.
 """.strip()
 
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
-
 
 # =========================
 # FILTROS DE SAÍDA
@@ -1130,7 +870,6 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 def render_tail(t: str) -> str:
     if not t:
         return ""
-    # remove rótulos meta e blocos <think>
     t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$', '', t, flags=re.IGNORECASE | re.MULTILINE)
     t = re.sub(r'&lt;\s*think\s*&gt;.*?&lt;\s*/\s*think\s*&gt;', '', t, flags=re.IGNORECASE | re.DOTALL)
     t = re.sub(r'\n{3,}', '\n\n', t).strip()
@@ -1144,7 +883,7 @@ EXPL_PAT = re.compile(
 
 def classify_nsfw_level(t: str) -> int:
     if EXPL_PAT.search(t or ""):
-        return 3  # explícito
+        return 3
     if re.search(r"\b(cintura|pesco[cç]o|costas|beijo prolongado|respira[cç][aã]o curta)\b", (t or ""), re.IGNORECASE):
         return 2
     if re.search(r"\b(olhar|aproximar|toque|m[aã]os dadas|beijo)\b", (t or ""), re.IGNORECASE):
@@ -1152,11 +891,9 @@ def classify_nsfw_level(t: str) -> int:
     return 0
 
 def sanitize_explicit(t: str, max_level: int, action: str) -> str:
-    # Liberação: se o conteúdo for de nível <= max_level, retorna tal como está.
     lvl = classify_nsfw_level(t)
     if lvl <= max_level:
         return t
-    # Se extrapolar o máximo definido, não cortar por padrão (liberar NSFW).
     return t
 
 def redact_for_logs(t: str) -> str:
@@ -1187,7 +924,7 @@ st.title("🎬 Narrador JM")
 st.subheader("Você é o roteirista. Digite uma direção de cena. A IA narrará Mary e Jânio.")
 st.markdown("---")
 
-# Inicialização dos estados de sessão (inclusive dos templates)
+# Estados básicos
 if "resumo_capitulo" not in st.session_state:
     st.session_state.resumo_capitulo = carregar_resumo_salvo()
 if "session_msgs" not in st.session_state:
@@ -1208,8 +945,6 @@ if "momento" not in st.session_state:
     st.session_state.momento = momento_carregar()
 if "max_avancos_por_cena" not in st.session_state:
     st.session_state.max_avancos_por_cena = 1
-#if "nsfw_max_level" not in st.session_state:
- #   st.session_state.nsfw_max_level = 3
 if "estilo_escrita" not in st.session_state:
     st.session_state.estilo_escrita = "AÇÃO"
 if "templates_jm" not in st.session_state:
@@ -1230,13 +965,13 @@ with col2:
         f'- Emoção oculta: {st.session_state.get("app_emocao_oculta", "").capitalize()}'
     )
 
-
 # =========================
 # SIDEBAR — Reorganizado
 # =========================
 
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
+
     # Provedor/modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
@@ -1254,9 +989,9 @@ with st.sidebar:
         index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
         key="estilo_escrita",
     )
-    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=3, key="nsfw_max_level")
+    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 3)), key="nsfw_max_level")
 
-    # >>> estas duas linhas precisam estar DENTRO do with st.sidebar: (indentadas)
+    # Sintonia & Ritmo (DENTRO do sidebar)
     st.checkbox(
         "Sintonia com o parceiro (modo harmônico)",
         key="modo_sintonia",
@@ -1270,6 +1005,13 @@ with st.sidebar:
         key="ritmo_cena",
     )
 
+    # Falas de Mary — planilha
+    st.checkbox(
+        "Usar falas da Mary da planilha (usar literalmente)",
+        value=st.session_state.get("usar_falas_mary", False),
+        key="usar_falas_mary",
+    )
+
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio")
     fase_default = mj_carregar_fase_inicial()
@@ -1279,7 +1021,6 @@ with st.sidebar:
     fase_escolhida = st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
     if fase_escolhida != st.session_state.get("mj_fase", fase_default):
         mj_set_fase(fase_escolhida, persist=True)
-
     options_momento = sorted(MOMENTOS.keys())
     mom_default = momento_carregar()
     mom_ui_val = int(st.session_state.get("momento", mom_default))
@@ -1287,9 +1028,7 @@ with st.sidebar:
     mom_ui = st.select_slider("Momento atual", options=options_momento, value=mom_ui_val, format_func=_momento_label, key="ui_momento")
     if mom_ui != st.session_state.get("momento", mom_default):
         momento_set(mom_ui, persist=False)
-
     st.slider("Micropassos por cena", 1, 3, value=int(st.session_state.get("max_avancos_por_cena", 1)), key="max_avancos_por_cena")
-
     col_a, col_b = st.columns(2)
     with col_a:
         if st.button("➕ Avançar 1 passo"):
@@ -1298,20 +1037,16 @@ with st.sidebar:
         if st.button("↺ Reiniciar (0)"):
             mj_set_fase(0, persist=True)
 
-    # <<< este markdown precisa estar no mesmo nível de colunas (fora do with col_b:)
     st.markdown("---")
     st.markdown("### 🎬 Roteiros Sequenciais (Templates)")
     nomes_templates = list(st.session_state.templates_jm.keys())
-
     if st.button("🔄 Recarregar templates"):
         st.session_state.templates_jm = carregar_templates_planilha()
         st.success("Templates atualizados da planilha!")
-
     if nomes_templates:
         roteiro_escolhido = st.selectbox("Escolha o roteiro:", nomes_templates, key="sb_rota_sel")
         etapas = st.session_state.templates_jm.get(roteiro_escolhido, [])
 
-        # Inicia o roteiro e já dispara a 1ª etapa (se existir)
         if st.button("Iniciar roteiro", key="btn_iniciar_roteiro"):
             st.session_state.template_ativo = roteiro_escolhido
             st.session_state.etapa_template = 0
@@ -1319,10 +1054,9 @@ with st.sidebar:
                 comando = etapas[0]
                 salvar_interacao("user", comando)
                 st.session_state.session_msgs.append({"role": "user", "content": comando})
-                st.session_state["_trigger_input"] = comando  # dispara geração
-                st.session_state.etapa_template = 1          # evita repetir a etapa 0
+                st.session_state["_trigger_input"] = comando
+                st.session_state.etapa_template = 1
 
-        # Progresso / próxima etapa
         if st.session_state.get("template_ativo"):
             etapas_ativas = st.session_state.templates_jm.get(st.session_state.template_ativo, [])
             etap = int(st.session_state.get("etapa_template", 0))
@@ -1333,7 +1067,7 @@ with st.sidebar:
                     salvar_interacao("user", comando)
                     st.session_state.session_msgs.append({"role": "user", "content": comando})
                     st.session_state.etapa_template = etap + 1
-                    st.session_state["_trigger_input"] = comando  # dispara geração
+                    st.session_state["_trigger_input"] = comando
             else:
                 st.success("Roteiro concluído!")
                 st.session_state.template_ativo = None
@@ -1376,7 +1110,7 @@ with st.sidebar:
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             inter = carregar_interacoes(n=6)
-            texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
+            texto = "\n".join(f"{r.get('role','user')}: {r.get('content','')}" for r in inter) if inter else ""
             prompt_resumo = (
                 "Resuma o seguinte trecho como um capítulo de novela brasileiro, mantendo tom e emoções.\n\n"
                 + texto + "\n\nResumo:"
@@ -1418,18 +1152,14 @@ with st.sidebar:
                 texto = entrada.get("conteudo", "").strip()
                 if texto:
                     ok = memoria_longa_salvar(texto, tags=k)
-                    if ok:
-                        count += 1
+                    if ok: count += 1
         st.success(f"{count} memórias biográficas reforçadas na memória longa!")
 
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
 
-
-
-   
 # =========================
-# EXIBIR HISTÓRICO (depois resumo)
+# EXIBIR HISTÓRICO
 # =========================
 
 with st.container():
@@ -1448,45 +1178,34 @@ with st.container():
             st.markdown(st.session_state.resumo_capitulo)
 
 # =========================
-# ENVIO DO USUÁRIO + STREAMING (OpenRouter/Together) + FALLBACKS
+# ENVIO DO USUÁRIO + STREAMING
 # =========================
 
 entrada = st.chat_input("Digite sua direção de cena...")
-# Permite que botões do roteiro disparem a geração
-if not entrada:
-    entrada = st.session_state.pop("_trigger_input", None)
-
 
 if entrada:
-    # 0) Atualiza Momento sugerido (opcional e seguro)
     try:
         mom_atual = int(st.session_state.get("momento", momento_carregar()))
-        mom_sug = detectar_momento_sugerido(entrada, fallback=mom_atual)
-        mom_novo = clamp_momento(mom_atual, mom_sug, int(st.session_state.get("max_avancos_por_cena", 1)))
+        mom_sug   = detectar_momento_sugerido(entrada, fallback=mom_atual)
+        mom_novo  = clamp_momento(mom_atual, mom_sug, int(st.session_state.get("max_avancos_por_cena", 1)))
         if st.session_state.get("app_bloqueio_intimo", False):
             mom_novo = clamp_momento(mom_atual, mom_sug, 1)
         momento_set(mom_novo, persist=False)
     except Exception:
         pass
 
-    # 1) Salva a entrada e mantém histórico de sessão
     salvar_interacao("user", str(entrada))
     st.session_state.session_msgs.append({"role": "user", "content": str(entrada)})
 
-    # 2) Constrói prompt principal
     prompt = construir_prompt_com_narrador()
 
-    # 3) Histórico curto (somente sessão atual; o prompt já inclui últimas do sheet)
     historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
                  for m in st.session_state.session_msgs]
 
-    # 4) Provedor + modelo
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
         auth = st.secrets.get("TOGETHER_API_KEY", "")
-        # Garanta que o ID tenha o A35B:
-        # ex.: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
         model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
     else:
         endpoint = "https://openrouter.ai/api/v1/chat/completions"
@@ -1497,14 +1216,7 @@ if entrada:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
 
-    # 5) Mensagens
-    system_pt = {
-        "role": "system",
-        "content": (
-            "Responda em português do Brasil. Evite conteúdo meta. "
-            "Mostre apenas a narrativa final ao leitor."
-        ),
-    }
+    system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
     messages = [system_pt, {"role": "system", "content": prompt}] + historico
 
     payload = {
@@ -1516,22 +1228,16 @@ if entrada:
     }
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
-    # 6) Render / Filtro de saída
     def _render_visible(t: str) -> str:
         out = render_tail(t)
-        out = sanitize_explicit(
-            out,
-            max_level=int(st.session_state.get("nsfw_max_level", 3)),
-            action="livre"
-        )
+        out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level", 3)), action="livre")
         return out
 
     with st.chat_message("assistant"):
         placeholder = st.empty()
-        resposta_txt = ""   # texto bruto vindo do stream
+        resposta_txt = ""
         last_update = time.time()
 
-        # 7) Reforço antecipado: memórias que ENTRARAM no prompt (topk + recorrentes)
         try:
             usados_prompt = []
             usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
@@ -1542,28 +1248,20 @@ if entrada:
         except Exception:
             pass
 
-        # 8) STREAM
         try:
-            with requests.post(
-                endpoint, headers=headers, json=payload, stream=True,
-                timeout=int(st.session_state.get("timeout_s", 300))
-            ) as r:
+            with requests.post(endpoint, headers=headers, json=payload, stream=True,
+                               timeout=int(st.session_state.get("timeout_s", 300))) as r:
                 if r.status_code == 200:
                     for raw in r.iter_lines(decode_unicode=False):
-                        if not raw:
-                            continue
+                        if not raw: continue
                         line = raw.decode("utf-8", errors="ignore").strip()
-                        if not line.startswith("data:"):
-                            continue
+                        if not line.startswith("data:"): continue
                         data = line[5:].strip()
-                        if data == "[DONE]":
-                            break
+                        if data == "[DONE]": break
                         try:
                             j = json.loads(data)
-                            # CORRETO: choices[0]["delta"]["content"]
                             delta = j["choices"][0]["delta"].get("content", "")
-                            if not delta:
-                                continue
+                            if not delta: continue
                             resposta_txt += delta
                             if time.time() - last_update > 0.10:
                                 placeholder.markdown(_render_visible(resposta_txt) + "▌")
@@ -1575,20 +1273,14 @@ if entrada:
         except Exception as e:
             st.error(f"Erro no streaming: {e}")
 
-        # 9) FALLBACKS se veio vazio
         visible_txt = _render_visible(resposta_txt).strip()
-
         if not visible_txt:
-            # 9a) retry sem stream
             try:
-                r2 = requests.post(
-                    endpoint, headers=headers,
-                    json={**payload, "stream": False},
-                    timeout=int(st.session_state.get("timeout_s", 300))
-                )
+                r2 = requests.post(endpoint, headers=headers,
+                                   json={**payload, "stream": False},
+                                   timeout=int(st.session_state.get("timeout_s", 300)))
                 if r2.status_code == 200:
                     try:
-                        # CORRETO: choices[0]["message"]["content"]
                         resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
                     except Exception:
                         resposta_txt = ""
@@ -1599,7 +1291,6 @@ if entrada:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
         if not visible_txt:
-            # 9b) retry sem o system extra (alguns modelos travam com system duplo)
             try:
                 r3 = requests.post(
                     endpoint, headers=headers,
@@ -1623,10 +1314,8 @@ if entrada:
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # 10) Exibição final
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
-        # 11) Aviso de momento (não bloqueia)
         try:
             viol = viola_momento(visible_txt, int(st.session_state.get("momento", 0)))
             if viol and st.session_state.get("app_bloqueio_intimo", False):
@@ -1634,18 +1323,15 @@ if entrada:
         except Exception:
             pass
 
-        # 12) Validação semântica (entrada do user vs resposta) usando texto visível
         if len(st.session_state.session_msgs) >= 1 and visible_txt and visible_txt != "[Sem conteúdo]":
             texto_anterior = st.session_state.session_msgs[-1]["content"]
             alerta = verificar_quebra_semantica_openai(texto_anterior, visible_txt)
             if alerta:
                 st.info(alerta)
 
-        # 13) Salvar resposta SEMPRE (usa o texto visível)
         salvar_interacao("assistant", visible_txt if visible_txt else "[Sem conteúdo]")
         st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt if visible_txt else "[Sem conteúdo]"})
 
-        # 14) Reforço de memórias usadas (pós-resposta)
         try:
             usados = []
             topk_usadas = memoria_longa_buscar_topk(
@@ -1658,54 +1344,3 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
-
-#
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
