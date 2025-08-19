@@ -63,6 +63,15 @@ except Exception:
     OPENAI_CLIENT = None
     OPENAI_OK = False
 
+# === FALAS SOBRE VIRGINDADE DA MARY (brandas; você pode trocar depois) ===
+FALAS_VIRGINDADE_MARY = [
+    "Eu preciso te dizer… eu ainda sou virgem.",
+    "Quero ir devagar, no meu tempo — fica comigo.",
+    "Hoje eu quero carinho e beijo, sem passar do meu limite.",
+    "Se for com você, quero que seja especial; me escuta, tá?",
+]
+
+
 # =========================
 # CONFIG BÁSICA DO APP
 # =========================
@@ -224,6 +233,38 @@ def persona_block_temporal(nome: str, buckets: dict, ate_ts: str, max_linhas: in
         return ""
     titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
     return f"{titulo}:\n- " + "\n- ".join(ult)
+
+def detectar_virgindade_mary(memos: dict, ate_ts: str = "") -> bool:
+    """
+    True se há, em [mary], alguma memória com 'virgem' ou 'virgindade'
+    (respeitando corte temporal, se ate_ts vier).
+    """
+    for d in memos.get("[mary]", []) or []:
+        c = (d.get("conteudo") or "").lower()
+        ts = (d.get("timestamp") or "")
+        if ate_ts and ts and ts > ate_ts:
+            continue
+        if ("virgem" in c) or ("virgindade" in c):
+            return True
+    return False
+
+
+def montar_bloco_virgindade(ativar: bool) -> str:
+    """
+    Se ativar=True, devolve bloco de regras + 2–3 falas brandas (você pode editar depois).
+    """
+    if not ativar:
+        return ""
+    exemplos = "\n".join(f"- {s}" for s in FALAS_VIRGINDADE_MARY[:3])
+    return (
+        "### Virgindade & Limites (prioritário)\n"
+        "- Mary é virgem e valoriza isso. Se a cena se aproximar de sexo explícito, "
+        "**ela verbaliza seus limites antes** de qualquer avanço.\n"
+        "- Mostre desejo com respeito ao ritmo: consentimento claro, trocas gentis, pausas.\n"
+        "- Inclua **uma fala curta** de Mary sobre isso quando apropriado (exemplos abaixo):\n"
+        f"{exemplos}\n"
+    )
+
 
 def carregar_resumo_salvo() -> str:
     try:
@@ -762,7 +803,13 @@ def construir_prompt_com_narrador() -> str:
         ate_ts = _parse_ts(hist[-1].get("timestamp", ""))
     else:
         ate_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+   
+    # >>> Virgindade (auto, a partir de memoria_jm e corte temporal)
+    virg_bloco = montar_bloco_virgindade(
+        ativar=detectar_virgindade_mary(memos, ate_ts)
+    )
 
+    
     # Memória longa Top-K (opcional)
     ml_topk_txt = "(nenhuma)"
     st.session_state["_ml_topk_texts"] = []
@@ -817,10 +864,10 @@ def construir_prompt_com_narrador() -> str:
             "- Respeite pausas, respiração, olhar; o desejo é mostrado pela troca, não por imposição.\n"
         )
 
-    prompt = f"""
+   prompt = f"""
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
 
-{ancora_bloco}{sintonia_bloco}### Dossiê (personas)
+{ancora_bloco}{sintonia_bloco}{virg_bloco}### Dossiê (personas)
 {dossie_txt}
 
 ### Diretrizes gerais (ALL)
@@ -1362,4 +1409,5 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
