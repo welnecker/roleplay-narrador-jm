@@ -159,6 +159,7 @@ def _init_templates_once():
 _init_templates_once()
 
 # =====
+# =====
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =====
 
@@ -292,16 +293,43 @@ def salvar_resumo(resumo: str):
         st.error(f"Erro ao salvar resumo: {e}")
 
 
+# === PASSO 1 (NORMALIZADOR DE LINHAS DE HISTÓRICO) ===
+def _normalize_msg_row(r: Any) -> dict:
+    """Normaliza uma linha de interação para {'timestamp','role','content'}."""
+    if isinstance(r, dict):
+        d = { (k or "").strip().lower(): v for k, v in r.items() }
+        return {
+            "timestamp": str(d.get("timestamp", "") or "").strip(),
+            "role":      str(d.get("role", "user") or "user").strip(),
+            "content":   str(d.get("content", "") or "").strip(),
+        }
+    if isinstance(r, (list, tuple)) and len(r) >= 3:
+        return {
+            "timestamp": str(r[0] or "").strip(),
+            "role":      str(r[1] or "user").strip(),
+            "content":   str(r[2] or "").strip(),
+        }
+    # fallback
+    return {"timestamp": "", "role": "user", "content": str(r or "").strip()}
+
+
 def carregar_interacoes(n: int = 20):
     """
     Carrega últimas n interações (role, content) usando cache de sessão
-    para evitar leituras repetidas.
+    para evitar leituras repetidas. (aplica normalização básica)
     """
     cache = st.session_state.get("_cache_interacoes", None)
     if cache is None:
         regs = _sheet_all_records_cached(TAB_INTERACOES)
+        # aplica normalização nas linhas vindas do Sheets
+        regs = [_normalize_msg_row(x) for x in regs]
         st.session_state["_cache_interacoes"] = regs
         cache = regs
+    else:
+        # garante que o cache esteja normalizado mesmo se herdou algo antigo
+        cache = [_normalize_msg_row(x) for x in cache]
+        st.session_state["_cache_interacoes"] = cache
+
     return cache[-n:] if len(cache) > n else cache
 
 
@@ -325,14 +353,13 @@ def salvar_interacao(role: str, content: str):
         # atualiza cache local
         lst = st.session_state.get("_cache_interacoes")
         if isinstance(lst, list):
-            lst.append({"timestamp": timestamp, "role": row_role, "content": row_content})
+            # normaliza também o item adicionado agora
+            lst.append(_normalize_msg_row({"timestamp": timestamp, "role": row_role, "content": row_content}))
         else:
             # (fix) cria corretamente a primeira entrada do cache
-            st.session_state["_cache_interacoes"] = [{
-                "timestamp": timestamp,
-                "role": row_role,
-                "content": row_content,
-            }]
+            st.session_state["_cache_interacoes"] = [
+                _normalize_msg_row({"timestamp": timestamp, "role": row_role, "content": row_content})
+            ]
 
         _invalidate_sheet_caches()
     except Exception as e:
@@ -894,8 +921,8 @@ def construir_prompt_com_narrador() -> str:
     # Histórico
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
-    hist_txt = "\n".join(f"{r['role']}: {r['content']}" for r in hist) if hist else "(sem histórico)"
-    pergunta_user = hist[-1]["content"] if hist and hist[-1].get("role") == "user" else ""
+    hist_txt = "\n".join(f"{r.get('role','user')}: {r.get('content','')}" for r in hist) if hist else "(sem histórico)"
+    pergunta_user = hist[-1].get("content","") if hist and str(hist[-1].get("role","")).lower() == "user" else ""
     # Liga sintonia quando a última entrada pede calma/devagar (sem sobrescrever escolha manual da sidebar)
     try:
         slow_re = r"\b(devagar|sem\s+pressa|com\s+calma|calma|apreciar|desfrutar)\b"
@@ -1580,6 +1607,7 @@ if entrada:
             pass
 
 #
+
 
 
 
