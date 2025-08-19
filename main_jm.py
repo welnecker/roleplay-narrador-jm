@@ -774,9 +774,14 @@ def construir_prompt_com_narrador() -> str:
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
-    mary_sens_txt = gerar_mary_sensorial(
-        _sens_level, n=_sens_n, sintonia=bool(st.session_state.get("modo_sintonia", True))
-    ) if _sens_on else ""
+    mary_sens_txt = (
+        gerar_mary_sensorial(
+            _sens_level,
+            n=_sens_n,
+            sintonia=bool(st.session_state.get("modo_sintonia", True))
+        )
+        if _sens_on else ""
+    )
 
     # Sintonia & Ritmo
     modo_sintonia = bool(st.session_state.get("modo_sintonia", True))
@@ -798,18 +803,18 @@ def construir_prompt_com_narrador() -> str:
             "- Regra: mantenha a cena **neste local**; **não** troque para UFES, bar, biblioteca etc.\n"
             "- Primeira frase deve ancorar **lugar e hora** neste formato: `Local — Hora — ...`.\n"
         )
+
     # Corte temporal
     if hist:
         ate_ts = _parse_ts(hist[-1].get("timestamp", ""))
     else:
         ate_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-   
-    # >>> Virgindade (auto, a partir de memoria_jm e corte temporal)
+
+    # Virgindade (auto a partir de memoria_jm + corte temporal)
     virg_bloco = montar_bloco_virgindade(
         ativar=detectar_virgindade_mary(memos, ate_ts)
     )
 
-    
     # Memória longa Top-K (opcional)
     ml_topk_txt = "(nenhuma)"
     st.session_state["_ml_topk_texts"] = []
@@ -824,6 +829,8 @@ def construir_prompt_com_narrador() -> str:
             if topk:
                 ml_topk_txt = "\n".join([f"- {t}" for (t, _sc, _sim, _rr) in topk])
                 st.session_state["_ml_topk_texts"] = [t for (t, *_rest) in topk]
+            else:
+                st.session_state["_ml_topk_texts"] = []
         except Exception:
             st.session_state["_ml_topk_texts"] = []
     else:
@@ -841,20 +848,22 @@ def construir_prompt_com_narrador() -> str:
     dossie = []
     mary = persona_block_temporal("mary", memos, ate_ts, 8)
     janio = persona_block_temporal("janio", memos, ate_ts, 8)
-    if mary: dossie.append(mary)
-    if janio: dossie.append(janio)
+    if mary:
+        dossie.append(mary)
+    if janio:
+        dossie.append(janio)
     dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
 
     flag_parallel = bool(st.session_state.get("no_coincidencias", True))
 
-    # Falas da Mary (planilha)
+    # Falas da Mary (planilha -> opcional)
     falas_mary_bloco = ""
     if st.session_state.get("usar_falas_mary", False):
         falas_mary = carregar_falas_mary()
         if falas_mary:
             falas_mary_bloco = "### Falas de Mary (usar literalmente)\n" + "\n".join(f"- {s}" for s in falas_mary)
 
-    # Sintonia & Ritmo
+    # Sintonia & Ritmo (texto de instrução)
     sintonia_bloco = ""
     if modo_sintonia:
         sintonia_bloco = (
@@ -864,11 +873,12 @@ def construir_prompt_com_narrador() -> str:
             "- Respeite pausas, respiração, olhar; o desejo é mostrado pela troca, não por imposição.\n"
         )
 
-       prompt = f"""
-    Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
-    
-    {ancora_bloco}{sintonia_bloco}{virg_bloco}### Dossiê (personas)
-    {dossie_txt}
+    # ===== Montagem do prompt (fora de qualquer if!) =====
+    prompt = f"""
+Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
+
+{ancora_bloco}{sintonia_bloco}{virg_bloco}### Dossiê (personas)
+{dossie_txt}
 
 ### Diretrizes gerais (ALL)
 {chr(10).join(f"- {c}" for c in recorrentes) if recorrentes else "(vazio)"}
@@ -884,12 +894,13 @@ def construir_prompt_com_narrador() -> str:
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
 ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
-- As falas de Mary devem soar naturais, diretas e sensoriais; evite grosserias. Ajuste o tom ao **modo de sintonia** e ao **ritmo**.
+- Todas as cenas devem ser sensoriais e físicas (toques, temperatura, respiração). Evite vulgaridade.
+- Falas: naturais e críveis; evite imperativos agressivos quando **modo_sintonia** estiver ativo.
 
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Comece com 1–2 frases sobre caminhar/olhar/perfume/cabelos (negros, volumosos, levemente ondulados)."}
 - Aplique essa camada ANTES do primeiro diálogo.
-- Frases curtas, físicas; evite metáforas rebuscadas.
+- Frases curtas, diretas, físicas; evite metáforas rebuscadas.
 
 {falas_mary_bloco}
 
@@ -907,12 +918,12 @@ def construir_prompt_com_narrador() -> str:
 - Nesta cena, **permita**: {mdata['permitidos']}
 - Evite/adiar: {mdata['proibidos']}
 - **Micropassos:** avance no máximo **{int(st.session_state.get("max_avancos_por_cena",1))}** subpasso(s) rumo a: {proximo_nome}.
-- Se o roteirista pedir salto maior, **negocie** consentimento e **prepare** a transição.
+- Se o roteirista pedir salto maior, **negocie**: peça consentimento e **prepare** a transição (sem teletransporte).
 
 ### Geografia & Montagem
-- **Não force coincidências**: sem ponte explícita, mantenha locais distintos e use **montagem paralela** (A/B) = {flag_parallel}.
-- **Comece cada bloco** com uma frase que **ancore lugar e hora** (ex.: “Local — Hora — …”). Escreva isso na primeira frase do parágrafo.
-- Havendo ponte diegética plausível, convergir ao final é permitido (sem teletransporte).
+- **Não force coincidências**: sem ponte explícita, mantenha locais distintos e use **montagem paralela** (A/B) conforme {flag_parallel}.
+- **Comece cada bloco** com uma frase que **ancore lugar e hora** (ex.: “Local — Hora — …”). Não use títulos; escreva isso na **primeira frase** do parágrafo.
+- Se houver ponte diegética, convergir para co-presença no final é permitido (sem teletransporte).
 
 ### Formato OBRIGATÓRIO da cena
 - **Inclua DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação física/visual (mínimo 4 falas).
@@ -922,11 +933,12 @@ def construir_prompt_com_narrador() -> str:
 
 ### Regra de saída
 - Narre em **terceira pessoa**; nunca fale com "você".
-- Produza uma cena fechada e natural.
+- Produza uma cena fechada e natural, sem comentários externos ou instruções.
 """.strip()
 
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
+
 
 # =========================
 # FILTROS DE SAÍDA
@@ -1409,6 +1421,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
