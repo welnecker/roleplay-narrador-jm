@@ -38,7 +38,7 @@ MODELOS_OPENROUTER = {
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
     "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
     "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-    "⚡ Google Gemini 2.5 Flash Lite": "google/gemini-2.5-flash",
+    "⚡ Google Gemini 2.5 Pro": "google/gemini-2.5-pro",
     "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
     "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
     "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
@@ -552,7 +552,7 @@ def montar_bloco_virgindade(ativar: bool) -> str:
     )
 
 # =========================
-# PROMPT BUILDER (APENAS FASE)
+# PROMPT BUILDER (APENAS FASE) — compatível com Modo Mary
 # =========================
 
 def construir_prompt_com_narrador() -> str:
@@ -567,7 +567,10 @@ def construir_prompt_com_narrador() -> str:
     proximo_nome = ""
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
 
-    # Sensorial Mary
+    # Modo de resposta (narrador padrão ou Mary em 1ª pessoa)
+    modo_mary = bool(st.session_state.get("interpretar_apenas_mary", False))
+
+    # Camada sensorial — Mary
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
@@ -585,6 +588,8 @@ def construir_prompt_com_narrador() -> str:
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r.get('role','user')}: {r.get('content','')}" for r in hist) if hist else "(sem histórico)"
     ultima_fala_user = _last_user_text(hist)
+
+    # Âncora de cenário
     ancora = _deduzir_ancora(ultima_fala_user)
     ancora_bloco = ""
     if ancora:
@@ -604,8 +609,10 @@ def construir_prompt_com_narrador() -> str:
     if st.session_state.get("use_memoria_longa", True) and hist:
         try:
             topk = memoria_longa_buscar_topk(
-                query_text=hist[-1]["content"], k=int(st.session_state.get("k_memoria_longa", 3)),
-                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)), ate_ts=ate_ts,
+                query_text=hist[-1]["content"],
+                k=int(st.session_state.get("k_memoria_longa", 3)),
+                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
+                ate_ts=ate_ts,
             )
             if topk:
                 ml_topk_txt = "\n".join([f"- {t}" for (t, _sc, _sim, _rr) in topk])
@@ -622,7 +629,7 @@ def construir_prompt_com_narrador() -> str:
     ]
     st.session_state["_ml_recorrentes"] = memos_all
 
-    # Dossiê temporal
+    # Dossiê temporal (Mary / Jânio)
     dossie = []
     mary = persona_block_temporal("mary", memos, ate_ts, 8)
     janio = persona_block_temporal("janio", memos, ate_ts, 8)
@@ -630,11 +637,12 @@ def construir_prompt_com_narrador() -> str:
     if janio: dossie.append(janio)
     dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
 
-    # Falas Mary
+    # Falas Mary (planilha ou preset leve)
     falas_mary_bloco = ""
     if st.session_state.get("usar_falas_mary", False):
         falas = carregar_falas_mary()
         if not falas:
+            # fallback leve (substitua depois, se quiser)
             falas = FALAS_EXPLICITAS_MARY
         if falas:
             falas_mary_bloco = "### Falas de Mary (usar literalmente)\n" + "\n".join(f"- {s}" for s in falas)
@@ -645,20 +653,44 @@ def construir_prompt_com_narrador() -> str:
         sintonia_bloco = (
             "### Sintonia & Ritmo (prioritário)\n"
             f"- Ritmo da cena: **{ritmo_label}**.\n"
-            "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites, pedidos gentis.\n"
-            "- Pausas e respiração contam; o desejo é mostrado pela troca, não por imposição.\n"
+            "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites e pedidos gentis.\n"
+            "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
         )
 
-    # Virgindade
+    # Virgindade (auto)
     virg_bloco = montar_bloco_virgindade(ativar=detectar_virgindade_mary(memos, ate_ts))
+
+    # Bloqueio de clímax (apenas Fase)
+    climax_bloco = ""
+    if bool(st.session_state.get("app_bloqueio_intimo", True)) and fase < 5:
+        climax_bloco = (
+            "### Proteção de avanço íntimo (ATIVA)\n"
+            "- **Sem clímax por padrão**: não descreva orgasmo/finalização **a menos que o usuário tenha liberado explicitamente na mensagem anterior**.\n"
+            "- Encerre em **pausa sensorial** (respiração, silêncio, carinho), **sem** 'fade-to-black'.\n"
+        )
 
     flag_parallel = bool(st.session_state.get("no_coincidencias", True))
 
+    # Cabeçalho de papel (Narrador vs Mary 1ª pessoa)
+    if modo_mary:
+        papel_header = "Você é **Mary**, responda **em primeira pessoa**, sem narrador externo. Use apenas o que Mary vê/sente/ouve. Não descreva pensamentos de Jânio. Não use títulos nem repita instruções."
+        regra_saida = "- Narre **em primeira pessoa (eu)** como Mary; nunca use narrador onisciente.\n- Produza uma cena fechada e natural, sem comentários externos."
+        formato_cena = (
+            "- Inclua **DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação **em 1ª pessoa (Mary)**.\n"
+            "- Quando Jânio falar, use travessão normalmente; mantenha minha voz (Mary) como base."
+        )
+    else:
+        papel_header = "Você é o **Narrador** de um roleplay dramático brasileiro; foque em Mary e Jânio. Não repita instruções nem títulos."
+        regra_saida = "- Narre **em terceira pessoa**; nunca fale com 'você'.\n- Produza uma cena fechada e natural, sem comentários externos."
+        formato_cena = (
+            "- Inclua **DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação física/visual (mínimo 4 falas quando ambos estiverem na cena)."
+        )
+
     # MONTAGEM DO PROMPT
     prompt = f"""
-Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
+{papel_header}
 
-{ancora_bloco}{sintonia_bloco}{virg_bloco}{falas_mary_bloco}
+{ancora_bloco}{sintonia_bloco}{virg_bloco}{climax_bloco}{falas_mary_bloco}
 ### Dossiê (personas)
 {dossie_txt}
 
@@ -677,10 +709,11 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
 - Todas as cenas são sensoriais e físicas (toques, temperatura, respiração), sem vulgaridade.
+- **Não use 'fade-to-black'** em nenhum momento.
 
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Comece com 1–2 frases sobre caminhar/olhar/perfume/cabelos (negros, volumosos, levemente ondulados)."}
-- Aplique essa camada ANTES do primeiro diálogo.
+- Aplique essa camada **antes** do primeiro diálogo.
 - Frases curtas, diretas, físicas; evite metáforas rebuscadas.
 
 ### Memória longa — Top-K relevantes
@@ -695,15 +728,13 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 ### Geografia & Montagem
 - Não force coincidências: sem ponte explícita, mantenha locais distintos e use montagem paralela (A/B) conforme {flag_parallel}.
 - Comece cada bloco com **lugar e hora** (“Local — Hora — …”) na primeira frase.
-- Se houver ponte diegética, convergir para co-presença no final é permitido (sem teletransporte).
+- Sem teletransporte.
 
 ### Formato OBRIGATÓRIO da cena
-- Inclua DIÁLOGOS diretos com travessão (—), intercalados com ação/reação (mínimo 4 falas quando ambos estiverem em cena).
-- Evite pensamentos internos longos; priorize gestos, respiração, olhares.
+{formato_cena}
 
 ### Regra de saída
-- Narre em terceira pessoa; nunca fale com "você".
-- Produza uma cena fechada e natural, sem comentários externos.
+{regra_saida}
 """.strip()
 
     prompt = inserir_regras_mary_e_janio(prompt)
@@ -790,6 +821,8 @@ for k, v in {
 
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
+
+    # Provedor / modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
     if not api_key:
@@ -799,14 +832,33 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### ✍️ Estilo & Progresso Dramático")
+
+    # Modo de resposta (NARRADOR ou MARY 1ª pessoa)
+    modo_op = st.selectbox(
+        "Modo de resposta",
+        ["Narrador padrão", "Mary (1ª pessoa)"],
+        index=0,
+        key="modo_resposta",
+    )
+    # Compat: flag booleana para o bloco de streaming
+    st.session_state.interpretar_apenas_mary = (modo_op == "Mary (1ª pessoa)")
+
     st.selectbox(
         "Estilo de escrita",
         ["AÇÃO", "ROMANCE LENTO", "NOIR"],
         index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
         key="estilo_escrita",
     )
+
+    # Defaults no mínimo
     st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=0, key="nsfw_max_level")
-    st.checkbox("Sintonia com o parceiro (modo harmônico)", key="modo_sintonia", value=st.session_state.get("modo_sintonia", True))
+
+    st.checkbox(
+        "Sintonia com o parceiro (modo harmônico)",
+        key="modo_sintonia",
+        value=st.session_state.get("modo_sintonia", True),
+    )
+
     st.select_slider(
         "Ritmo da cena",
         options=[0, 1, 2, 3],
@@ -814,7 +866,12 @@ with st.sidebar:
         format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
         key="ritmo_cena",
     )
-    st.checkbox("Usar falas da Mary da planilha (usar literalmente)", value=st.session_state.get("usar_falas_mary", False), key="usar_falas_mary")
+
+    st.checkbox(
+        "Usar falas da Mary da planilha (usar literalmente)",
+        value=st.session_state.get("usar_falas_mary", False),
+        key="usar_falas_mary",
+    )
 
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio (apenas Fase)")
@@ -822,9 +879,16 @@ with st.sidebar:
     options_fase = sorted(FASES_ROMANCE.keys())
     fase_ui_val = int(st.session_state.get("mj_fase", fase_default))
     fase_ui_val = max(min(fase_ui_val, max(options_fase)), min(options_fase))
-    fase_escolhida = st.select_slider("Fase do romance", options=options_fase, value=fase_ui_val, format_func=_fase_label, key="ui_mj_fase")
+    fase_escolhida = st.select_slider(
+        "Fase do romance",
+        options=options_fase,
+        value=fase_ui_val,
+        format_func=_fase_label,
+        key="ui_mj_fase",
+    )
     if fase_escolhida != st.session_state.get("mj_fase", fase_default):
         mj_set_fase(fase_escolhida, persist=True)
+
     col_a, col_b = st.columns(2)
     with col_a:
         if st.button("➕ Avançar 1 fase"):
@@ -834,8 +898,16 @@ with st.sidebar:
             mj_set_fase(0, persist=True)
 
     st.markdown("---")
-    st.checkbox("Evitar coincidências forçadas (montagem paralela A/B)", value=st.session_state.get("no_coincidencias", True), key="no_coincidencias")
-    st.checkbox("Bloquear avanços íntimos sem ordem", value=st.session_state.get("app_bloqueio_intimo", True), key="app_bloqueio_intimo")
+    st.checkbox(
+        "Evitar coincidências forçadas (montagem paralela A/B)",
+        value=st.session_state.get("no_coincidencias", True),
+        key="no_coincidencias",
+    )
+    st.checkbox(
+        "Bloquear avanços íntimos sem ordem",
+        value=st.session_state.get("app_bloqueio_intimo", True),
+        key="app_bloqueio_intimo",
+    )
     st.selectbox(
         "🎭 Emoção oculta",
         ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
@@ -854,6 +926,7 @@ with st.sidebar:
     st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
     st.slider("Top-K memórias", 1, 5, int(st.session_state.get("k_memoria_longa", 3)), 1, key="k_memoria_longa")
     st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
+
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
 
@@ -887,11 +960,25 @@ if entrada:
     salvar_interacao("user", str(entrada))
     st.session_state.session_msgs.append({"role": "user", "content": str(entrada)})
 
+    # --- MODO MARY (1ª pessoa) ---
+    mary_mode_active = bool(
+        st.session_state.get("interpretar_apenas_mary")
+        or st.session_state.get("modo_resposta") == "Mary (1ª pessoa)"
+    )
+
+    # Construção do prompt (já deve incluir, se você seguiu, o {voz_bloco} no construir_prompt_com_narrador)
     prompt = construir_prompt_com_narrador()
 
-    historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
-                 for m in st.session_state.session_msgs]
+    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
+    historico = []
+    for m in st.session_state.session_msgs:
+        role = m.get("role", "user")
+        content = m.get("content", "")
+        if mary_mode_active and role.lower() == "user":
+            content = f"JÂNIO: {content}"
+        historico.append({"role": role, "content": content})
 
+    # Provedor / modelo
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
@@ -906,8 +993,24 @@ if entrada:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
 
+    # System prompts
     system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
-    messages = [system_pt, {"role": "system", "content": prompt}] + historico
+    system_mary = {
+        "role": "system",
+        "content": (
+            "MODO MARY (ATIVO):\n"
+            "- Trate a fala do usuário como ações/falas de Jânio.\n"
+            "- Responda SOMENTE como Mary, em primeira pessoa.\n"
+            "- Não invente falas de Jânio; descreva apenas o que Mary diz/sente/faz.\n"
+            "- Se usar diálogo, use travessão (—) apenas para a fala de Mary."
+        )
+    }
+
+    messages = [system_pt]
+    if mary_mode_active:
+        messages.append(system_mary)
+    messages.append({"role": "system", "content": prompt})
+    messages += historico
 
     payload = {
         "model": model_to_call,
@@ -927,11 +1030,13 @@ if entrada:
         r"([^.!\n]*\b(cl[ií]max|orgasmo|gozou|gozaram|ejacul[ao]u)\b[^.!?\n]*[.!?])",
         flags=re.IGNORECASE
     )
+    DIALOGO_NAO_MARY = re.compile(r"(^|\n)\s*—\s*(J[âa]nio|ele|donisete)\b.*", re.IGNORECASE)
+
     def _user_allows_climax(msgs: list) -> bool:
         last_user = ""
         for r in reversed(msgs or []):
-            if str(r.get("role","")).lower() == "user":
-                last_user = r.get("content","")
+            if str(r.get("role", "")).lower() == "user":
+                last_user = r.get("content", "")
                 break
         return bool(CLIMAX_USER_TRIGGER.search(last_user or ""))
 
@@ -953,6 +1058,10 @@ if entrada:
 
     def _render_visible(t: str) -> str:
         out = render_tail(t)
+        # Se Modo Mary: remove falas explícitas atribuídas a Jânio
+        if mary_mode_active:
+            out = DIALOGO_NAO_MARY.sub("", out)
+        # Nivel de calor padrão 0 (você pode ajustar no sidebar)
         out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level", 0)), action="livre")
         return out
 
@@ -961,7 +1070,7 @@ if entrada:
         resposta_txt = ""
         last_update = time.time()
 
-        # reforço memórias usadas no prompt
+        # Reforço memórias usadas no prompt
         try:
             usados_prompt = []
             usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
@@ -978,20 +1087,23 @@ if entrada:
                                timeout=int(st.session_state.get("timeout_s", 300))) as r:
                 if r.status_code == 200:
                     for raw in r.iter_lines(decode_unicode=False):
-                        if not raw: continue
+                        if not raw:
+                            continue
                         line = raw.decode("utf-8", errors="ignore").strip()
-                        if not line.startswith("data:"): continue
+                        if not line.startswith("data:"):
+                            continue
                         data = line[5:].strip()
-                        if data == "[DONE]": break
+                        if data == "[DONE]":
+                            break
                         try:
                             j = json.loads(data)
                             delta = j["choices"][0]["delta"].get("content", "")
-                            if not delta: continue
+                            if not delta:
+                                continue
                             resposta_txt += delta
                             if time.time() - last_update > 0.10:
-                                # atualização parcial
                                 parcial = _render_visible(resposta_txt) + "▌"
-                                # bloqueio de clímax on-the-fly (fase <5 ou sem liberação)
+                                # Bloqueio de clímax on-the-fly (fase <5 e sem liberação)
                                 if st.session_state.get("app_bloqueio_intimo", True):
                                     fase_atual = int(st.session_state.get("mj_fase", 0))
                                     if (fase_atual < 5) and (not _user_allows_climax(st.session_state.session_msgs)):
@@ -1050,28 +1162,30 @@ if entrada:
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # BLOQUEIO DE CLÍMAX FINAL (apenas fase + gatilho do usuário)
+        # BLOQUEIO DE CLÍMAX FINAL (fase + gatilho do usuário)
         if st.session_state.get("app_bloqueio_intimo", True):
             fase_atual = int(st.session_state.get("mj_fase", 0))
             if (fase_atual < 5) and (not _user_allows_climax(st.session_state.session_msgs)):
                 visible_txt = _strip_or_soften_climax(visible_txt)
 
+        # Render final
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
-        # validação simples
-        if len(st.session_state.session_msgs) >= 1 and visible_txt and visible_txt != "[Sem conteúdo]":
-            pass  # mantido simples
-
-        salvar_interacao("assistant", visible_txt if visible_txt else "[Sem conteúdo]")
-        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt if visible_txt else "[Sem conteúdo]"})
+        # Persistência
+        if visible_txt and visible_txt != "[Sem conteúdo]":
+            salvar_interacao("assistant", visible_txt)
+            st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
+        else:
+            salvar_interacao("assistant", "[Sem conteúdo]")
+            st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
 
         # Reforço pós-resposta
         try:
             usados = []
             topk_usadas = memoria_longa_buscar_topk(
                 query_text=visible_txt,
-                k=int(st.session_state.get("k_memoria_longa",3)),
-                limiar=float(st.session_state.get("limiar_memoria_longa",0.78)),
+                k=int(st.session_state.get("k_memoria_longa", 3)),
+                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
             )
             for t, _sc, _sim, _rr in topk_usadas:
                 usados.append(t)
