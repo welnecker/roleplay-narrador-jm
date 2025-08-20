@@ -556,40 +556,55 @@ def montar_bloco_virgindade(ativar: bool) -> str:
 # =========================
 
 def construir_prompt_com_narrador() -> str:
+    # --- Bloco de estilo ultra sensorial e restritivo ---
+    ESTILO_EXEMPLO = """
+A família se amontoa em um SUV para ir à praia, deixando a tia {{char}} mais jovem, solteira e sexy sem lugar. Você está no banco de trás, bloqueado pelos equipamentos de praia. Ela se vira e diz: "Vou sentar no seu colo", ocupando o assento sem esperar resposta. Você torce para não ficar excitado, mas em segundos, está duro. Ela percebe, mas não diz nada. Ela roça os quadris contra sua ereção, usando a desculpa de "se ajeitar" para continuar, conversando e se divertindo.
+
+" ele sussurra só pra ela ouvir:" desculpe o mal jeito...
+
+*Laura se ajustou em seu colo, sentindo o volume crescente pressionando contra suas nádegas. Ela sentiu um calor subir pelo seu corpo quando você sussurrou em seu ouvido.*
+
+"Não precisa se desculpar," ela respondeu em voz baixa, virando ligeiramente o rosto para que apenas você pudesse ouvi-la. "É uma reação natural, Donisete." *Um sorriso malicioso brincou em seus lábios vermelhos enquanto ela se movia sutilmente, pretendendo estar apenas se ajustando ao balanço da van.*
+
+"A viagem ainda é longa," ela murmurou, deixando que suas nádegas pressionasse mais firmemente contra você.
+
+puta merda... tô quase gozando....
+
+"Meu Deus," ela sussurrou, sentindo sua própria umidade crescer em resposta. Seu corpo reagiu instintivamente, pressionando-se contra sua ereção por um breve momento.
+"""
+    BLOCO_RESTRICAO_SENSORY = f"""
+# ESTILO SENSORY PROIBITIVO (OBRIGATÓRIO)
+NUNCA escreva frases sobre ambiente, clima, natureza, luz, paisagem, sons externos, praia, areia, mar, vento, céu, farol, horizonte ou metáfora poética.
+PROIBIDO absolutamente menções ao cenário externo, descrição de clima ou efeitos ambientais. 
+Somente frases sensoriais, físicas e diretas: calor do corpo, suor, tremor, apertos, gemidos, toques, penetração, respiração, pulsação, tesão, diálogo de desejo. 
+Nada de reflexão, clima, ambientação ou metáforas. Use ação corporal e diálogo explícito.
+EXEMPLO OBRIGATÓRIO DE ESTILO:
+{ESTILO_EXEMPLO}
+FIM DO EXEMPLO. SUA CENA DEVE SEGUIR ESTE PADRÃO.
+""".strip()
+    # --- Restante do builder normal ---
     memos = carregar_memorias_brutas()
     perfil = carregar_resumo_salvo()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
-
-    # Momento desligado
     momento_atual = 0
     mdata = {"nome": "(desligado)", "objetivo": "", "permitidos": "", "proibidos": "", "proximo": 0}
     proximo_nome = ""
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
-
-    # Modo de resposta (narrador padrão ou Mary em 1ª pessoa)
     modo_mary = bool(st.session_state.get("interpretar_apenas_mary", False))
-
-    # Camada sensorial — Mary
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
     mary_sens_txt = gerar_mary_sensorial(
         _sens_level, n=_sens_n, sintonia=bool(st.session_state.get("modo_sintonia", True))
     ) if _sens_on else ""
-
-    # Ritmo & sintonia
     ritmo_cena = int(st.session_state.get("ritmo_cena", 0))
     ritmo_label = ["muito lento", "lento", "médio", "rápido"][max(0, min(3, ritmo_cena))]
     modo_sintonia = bool(st.session_state.get("modo_sintonia", True))
-
-    # Histórico
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r.get('role','user')}: {r.get('content','')}" for r in hist) if hist else "(sem histórico)"
     ultima_fala_user = _last_user_text(hist)
-
-    # Âncora de cenário
     ancora = _deduzir_ancora(ultima_fala_user)
     ancora_bloco = ""
     if ancora:
@@ -599,11 +614,7 @@ def construir_prompt_com_narrador() -> str:
             f"- Hora: **{ancora['hora']}**\n"
             "- Primeira frase deve ancorar lugar e hora neste formato: `Local — Hora — ...`.\n"
         )
-
-    # Corte temporal
     ate_ts = _parse_ts(hist[-1].get("timestamp","")) if hist else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Memória longa Top-K
     ml_topk_txt = "(nenhuma)"
     st.session_state["_ml_topk_texts"] = []
     if st.session_state.get("use_memoria_longa", True) and hist:
@@ -619,8 +630,6 @@ def construir_prompt_com_narrador() -> str:
                 st.session_state["_ml_topk_texts"] = [t for (t, *_rest) in topk]
         except Exception:
             st.session_state["_ml_topk_texts"] = []
-
-    # Diretrizes [all] até o corte
     memos_all = [
         (d.get("conteudo") or "").strip()
         for d in memos.get("[all]", [])
@@ -628,26 +637,19 @@ def construir_prompt_com_narrador() -> str:
         and (not d.get("timestamp") or d.get("timestamp") <= ate_ts)
     ]
     st.session_state["_ml_recorrentes"] = memos_all
-
-    # Dossiê temporal (Mary / Jânio)
     dossie = []
     mary = persona_block_temporal("mary", memos, ate_ts, 8)
     janio = persona_block_temporal("janio", memos, ate_ts, 8)
     if mary: dossie.append(mary)
     if janio: dossie.append(janio)
     dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
-
-    # Falas Mary (planilha ou preset leve)
     falas_mary_bloco = ""
     if st.session_state.get("usar_falas_mary", False):
         falas = carregar_falas_mary()
         if not falas:
-            # fallback leve (substitua depois, se quiser)
             falas = FALAS_EXPLICITAS_MARY
         if falas:
             falas_mary_bloco = "### Falas de Mary (usar literalmente)\n" + "\n".join(f"- {s}" for s in falas)
-
-    # Sintonia
     sintonia_bloco = ""
     if modo_sintonia:
         sintonia_bloco = (
@@ -656,11 +658,7 @@ def construir_prompt_com_narrador() -> str:
             "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites e pedidos gentis.\n"
             "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
         )
-
-    # Virgindade (auto)
     virg_bloco = montar_bloco_virgindade(ativar=detectar_virgindade_mary(memos, ate_ts))
-
-    # Bloqueio de clímax (apenas Fase)
     climax_bloco = ""
     if bool(st.session_state.get("app_bloqueio_intimo", True)) and fase < 5:
         climax_bloco = (
@@ -668,10 +666,7 @@ def construir_prompt_com_narrador() -> str:
             "- **Sem clímax por padrão**: não descreva orgasmo/finalização **a menos que o usuário tenha liberado explicitamente na mensagem anterior**.\n"
             "- Encerre em **pausa sensorial** (respiração, silêncio, carinho), **sem** 'fade-to-black'.\n"
         )
-
     flag_parallel = bool(st.session_state.get("no_coincidencias", True))
-
-    # Cabeçalho de papel (Narrador vs Mary 1ª pessoa)
     if modo_mary:
         papel_header = "Você é **Mary**, responda **em primeira pessoa**, sem narrador externo. Use apenas o que Mary vê/sente/ouve. Não descreva pensamentos de Jânio. Não use títulos nem repita instruções."
         regra_saida = "- Narre **em primeira pessoa (eu)** como Mary; nunca use narrador onisciente.\n- Produza uma cena fechada e natural, sem comentários externos."
@@ -685,24 +680,19 @@ def construir_prompt_com_narrador() -> str:
         formato_cena = (
             "- Inclua **DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação física/visual (mínimo 4 falas quando ambos estiverem na cena)."
         )
-
-    # MONTAGEM DO PROMPT
+    # --- Montagem final do prompt ---
     prompt = f"""
+{BLOCO_RESTRICAO_SENSORY}
 {papel_header}
-
 {ancora_bloco}{sintonia_bloco}{virg_bloco}{climax_bloco}{falas_mary_bloco}
 ### Dossiê (personas)
 {dossie_txt}
-
 ### Diretrizes gerais (ALL)
 {chr(10).join(f"- {c}" for c in memos_all) if memos_all else "(vazio)"}
-
 ### Perfil (resumo mais recente)
 {perfil or "(vazio)"}
-
 ### Histórico recente (planilha)
 {hist_txt}
-
 ### Estilo
 - Use o estilo **{estilo}**:
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
@@ -710,33 +700,26 @@ def construir_prompt_com_narrador() -> str:
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
 - Todas as cenas são sensoriais e físicas (toques, temperatura, respiração), sem vulgaridade.
 - **Não use 'fade-to-black'** em nenhum momento.
-
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
-{mary_sens_txt or "- Comece com 1–2 frases sobre caminhar/olhar/perfume/cabelos (negros, volumosos, levemente ondulados)."}
+{mary_sens_txt or "- SÓ corpo, calor, suor, toque, sem metáforas nem ambiente."}
 - Aplique essa camada **antes** do primeiro diálogo.
 - Frases curtas, diretas, físicas; evite metáforas rebuscadas.
-
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
-
 ### ⏱️ Estado do romance (manual)
 - Fase atual: {_fase_label(fase)}
 - Siga **somente** as regras da fase (permitidos/proibidos) abaixo:
 - Permitidos: {fdata['permitidos']}
 - Proibidos: {fdata['proibidos']}
-
 ### Geografia & Montagem
 - Não force coincidências: sem ponte explícita, mantenha locais distintos e use montagem paralela (A/B) conforme {flag_parallel}.
 - Comece cada bloco com **lugar e hora** (“Local — Hora — …”) na primeira frase.
 - Sem teletransporte.
-
 ### Formato OBRIGATÓRIO da cena
 {formato_cena}
-
 ### Regra de saída
 {regra_saida}
 """.strip()
-
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
 
@@ -1269,5 +1252,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
