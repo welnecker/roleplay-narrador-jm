@@ -609,7 +609,7 @@ MODELOS_OPENROUTER = {
     "🧠 DeepSeek R1 0528 ★★★★☆ ($$)": "deepseek/deepseek-r1-0528",
     "🧠 DeepSeek R1T2 Chimera ★★★★ (free)": "tngtech/deepseek-r1t2-chimera:free",
     "🧠 GPT-4.1 ★★★★★ (1M ctx)": "openai/gpt-4.1",
-    "⚡ Google Gemini 2.5 Flash Lite": "google/gemini-2.5-flash-lite",
+    "⚡ Google Gemini 2.5 Flash Lite": "google/gemini-2.5-flash",
     "👑 WizardLM 8x22B ★★★★☆ ($$$)": "microsoft/wizardlm-2-8x22b",
     "👑 Qwen 235B 2507 ★★★★★ (PAID)": "qwen/qwen3-235b-a22b-07-25",
     "👑 EVA Qwen2.5 72B ★★★★★ (RP Pro)": "eva-unit-01/eva-qwen-2.5-72b",
@@ -1586,6 +1586,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
