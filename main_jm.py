@@ -929,7 +929,8 @@ with st.sidebar:
 
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
-        st.markdown("---")
+
+    st.markdown("---")
     st.markdown("### 📝 Utilitários")
 
     # Gerar resumo do capítulo (pega as últimas interações do Sheets)
@@ -1013,8 +1014,8 @@ with st.sidebar:
 with st.container():
     interacoes = carregar_interacoes(n=20)
     for r in interacoes:
-        role = r.get("role","user")
-        content = r.get("content","")
+        role = r.get("role", "user")
+        content = r.get("content", "")
         if role == "user":
             with st.chat_message("user"):
                 st.markdown(content)
@@ -1268,4 +1269,5 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
