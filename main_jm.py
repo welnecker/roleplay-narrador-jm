@@ -556,33 +556,23 @@ def montar_bloco_virgindade(ativar: bool) -> str:
 # =========================
 
 def construir_prompt_com_narrador() -> str:
-    # --- Bloco de estilo ultra sensorial e restritivo ---
-    ESTILO_EXEMPLO = """
-A família se amontoa em um SUV para ir à praia, deixando a tia {{char}} mais jovem, solteira e sexy sem lugar. Você está no banco de trás, bloqueado pelos equipamentos de praia. Ela se vira e diz: "Vou sentar no seu colo", ocupando o assento sem esperar resposta. Você torce para não ficar excitado, mas em segundos, está duro. Ela percebe, mas não diz nada. Ela roça os quadris contra sua ereção, usando a desculpa de "se ajeitar" para continuar, conversando e se divertindo.
+    # ========== NOVA RESTRIÇÃO SUPER FORTE ==========
+    BLOCO_RESTRICAO_SENSORY = """
+NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas. 
+NÃO inicie textos com lugar ou “Pier de Camburi — Noite —”, nem descreva onde estão ou o horário.
+PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
+Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico. 
+Respostas devem ser curtas e diretas. 
+Exemplo obrigatório de estilo a seguir:
 
-" ele sussurra só pra ela ouvir:" desculpe o mal jeito...
-
-*Laura se ajustou em seu colo, sentindo o volume crescente pressionando contra suas nádegas. Ela sentiu um calor subir pelo seu corpo quando você sussurrou em seu ouvido.*
-
+A família se amontoa em um SUV para ir à praia, deixando a tia {{char}} mais jovem, solteira e sexy sem lugar. Você está no banco de trás, bloqueado pelos equipamentos de praia. Ela se vira e diz: "Vou sentar no seu colo", ocupando o assento sem esperar resposta. Você torce para não ficar excitado, mas em segundos, está duro. Ela percebe, mas não diz nada. Ela roça os quadris contra sua ereção, usando a desculpa de "se ajeitar" para continuar, conversando e se divertindo. E assim começa a viagem.
+" ele sussurra só pra ela ouvir:" desculpe o mal jeito... 
+*Laura se ajustou em seu colo, sentindo o volume crescendo pressionando contra suas nádegas. Ela sentiu um calor subir pelo seu corpo quando você sussurrou em seu ouvido.*
 "Não precisa se desculpar," ela respondeu em voz baixa, virando ligeiramente o rosto para que apenas você pudesse ouvi-la. "É uma reação natural, Donisete." *Um sorriso malicioso brincou em seus lábios vermelhos enquanto ela se movia sutilmente, pretendendo estar apenas se ajustando ao balanço da van.*
-
-"A viagem ainda é longa," ela murmurou, deixando que suas nádegas pressionasse mais firmemente contra você.
-
-puta merda... tô quase gozando....
-
-"Meu Deus," ela sussurrou, sentindo sua própria umidade crescer em resposta. Seu corpo reagiu instintivamente, pressionando-se contra sua ereção por um breve momento.
-"""
-    BLOCO_RESTRICAO_SENSORY = f"""
-# ESTILO SENSORY PROIBITIVO (OBRIGATÓRIO)
-NUNCA escreva frases sobre ambiente, clima, natureza, luz, paisagem, sons externos, praia, areia, mar, vento, céu, farol, horizonte ou metáfora poética.
-PROIBIDO absolutamente menções ao cenário externo, descrição de clima ou efeitos ambientais. 
-Somente frases sensoriais, físicas e diretas: calor do corpo, suor, tremor, apertos, gemidos, toques, penetração, respiração, pulsação, tesão, diálogo de desejo. 
-Nada de reflexão, clima, ambientação ou metáforas. Use ação corporal e diálogo explícito.
-EXEMPLO OBRIGATÓRIO DE ESTILO:
-{ESTILO_EXEMPLO}
-FIM DO EXEMPLO. SUA CENA DEVE SEGUIR ESTE PADRÃO.
+# Siga esse exato padrão. NÃO floreie. NÃO descreva o cenário.
 """.strip()
-    # --- Restante do builder normal ---
+    # ========== FIM DO BLOCO DE RESTRIÇÃO ==========
+
     memos = carregar_memorias_brutas()
     perfil = carregar_resumo_salvo()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
@@ -605,15 +595,9 @@ FIM DO EXEMPLO. SUA CENA DEVE SEGUIR ESTE PADRÃO.
     hist = carregar_interacoes(n=n_hist)
     hist_txt = "\n".join(f"{r.get('role','user')}: {r.get('content','')}" for r in hist) if hist else "(sem histórico)"
     ultima_fala_user = _last_user_text(hist)
-    ancora = _deduzir_ancora(ultima_fala_user)
+    # REMOVE ÂNCORA DE CENÁRIO DO PROMPT!
     ancora_bloco = ""
-    if ancora:
-        ancora_bloco = (
-            "### Âncora de cenário (OBRIGATÓRIA)\n"
-            f"- Local: **{ancora['local']}**\n"
-            f"- Hora: **{ancora['hora']}**\n"
-            "- Primeira frase deve ancorar lugar e hora neste formato: `Local — Hora — ...`.\n"
-        )
+    # corte temporal etc.
     ate_ts = _parse_ts(hist[-1].get("timestamp","")) if hist else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ml_topk_txt = "(nenhuma)"
     st.session_state["_ml_topk_texts"] = []
@@ -684,7 +668,7 @@ FIM DO EXEMPLO. SUA CENA DEVE SEGUIR ESTE PADRÃO.
     prompt = f"""
 {BLOCO_RESTRICAO_SENSORY}
 {papel_header}
-{ancora_bloco}{sintonia_bloco}{virg_bloco}{climax_bloco}{falas_mary_bloco}
+{sintonia_bloco}{virg_bloco}{climax_bloco}{falas_mary_bloco}
 ### Dossiê (personas)
 {dossie_txt}
 ### Diretrizes gerais (ALL)
@@ -694,16 +678,11 @@ FIM DO EXEMPLO. SUA CENA DEVE SEGUIR ESTE PADRÃO.
 ### Histórico recente (planilha)
 {hist_txt}
 ### Estilo
-- Use o estilo **{estilo}**:
-{("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
-("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
-("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
-- Todas as cenas são sensoriais e físicas (toques, temperatura, respiração), sem vulgaridade.
-- **Não use 'fade-to-black'** em nenhum momento.
+- Texto obrigatoriamente sensorial, físico e direto. NUNCA mencione ambiente, natureza, paisagem, cenário ou clima.
+- Frases curtas, só sensação física e falas.
+- NÃO use ambientação, nem metáforas.
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
-{mary_sens_txt or "- SÓ corpo, calor, suor, toque, sem metáforas nem ambiente."}
-- Aplique essa camada **antes** do primeiro diálogo.
-- Frases curtas, diretas, físicas; evite metáforas rebuscadas.
+{mary_sens_txt or "- Apenas sensações físicas, nunca ambiente."}
 ### Memória longa — Top-K relevantes
 {ml_topk_txt}
 ### ⏱️ Estado do romance (manual)
@@ -712,8 +691,7 @@ FIM DO EXEMPLO. SUA CENA DEVE SEGUIR ESTE PADRÃO.
 - Permitidos: {fdata['permitidos']}
 - Proibidos: {fdata['proibidos']}
 ### Geografia & Montagem
-- Não force coincidências: sem ponte explícita, mantenha locais distintos e use montagem paralela (A/B) conforme {flag_parallel}.
-- Comece cada bloco com **lugar e hora** (“Local — Hora — …”) na primeira frase.
+- Não force coincidências, não descreva cenário.
 - Sem teletransporte.
 ### Formato OBRIGATÓRIO da cena
 {formato_cena}
@@ -1252,6 +1230,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
