@@ -929,6 +929,82 @@ with st.sidebar:
 
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
+        st.markdown("---")
+    st.markdown("### 📝 Utilitários")
+
+    # Gerar resumo do capítulo (pega as últimas interações do Sheets)
+    if st.button("📝 Gerar resumo do capítulo"):
+        try:
+            inter = carregar_interacoes(n=6)
+            texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
+            prompt_resumo = (
+                "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
+                + texto + "\n\nResumo:"
+            )
+
+            # Usa o provedor/modelo selecionados no topo do sidebar
+            provedor = st.session_state.get("provedor_ia", "OpenRouter")
+            api_url_local = api_url
+            api_key_local = api_key
+            model_id_call = (
+                model_id_for_together(st.session_state.modelo_escolhido_id)
+                if provedor == "Together"
+                else st.session_state.modelo_escolhido_id
+            )
+
+            if not api_key_local:
+                st.error("⚠️ API key ausente para o provedor selecionado (defina em st.secrets).")
+            else:
+                r = requests.post(
+                    api_url_local,
+                    headers={"Authorization": f"Bearer {api_key_local}", "Content-Type": "application/json"},
+                    json={
+                        "model": model_id_call,
+                        "messages": [{"role": "user", "content": prompt_resumo}],
+                        "max_tokens": 800,
+                        "temperature": 0.85
+                    },
+                    timeout=int(st.session_state.get("timeout_s", 300)),
+                )
+                if r.status_code == 200:
+                    resumo = r.json()["choices"][0]["message"]["content"].strip()
+                    st.session_state.resumo_capitulo = resumo
+                    salvar_resumo(resumo)
+                    st.success("Resumo gerado e salvo com sucesso!")
+                else:
+                    st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
+        except Exception as e:
+            st.error(f"Erro ao gerar resumo: {e}")
+
+    # Salvar última resposta do assistente como memória longa
+    if st.button("💾 Salvar última resposta como memória"):
+        ultimo_assist = ""
+        for m in reversed(st.session_state.get("session_msgs", [])):
+            if m.get("role") == "assistant":
+                ultimo_assist = (m.get("content") or "").strip()
+                break
+        if ultimo_assist:
+            ok = memoria_longa_salvar(ultimo_assist, tags="auto")
+            st.success("Memória de longo prazo salva!" if ok else "Falha ao salvar memória.")
+        else:
+            st.info("Ainda não há resposta do assistente nesta sessão.")
+
+    # Reforçar memórias biográficas (Mary / Jânio / All) na memória longa
+    if st.button("🔁 Reforçar memórias biográficas"):
+        try:
+            memos = carregar_memorias_brutas()
+            count = 0
+            for k in ["[mary]", "[janio]", "[all]"]:
+                for entrada in memos.get(k, []):
+                    texto = (entrada.get("conteudo") or "").strip()
+                    if texto:
+                        ok = memoria_longa_salvar(texto, tags=k)
+                        if ok:
+                            count += 1
+            st.success(f"{count} memórias biográficas reforçadas na memória longa!")
+        except Exception as e:
+            st.error(f"Erro ao reforçar memórias: {e}")
+
 
 # =========================
 # EXIBIR HISTÓRICO
@@ -1192,3 +1268,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
