@@ -465,27 +465,27 @@ def memoria_longa_reforcar(textos_usados: list):
         pass
 
 # =========================
-# ROMANCE (FASES) + MOMENTO
+# ROMANCE (FASES) + MOMENTO  (PRESET + HELPERS, sem fade-to-black)
 # =========================
 
 FASES_ROMANCE: Dict[int, Dict[str, str]] = {
     0: {"nome": "Estranhos",
         "permitidos": "olhares; near-miss (mesmo café/rua/ônibus); detalhe do ambiente",
-        "proibidos": "troca de nomes; toques; conversa pessoal"},
+        "proibidos": "troca de nomes; toques; conversa pessoal; beijos"},
     1: {"nome": "Percepção",
-        "permitidos": "cumprimento neutro; pergunta impessoal curta",
-        "proibidos": "contato físico; confidências"},
+        "permitidos": "cumprimento neutro; pergunta impessoal curta; beijo no rosto (breve)",
+        "proibidos": "beijo na boca; toques íntimos"},
     2: {"nome": "Conhecidos",
-        "permitidos": "troca de nomes; pequena ajuda; 1 pergunta pessoal leve",
-        "proibidos": "toque prolongado; encontro a sós planejado"},
-    3: {"nome": "Amizade",
-        "permitidos": "conversa 10–20 min; caminhar juntos; troca de contatos; 1 gesto de afeto leve (com consentimento)",
-        "proibidos": "beijos; carícias intimistas"},
-    4: {"nome": "Confiança / Quase",
-        "permitidos": "confidências; abraço com consentimento expresso; marcar encontro futuro claro",
-        "proibidos": "pressa ou “provas de amor” físicas"},
+        "permitidos": "troca de nomes; pequena ajuda; 1 pergunta pessoal leve; beijo suave na boca (sem língua)",
+        "proibidos": "beijo intenso/profundo; carícias íntimas; encontro a sós planejado"},
+    3: {"nome": "Romance",
+        "permitidos": "conversa 10–20 min; caminhar juntos; troca de contatos; beijos intensos (sem toques íntimos)",
+        "proibidos": "carícias íntimas; sexo"},
+    4: {"nome": "Namoro",
+        "permitidos": "beijos intensos; carícias íntimas; progressão cuidadosa **sem fade-to-black**",
+        "proibidos": "penetração/sexo (até decidir avançar de fase)"},
     5: {"nome": "Compromisso / Encontro definitivo",
-        "permitidos": "beijo prolongado; dormir juntos; consumação implícita (fade-to-black); manhã seguinte sugerida",
+        "permitidos": "sexo consensual; detalhamento contínuo **sem fade-to-black**",
         "proibidos": ""},
 }
 
@@ -520,6 +520,7 @@ def mj_carregar_fase_inicial() -> int:
     st.session_state.mj_fase = 0
     return 0
 
+# ---------- MOMENTOS (sem fade-to-black) ----------
 MOMENTOS = {
     0: {"nome": "Aproximação logística",
         "objetivo": "um acompanha o outro",
@@ -534,10 +535,10 @@ MOMENTOS = {
         "gatilhos": [r"\b(amo voc[eê]|te amo|n[aã]o paro de pensar)\b"],
         "proximo": 2},
     2: {"nome": "Revelação sensível",
-        "objetivo": "Mary revela vulnerabilidade / limites",
+        "objetivo": "Mary revela vulnerabilidade / limites (p.ex. virgindade) e prioridades",
         "permitidos": "nomear limites; conforto mútuo",
         "proibidos": "carícias íntimas; tirar roupas",
-        "gatilhos": [r"\b(meu limite|prefiro ir devagar)\b"],
+        "gatilhos": [r"\b(sou virgem|nunca fiz|meu limite|prefiro ir devagar)\b"],
         "proximo": 3},
     3: {"nome": "Consentimento explícito",
         "objetivo": "alinhamento de limites e um 'sim' claro",
@@ -545,10 +546,10 @@ MOMENTOS = {
         "proibidos": "",
         "gatilhos": [r"\b(consento|quero|vamos juntos|tudo bem pra voc[eê])\b", r"\b(at[eé] onde)\b"],
         "proximo": 4},
-    4: {"nome": "Intimidade (elíptica)",
-        "objetivo": "intimidade sugerida (fade-to-black) / pós-ato implícito",
-        "permitidos": "beijos longos; proximidade forte; fade-to-black",
-        "proibidos": "",
+    4: {"nome": "Intimidade em progresso (contínua)",
+        "objetivo": "intimidade contínua **sem fade-to-black**; pós-ato aparece como continuidade, não salto",
+        "permitidos": "beijos longos; proximidade forte; continuidade em cena (sem cortes)",
+        "proibidos": "clímax se bloqueio estiver ativo",
         "gatilhos": [r"\b(quarto|cama|luz baixa|porta fechada|manh[aã] seguinte)\b"],
         "proximo": 4},
 }
@@ -597,8 +598,77 @@ def momento_carregar() -> int:
     st.session_state.momento = 0
     return 0
 
+# ---------- HELPERS de verificação por fase/momento ----------
+# Regras básicas de detecção (simples e baratas). Ajuste conforme seu corpus.
+_RE_BEIJO = re.compile(r"\bbeij\w+", re.IGNORECASE)
+_RE_BOCA  = re.compile(r"\bboca\b|\bl[áa]bios?\b", re.IGNORECASE)
+_RE_INTENSO = re.compile(r"\b(intenso|profundo|com\s+l[ií]ngua|ardente|fren[eé]tico)\b", re.IGNORECASE)
+_RE_CARICIA_INTIMA = re.compile(
+    r"\b(seios?|mamilos?|bunda|coxas internas?|virilha|clit[oó]ris|"
+    r"p[eê]nis|pau|p[óo]rra|vag(in|ina)|genit[aá]lia|masturba\w+|"
+    r"m[aã]o\s+por\s+dentro\s+da\s+calcinha)\b", re.IGNORECASE)
+_RE_PENETRACAO = re.compile(
+    r"\bpenetra\w+|penetra[cç][aã]o|meter|meteu|entrou\s+(nela|nele|dentro)\b", re.IGNORECASE)
+_RE_CLIMAX = re.compile(r"\b(orgasmo|cl[ií]max|gozou|gozar|ejacul\w+)\b", re.IGNORECASE)
+
+def _violacoes_por_fase(texto: str, fase: int) -> list:
+    """Retorna lista de descrições de violações encontradas no texto para a fase atual."""
+    viol = []
+
+    # Beijos por fase
+    if fase == 0:
+        if _RE_BEIJO.search(texto):
+            viol.append("Fase 0 (Estranhos): sem beijo.")
+    elif fase == 1:
+        if _RE_BEIJO.search(texto) and _RE_BOCA.search(texto):
+            viol.append("Fase 1 (Percepção): só beijo no rosto; sem beijo na boca.")
+    elif fase == 2:
+        # Beijo permitido, mas deve ser suave (sem língua/intensidade)
+        if _RE_BEIJO.search(texto) and _RE_INTENSO.search(texto):
+            viol.append("Fase 2 (Conhecidos): beijo apenas suave, sem língua/intenso.")
+
+    # Carícias íntimas/sexo
+    if fase < 4 and _RE_CARICIA_INTIMA.search(texto):
+        viol.append(f"Fase {fase} ({FASES_ROMANCE[fase]['nome']}): carícias íntimas ainda não permitidas.")
+    if fase < 5 and _RE_PENETRACAO.search(texto):
+        viol.append(f"Fase {fase} ({FASES_ROMANCE[fase]['nome']}): penetração/sexo só na fase 5.")
+
+    # Clímax (respeita checkbox global)
+    if bool(st.session_state.get("app_bloqueio_intimo", False)) and _RE_CLIMAX.search(texto):
+        viol.append("Bloqueio de clímax ativo: não descreva orgasmo/ejaculação.")
+
+    return viol
+
+def _violacoes_por_momento(texto: str, momento: int) -> list:
+    """Regras leves por momento (evita sexo antes de consentimento explícito)."""
+    viol = []
+    if momento < 3:
+        # Antes de “Consentimento explícito”, evite carícias íntimas e penetração
+        if _RE_CARICIA_INTIMA.search(texto):
+            viol.append("Sem consentimento explícito (momento < 3): evite carícias íntimas.")
+        if _RE_PENETRACAO.search(texto):
+            viol.append("Sem consentimento explícito (momento < 3): evite penetração/sexo.")
+    return viol
+
 def viola_momento(texto: str, momento: int) -> str:
-    return ""
+    """
+    Devolve mensagem de aviso (string) se o texto violar regras de fase/momento
+    ou o bloqueio de clímax. Caso contrário, retorna "".
+    Obs.: Mostrada apenas como aviso (não bloqueia a saída já gerada).
+    """
+    try:
+        fase = int(st.session_state.get("mj_fase", 0))
+    except Exception:
+        fase = 0
+
+    problemas = []
+    problemas.extend(_violacoes_por_fase(texto or "", fase))
+    problemas.extend(_violacoes_por_momento(texto or "", int(momento)))
+
+    if not problemas:
+        return ""
+    # Junta em uma linha curta com marcadores
+    return " / ".join(problemas)
 
 # =========================
 # PROVEDORES E MODELOS (enxuto)
@@ -656,14 +726,21 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 ⚖️ Regras de coerência:
 - Narre em terceira pessoa; não se dirija ao leitor como "você".
 - Consentimento claro antes de qualquer gesto significativo.
-- Jânio respeita o ritmo de Mary.
-- Linguagem sensual proporcional ao nível de calor ({calor}).
-""".strip()
+- Jânio não pressiona; respeita o ritmo de Mary.
+- Linguagem sensual proporcional ao nível de calor ({calor}).""".strip()
+
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     if fase >= 5:
-        regras += "\n- A intimidade pode ser sugerida sem elipses forçadas."
+        regras += """
+- Intimidade pode ser descrita com detalhes explícitos (sem necessidade de corte)."""
     else:
-        regras += "\n- Evite consumação explícita; foque em progressão coerente."
+        regras += """
+- Sem consumação em cena; foque em progressão coerente."""
+
+    # >>> ADIÇÃO ANTI-F2B <<<
+    regras += """
+- **Sem fade-to-black**: nunca corte para o escuro nem resuma a consumação; mantenha a continuidade em cena.
+- Se o bloqueio de clímax estiver ativo, finalize em **pausa sensorial** (respiração/olhares/carinhos), sem corte e sem orgasmo."""
     return prompt_base + "\n" + regras
 
 def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True, sintonia: bool = False) -> str:
@@ -943,8 +1020,9 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 {("- Frases curtas, cortes rápidos, foco em gesto/ritmo.") if estilo=="AÇÃO" else
 ("- Atmosfera sombria, subtexto, silêncio que pesa.") if estilo=="NOIR" else
 ("- Ritmo lento, tensão emocional, detalhes sensoriais (sem grafismo).")}
-- Cenas sensoriais (toques, temperatura, respiração). Evite vulgaridade gratuita.
-- Quando **modo_sintonia** estiver ativo, evite imperativos agressivos; prefira convites e cadência calma.
+- Todas as cenas devem ser sensoriais e físicas (toques, temperatura, respiração).
+- **Não use fade-to-black em hipótese alguma**; mantenha a continuidade da ação.
+- Falas: naturais e críveis; evite imperativos ríspidos quando **modo_sintonia** estiver ativo.
 
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Comece com 1–2 frases sobre caminhar/olhar/perfume/cabelos (negros, volumosos, levemente ondulados)."}
@@ -994,10 +1072,14 @@ Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio
 def render_tail(t: str) -> str:
     if not t:
         return ""
+    # remove rótulos meta e blocos <think>
     t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$', '', t, flags=re.IGNORECASE | re.MULTILINE)
     t = re.sub(r'&lt;\s*think\s*&gt;.*?&lt;\s*/\s*think\s*&gt;', '', t, flags=re.IGNORECASE | re.DOTALL)
+    # >>> ANTI F2B <<<
+    t = re.sub(r'(?i)fade\s*-\s*to\s*-\s*black|(?i)fade\s*to\s*black', '', t)
     t = re.sub(r'\n{3,}', '\n\n', t).strip()
     return t
+
 
 EXPL_PAT = re.compile(
     r"\b(seio[s]?|mamilos?|bunda|fio[- ]?dental|genit[aá]lia|ere[cç][aã]o|penetra[cç][aã]o|"
@@ -1586,6 +1668,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
