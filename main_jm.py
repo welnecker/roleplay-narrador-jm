@@ -896,6 +896,21 @@ def construir_prompt_com_narrador() -> str:
             "- Respeite pausas, respiração, olhar; o desejo é mostrado pela troca, não por imposição.\n"
         )
 
+        # --- Voz/Narração (Mary-only) ---
+    mary_only = bool(st.session_state.get("modo_mary_only", False))
+    voz_bloco = ""
+    if mary_only:
+        voz_bloco = (
+            "### Voz da cena (Mary — 1ª pessoa, exclusivo)\n"
+            "- Responda **somente como Mary**, em **primeira pessoa** (\"eu\").\n"
+            "- Não escreva falas de Jânio; se necessário, **sugira** reações dele apenas por percepção de Mary (toques, olhares, gestos), sem falas diretas.\n"
+            "- Estrutura: parágrafos curtos de sensação/ação + **falas de Mary** com travessão (— ...), quando ela falar em voz alta.\n"
+            "- Evite metacomentários, rol de instruções ou títulos; entregue apenas a narrativa da Mary.\n"
+        )
+
+
+    
+
     # Bloqueio de clímax: instrução no prompt (além do pós-processamento)
     bloquear = bool(st.session_state.get("app_bloqueio_intimo", False))
     mom = int(st.session_state.get("momento", 0))
@@ -911,7 +926,7 @@ def construir_prompt_com_narrador() -> str:
     prompt = f"""
 Você é o Narrador de um roleplay dramático brasileiro, foque em Mary e Jânio. Não repita instruções nem títulos.
 
-{ancora_bloco}{sintonia_bloco}{climax_rules}{virg_bloco}{falas_mary_bloco}### Dossiê (personas)
+{ancora_bloco}{sintonia_bloco}{voz_bloco}{climax_rules}{virg_bloco}{falas_mary_bloco}### Dossiê (personas)
 {dossie_txt}
 
 ### Diretrizes gerais (ALL)
@@ -1100,6 +1115,19 @@ with st.sidebar:
     )
     st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 0)), key="nsfw_max_level")
 
+     # === NOVO: Modo de resposta (Narrador x Mary) ===
+    st.markdown("### 🎭 Modo")
+    modo_opt = st.radio(
+        "Quem a IA interpreta?",
+        ["Narrador (3ª pessoa)", "Mary (1ª pessoa)"],
+        index=0,  # padrão: compatível com o modo atual (Narrador)
+        key="modo_resposta",
+        help="No modo Mary (1ª pessoa), a IA responde apenas como Mary e não cria falas novas do Jânio."
+    )
+    # Compatibilidade: algumas partes podem ler esta flag booleana
+    st.session_state["interpretar_apenas_mary"] = (modo_opt == "Mary (1ª pessoa)")
+
+    
     # Sintonia & Ritmo (DENTRO do sidebar)
     st.checkbox(
         "Sintonia com o parceiro (modo harmônico)",
@@ -1293,6 +1321,7 @@ with st.container():
 entrada = st.chat_input("Digite sua direção de cena...")
 
 if entrada:
+    # 0) Atualiza Momento sugerido
     try:
         mom_atual = int(st.session_state.get("momento", momento_carregar()))
         mom_sug   = detectar_momento_sugerido(entrada, fallback=mom_atual)
@@ -1303,14 +1332,18 @@ if entrada:
     except Exception:
         pass
 
+    # 1) Persistência da entrada
     salvar_interacao("user", str(entrada))
     st.session_state.session_msgs.append({"role": "user", "content": str(entrada)})
 
+    # 2) Prompt base
     prompt = construir_prompt_com_narrador()
 
+    # 3) Histórico curto (sessão atual)
     historico = [{"role": m.get("role", "user"), "content": m.get("content", "")}
                  for m in st.session_state.session_msgs]
 
+    # 4) Seleção de provedor/modelo
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
@@ -1325,8 +1358,73 @@ if entrada:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
 
+    # 5) System msgs + Modo Mary (1ª pessoa)
     system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
-    messages = [system_pt, {"role": "system", "content": prompt}] + historico
+    only_mary = bool(st.session_state.get("interpretar_apenas_mary", False))
+
+    # Instrução extra quando em modo Mary (1ª pessoa)
+    system_mary = {
+        "role": "system",
+        "content": (
+            "MODO MARY (1ª pessoa): Responda apenas como Mary, em primeira pessoa. "
+            "Não crie falas do Jânio; trate a fala do usuário como a de Jânio. "
+            "Use narração breve na 1ª pessoa para ações e travessão para falas de Mary quando houver diálogo. "
+            "Mantenha consistência com o dossiê e as memórias."
+        )
+    } if only_mary else None
+
+    # 6) Helpers de clímax (SEM CLÍMAX até o usuário liberar)
+    CLIMAX_USER_TRIGGER = re.compile(
+        r"\b(finalmente\b.*orgasmo|explode\b.*orgasmo|cheg(a|ou)\b.*cl[ií]max|"
+        r"pode\b.*finalizar|libero\b.*cl[ií]max|goza(r)?\b.*agora)\b",
+        flags=re.IGNORECASE
+    )
+    ORGASM_OUT_PAT = re.compile(
+        r"([^.!\n]*\b(cl[ií]max|orgasmo|gozou|gozaram|ejacul[ao]u)\b[^.!?\n]*[.!?])",
+        flags=re.IGNORECASE
+    )
+
+    def _user_allows_climax(msgs: list) -> bool:
+        """True se a ÚLTIMA fala do usuário liberar explicitamente o clímax."""
+        last_user = ""
+        for r in reversed(msgs or []):
+            if str(r.get("role","")).lower() == "user":
+                last_user = r.get("content","")
+                break
+        if not last_user:
+            try:
+                hist_chk = carregar_interacoes(n=3)
+                for r in reversed(hist_chk or []):
+                    if str(r.get("role","")).lower() == "user":
+                        last_user = r.get("content","")
+                        break
+            except Exception:
+                pass
+        return bool(CLIMAX_USER_TRIGGER.search(last_user or ""))
+
+    def _strip_or_soften_climax(texto: str) -> str:
+        """Remove frases de orgasmo/clímax e encerra com pausa natural."""
+        if not texto:
+            return texto
+        texto = ORGASM_OUT_PAT.sub("", texto)
+        texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
+        if not texto.endswith((".", "…", "!", "?")):
+            texto += "…"
+        finais_possiveis = [
+            " Eles param um instante, respirando juntos, sem apressar o desfecho.",
+            " A tensão fica no ar, guardada para o próximo passo.",
+            " Eles se encostam em silêncio, deixando o resto para depois."
+        ]
+        if all(fp not in texto for fp in finais_possiveis):
+            texto += random.choice(finais_possiveis)
+        return texto
+
+    # 7) Construção final das mensagens
+    messages = [system_pt]
+    if system_mary:
+        messages.append(system_mary)
+    messages.append({"role": "system", "content": prompt})
+    messages.extend(historico)
 
     payload = {
         "model": model_to_call,
@@ -1337,16 +1435,19 @@ if entrada:
     }
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
+    # 8) Render final (sanitização leve)
     def _render_visible(t: str) -> str:
         out = render_tail(t)
         out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level", 3)), action="livre")
         return out
 
+    # 9) Streaming + fallbacks
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
         last_update = time.time()
 
+        # Reforço antecipado (memórias puxadas pro prompt)
         try:
             usados_prompt = []
             usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
@@ -1357,20 +1458,27 @@ if entrada:
         except Exception:
             pass
 
+        # --- STREAM ---
         try:
-            with requests.post(endpoint, headers=headers, json=payload, stream=True,
-                               timeout=int(st.session_state.get("timeout_s", 300))) as r:
+            with requests.post(
+                endpoint, headers=headers, json=payload, stream=True,
+                timeout=int(st.session_state.get("timeout_s", 300))
+            ) as r:
                 if r.status_code == 200:
                     for raw in r.iter_lines(decode_unicode=False):
-                        if not raw: continue
+                        if not raw:
+                            continue
                         line = raw.decode("utf-8", errors="ignore").strip()
-                        if not line.startswith("data:"): continue
+                        if not line.startswith("data:"):
+                            continue
                         data = line[5:].strip()
-                        if data == "[DONE]": break
+                        if data == "[DONE]":
+                            break
                         try:
                             j = json.loads(data)
                             delta = j["choices"][0]["delta"].get("content", "")
-                            if not delta: continue
+                            if not delta:
+                                continue
                             resposta_txt += delta
                             if time.time() - last_update > 0.10:
                                 placeholder.markdown(_render_visible(resposta_txt) + "▌")
@@ -1381,103 +1489,9 @@ if entrada:
                     st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
         except Exception as e:
             st.error(f"Erro no streaming: {e}")
-        #############################
-                # >>> ADD: Helpers de clímax (definir antes de usar)
-        CLIMAX_USER_TRIGGER = re.compile(
-            r"\b(finalmente\b.*orgasmo|explode\b.*orgasmo|cheg(a|ou)\b.*cl[ií]max|pode\b.*finalizar|libero\b.*cl[ií]max|goza(r)?\b.*agora)\b",
-            flags=re.IGNORECASE
-        )
 
-        ORGASM_OUT_PAT = re.compile(
-            r"([^.!\n]*\b(cl[ií]max|orgasmo|gozou|gozaram|ejacul[ao]u)\b[^.!?\n]*[.!?])",
-            flags=re.IGNORECASE
-        )
-
-        def _user_allows_climax(msgs: list) -> bool:
-            """
-            Retorna True se a ÚLTIMA fala do usuário libera explicitamente o clímax.
-            """
-            last_user = ""
-            for r in reversed(msgs or []):
-                if str(r.get("role","")).lower() == "user":
-                    last_user = r.get("content","")
-                    break
-            if not last_user:
-                try:
-                    hist_chk = carregar_interacoes(n=3)
-                    for r in reversed(hist_chk or []):
-                        if str(r.get("role","")).lower() == "user":
-                            last_user = r.get("content","")
-                            break
-                except Exception:
-                    pass
-            return bool(CLIMAX_USER_TRIGGER.search(last_user or ""))
-
-        def _strip_or_soften_climax(texto: str) -> str:
-            """
-            Remove frases de orgasmo/clímax e encerra com pausa natural.
-            """
-            if not texto:
-                return texto
-            texto = ORGASM_OUT_PAT.sub("", texto)
-            texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
-            if not texto.endswith((".", "…", "!", "?")):
-                texto += "…"
-            finais_possiveis = [
-                " Eles param um instante, respirando juntos, sem apressar o desfecho.",
-                " A tensão fica no ar, guardada para o próximo passo.",
-                " Eles se encostam em silêncio, deixando o resto para depois."
-            ]
-            if all(fp not in texto for fp in finais_possiveis):
-                texto += random.choice(finais_possiveis)
-            return texto
-###########################
-
-           # === Item 3 — GUARDRAIL PÓS-GERAÇÃO (bloqueio de clímax/finalização precoce) ===
+        # Fallback 1: sem stream
         visible_txt = _render_visible(resposta_txt).strip()
-
-        # Se a proteção estiver ativa e o Momento < 3, evitamos clímax/“finalização” na saída
-        try:
-            bloquear = bool(st.session_state.get("app_bloqueio_intimo", False))
-            mom = int(st.session_state.get("momento", 0))
-        except Exception:
-            bloquear = False
-            mom = 0
-
-        if bloquear and mom < 3 and visible_txt:
-            # Palavras/expressões de clímax ou finalização explícita
-            padrao_climax = re.compile(
-                r"(?i)\b(goz(ar|ou|ando)|gozada|orgasm[oa]s?|cl[íi]max|ejacul(ou|ar)|explodiu(?: em)? orgasmo)\b"
-            )
-            padrao_finaliza = re.compile(
-                r"(?i)\b(goza dentro|me faz gozar|goza em mim|mete (fundo|com tudo)|me come (agora|logo))\b"
-            )
-
-            alterou = False
-            novas_linhas = []
-            for linha in visible_txt.splitlines():
-                # Se descreve clímax explícito, trocamos por pausa sensorial
-                if padrao_climax.search(linha):
-                    novas_linhas.append(
-                        "… eles freiam juntos, respirando alto; o momento fica em suspensão, sem finalização."
-                    )
-                    alterou = True
-                else:
-                    # Se pede “finalização” direta, converte para convite suave (sem finalizar)
-                    linha2 = padrao_finaliza.sub(
-                        "… ela muda o pedido por um beijo longo; os dois mantêm o clima, sem pressa.",
-                        linha,
-                    )
-                    if linha2 != linha:
-                        alterou = True
-                    novas_linhas.append(linha2)
-
-            visible_txt = "\n".join(novas_linhas).strip()
-            # Se houve alteração, garantimos um fechamento em pausa (sem clímax)
-            if alterou and not visible_txt.endswith(("sem pressa.", "em suspensão.", "em silêncio.")):
-                visible_txt += "\n\nEles ficam um instante em silêncio, só sentindo a respiração do outro."
-
-        # === FALLBACK 1: sem stream ===
         if not visible_txt:
             try:
                 r2 = requests.post(
@@ -1496,7 +1510,7 @@ if entrada:
             except Exception as e:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
-        # === FALLBACK 2: prompts limpos ===
+        # Fallback 2: prompts limpos
         if not visible_txt:
             try:
                 r3 = requests.post(
@@ -1521,9 +1535,26 @@ if entrada:
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
+        # 10) Pós-processamento: Bloqueio de clímax + correção “Modo Mary”
+        bloquear = bool(st.session_state.get("app_bloqueio_intimo", False))
+        mom = int(st.session_state.get("momento", 0))
+        if (bloquear or mom < 3) and not _user_allows_climax(st.session_state.session_msgs):
+            visible_txt = _strip_or_soften_climax(visible_txt)
 
+        if only_mary:
+            # Evita falas geradas para Jânio/“ele” na linha de diálogo
+            visible_txt = re.sub(
+                r'(^|\n)\s*[-–—]\s*(J[aâ]nio|Ele)\s*[:\-].*?$',
+                '',
+                visible_txt,
+                flags=re.IGNORECASE | re.MULTILINE
+            )
+            visible_txt = re.sub(r'\n{3,}', '\n\n', visible_txt).strip()
+
+        # 11) Exibição
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
+        # 12) Alerta de momento (não bloqueia)
         try:
             viol = viola_momento(visible_txt, int(st.session_state.get("momento", 0)))
             if viol and st.session_state.get("app_bloqueio_intimo", False):
@@ -1531,15 +1562,18 @@ if entrada:
         except Exception:
             pass
 
+        # 13) Validação semântica
         if len(st.session_state.session_msgs) >= 1 and visible_txt and visible_txt != "[Sem conteúdo]":
             texto_anterior = st.session_state.session_msgs[-1]["content"]
             alerta = verificar_quebra_semantica_openai(texto_anterior, visible_txt)
             if alerta:
                 st.info(alerta)
 
+        # 14) Persistência da resposta
         salvar_interacao("assistant", visible_txt if visible_txt else "[Sem conteúdo]")
         st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt if visible_txt else "[Sem conteúdo]"})
 
+        # 15) Reforço pós-resposta (memórias usadas)
         try:
             usados = []
             topk_usadas = memoria_longa_buscar_topk(
@@ -1552,6 +1586,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
