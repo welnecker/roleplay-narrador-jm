@@ -674,11 +674,21 @@ A família se amontoa em um SUV para ir à praia, deixando a tia {{char}} mais j
         formato_cena = (
             "- Inclua **DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação física/visual (mínimo 4 falas quando ambos estiverem na cena)."
         )
+
+        # Regra permanente de clímax (sem fade-to-black)
+        climax_bloco = (
+        "### Regra permanente de clímax\n"
+        "- **Não** descreva orgasmo/ejaculação/clímax **sem liberação explícita na ÚLTIMA fala do usuário**.\n"
+        "- Se não houver liberação, pare no **limiar**: respiração, tremor, pausa; **sem finalizar**.\n"
+        "- **Sem fade-to-black** em qualquer circunstância.\n"
+        "- Exemplos de liberação: 'finaliza', 'pode gozar', 'chegou ao clímax', 'goza agora', 'liberado o orgasmo'.\n"
+        )
+
     # --- Montagem final do prompt ---
     prompt = f"""
 {BLOCO_RESTRICAO_SENSORY}
 {papel_header}
-{sintonia_bloco}{virg_bloco}{climax_bloco}{falas_mary_bloco}
+{ancora_bloco}{sintonia_bloco}{virg_bloco}{climax_bloco}{falas_mary_bloco}
 ### Dossiê (personas)
 {dossie_txt}
 ### Diretrizes gerais (ALL)
@@ -1069,40 +1079,64 @@ if entrada:
     }
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
-    # Helpers de clímax
+        # =========================================================
+    # BLOQUEIO DE CLÍMAX — Helpers (sempre ativo por padrão)
+    # =========================================================
+
+    # Gatilho explícito do usuário para liberar o clímax
     CLIMAX_USER_TRIGGER = re.compile(
-        r"\b(finalmente\b.*orgasmo|explode\b.*orgasmo|cheg(a|ou)\b.*cl[ií]max|pode\b.*finalizar|libero\b.*cl[ií]max|goza(r)?\b.*agora)\b",
+        r"(?:\b("
+        r"finaliza(?:r)?|"
+        r"pode\s+(?:gozar|finalizar)|"
+        r"liber(?:a|o)\s+(?:o\s+)?(?:cl[ií]max|orgasmo)|"
+        r"cheg(?:a|ou)\s+ao?\s+(?:cl[ií]max|orgasmo)|"
+        r"goza(?:r)?\s+(?:agora|já)|"
+        r"agora\s+goza|"
+        r"permite\s+orgasmo|"
+        r"explod(?:e|iu)\s+em\s+orgasmo"
+        r")\b)",
         flags=re.IGNORECASE
     )
-    ORGASM_OUT_PAT = re.compile(
-        r"([^.!\n]*\b(cl[ií]max|orgasmo|gozou|gozaram|ejacul[ao]u)\b[^.!?\n]*[.!?])",
-        flags=re.IGNORECASE
-    )
+
+    # Léxico de termos de clímax
+    ORGASM_TERMS = r"(?:cl[ií]max|orgasmo|orgásm(?:ic)o|gozou|gozando|gozaram|ejacul(?:a|ou|ar)|cheg(?:a|ou)\s+lá|explod(?:e|iu))"
+
+    # Remove frases inteiras que contenham termos de clímax
+    ORGASM_SENT = re.compile(rf"([^.!\n]*\b{ORGASM_TERMS}\b[^.!?\n]*[.!?])", flags=re.IGNORECASE)
+
+    # (Modo Mary) — filtra falas atribuídas a Jânio quando ativo
     DIALOGO_NAO_MARY = re.compile(r"(^|\n)\s*—\s*(J[âa]nio|ele|donisete)\b.*", re.IGNORECASE)
 
     def _user_allows_climax(msgs: list) -> bool:
+        """
+        True se a ÚLTIMA fala do usuário libera explicitamente o clímax.
+        """
         last_user = ""
         for r in reversed(msgs or []):
-            if str(r.get("role", "")).lower() == "user":
-                last_user = r.get("content", "")
+            if str(r.get("role","")).lower() == "user":
+                last_user = r.get("content","") or ""
                 break
-        return bool(CLIMAX_USER_TRIGGER.search(last_user or ""))
+        return bool(CLIMAX_USER_TRIGGER.search(last_user))
 
     def _strip_or_soften_climax(texto: str) -> str:
+        """
+        Remove qualquer menção de clímax/ejaculação e encerra em pausa sensorial (sem fade-to-black).
+        """
         if not texto:
             return texto
-        texto = ORGASM_OUT_PAT.sub("", texto)
+        texto = ORGASM_SENT.sub("", texto)
         texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
         if not texto.endswith((".", "…", "!", "?")):
             texto += "…"
         finais = [
-            " Eles param um instante, respirando juntos, sem apressar o desfecho.",
-            " A tensão fica no ar, guardada para o próximo passo.",
-            " Eles se encostam em silêncio, deixando o resto para depois."
+            " A tensão fica no ar, sem conclusão, apenas a respiração quente entre eles.",
+            " Eles param no limiar, ainda ofegantes, guardando o resto para o próximo passo.",
+            " Um silêncio elétrico preenche o quarto; nenhum desfecho, só a pele e o pulso acelerado.",
         ]
         if all(f not in texto for f in finais):
             texto += random.choice(finais)
         return texto
+
 
     def _render_visible(t: str) -> str:
         out = render_tail(t)
@@ -1129,105 +1163,115 @@ if entrada:
         except Exception:
             pass
 
-        # STREAM
+        # ======================
+    # STREAM (PATCH C)
+    # ======================
+    try:
+        with requests.post(
+            endpoint, headers=headers, json=payload, stream=True,
+            timeout=int(st.session_state.get("timeout_s", 300))
+        ) as r:
+            if r.status_code == 200:
+                for raw in r.iter_lines(decode_unicode=False):
+                    if not raw:
+                        continue
+                    line = raw.decode("utf-8", errors="ignore").strip()
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        j = json.loads(data)
+                        delta = j["choices"][0]["delta"].get("content", "")
+                        if not delta:
+                            continue
+                        resposta_txt += delta
+
+                        # Atualização parcial
+                        if time.time() - last_update > 0.10:
+                            parcial = _render_visible(resposta_txt) + "▌"
+
+                            # BLOQUEIO ON-THE-FLY (sempre ativo se a opção estiver ligada)
+                            # Obs.: Agora NÃO depende mais da fase. Só libera se o usuário autorizou.
+                            if st.session_state.get("app_bloqueio_intimo", True):
+                                if not _user_allows_climax(st.session_state.session_msgs):
+                                    parcial = _strip_or_soften_climax(parcial)
+
+                            placeholder.markdown(parcial)
+                            last_update = time.time()
+                    except Exception:
+                        continue
+            else:
+                st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+    except Exception as e:
+        st.error(f"Erro no streaming: {e}")
+
+    # FINALIZA TEXTO VISÍVEL
+    visible_txt = _render_visible(resposta_txt).strip()
+
+    # Fallback sem stream
+    if not visible_txt:
         try:
-            with requests.post(endpoint, headers=headers, json=payload, stream=True,
-                               timeout=int(st.session_state.get("timeout_s", 300))) as r:
-                if r.status_code == 200:
-                    for raw in r.iter_lines(decode_unicode=False):
-                        if not raw:
-                            continue
-                        line = raw.decode("utf-8", errors="ignore").strip()
-                        if not line.startswith("data:"):
-                            continue
-                        data = line[5:].strip()
-                        if data == "[DONE]":
-                            break
-                        try:
-                            j = json.loads(data)
-                            delta = j["choices"][0]["delta"].get("content", "")
-                            if not delta:
-                                continue
-                            resposta_txt += delta
-                            if time.time() - last_update > 0.10:
-                                parcial = _render_visible(resposta_txt) + "▌"
-                                # Bloqueio de clímax on-the-fly (fase <5 e sem liberação)
-                                if st.session_state.get("app_bloqueio_intimo", True):
-                                    fase_atual = int(st.session_state.get("mj_fase", 0))
-                                    if (fase_atual < 5) and (not _user_allows_climax(st.session_state.session_msgs)):
-                                        parcial = _strip_or_soften_climax(parcial)
-                                placeholder.markdown(parcial)
-                                last_update = time.time()
-                        except Exception:
-                            continue
-                else:
-                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+            r2 = requests.post(
+                endpoint, headers=headers,
+                json={**payload, "stream": False},
+                timeout=int(st.session_state.get("timeout_s", 300))
+            )
+            if r2.status_code == 200:
+                try:
+                    resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    resposta_txt = ""
+                visible_txt = _render_visible(resposta_txt).strip()
+            else:
+                st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
         except Exception as e:
-            st.error(f"Erro no streaming: {e}")
+            st.error(f"Fallback (sem stream) erro: {e}")
 
-        # FINALIZA TEXTO VISÍVEL
-        visible_txt = _render_visible(resposta_txt).strip()
+    # Fallback com prompts limpos
+    if not visible_txt:
+        try:
+            r3 = requests.post(
+                endpoint, headers=headers,
+                json={
+                    "model": model_to_call,
+                    "messages": [{"role": "system", "content": prompt}] + historico,
+                    "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                    "temperature": 0.9,
+                    "stream": False,
+                },
+                timeout=int(st.session_state.get("timeout_s", 300))
+            )
+            if r3.status_code == 200:
+                try:
+                    resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    resposta_txt = ""
+                visible_txt = _render_visible(resposta_txt).strip()
+            else:
+                st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
+        except Exception as e:
+            st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # Fallback sem stream
-        if not visible_txt:
-            try:
-                r2 = requests.post(endpoint, headers=headers,
-                                   json={**payload, "stream": False},
-                                   timeout=int(st.session_state.get("timeout_s", 300)))
-                if r2.status_code == 200:
-                    try:
-                        resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
-                    except Exception:
-                        resposta_txt = ""
-                    visible_txt = _render_visible(resposta_txt).strip()
+    # BLOQUEIO DE CLÍMAX FINAL (sempre que a opção estiver ativa, só libera com comando do usuário)
+    if st.session_state.get("app_bloqueio_intimo", True):
+        if not _user_allows_climax(st.session_state.session_msgs):
+            visible_txt = _strip_or_soften_climax(visible_txt)
+
+    # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
+    if st.session_state.get("usar_falas_mary", False):
+        falas = st.session_state.get("_falas_mary_list", []) or []
+        if falas and visible_txt:
+            tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
+            if not tem_fala:
+                escolha = random.choice(falas)
+                if st.session_state.get("interpretar_apenas_mary", False):
+                    inj = f"— {escolha}\n\n"
                 else:
-                    st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
-            except Exception as e:
-                st.error(f"Fallback (sem stream) erro: {e}")
+                    inj = f"— {escolha} — diz Mary.\n\n"
+                visible_txt = inj + visible_txt
 
-        # Fallback prompts limpos
-        if not visible_txt:
-            try:
-                r3 = requests.post(
-                    endpoint, headers=headers,
-                    json={
-                        "model": model_to_call,
-                        "messages": [{"role": "system", "content": prompt}] + historico,
-                        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
-                        "temperature": 0.9,
-                        "stream": False,
-                    },
-                    timeout=int(st.session_state.get("timeout_s", 300))
-                )
-                if r3.status_code == 200:
-                    try:
-                        resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
-                    except Exception:
-                        resposta_txt = ""
-                    visible_txt = _render_visible(resposta_txt).strip()
-                else:
-                    st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
-            except Exception as e:
-                st.error(f"Fallback (prompts limpos) erro: {e}")
-
-                # BLOQUEIO DE CLÍMAX FINAL (fase + gatilho do usuário)
-        if st.session_state.get("app_bloqueio_intimo", True):
-            fase_atual = int(st.session_state.get("mj_fase", 0))
-            if (fase_atual < 5) and (not _user_allows_climax(st.session_state.session_msgs)):
-                visible_txt = _strip_or_soften_climax(visible_txt)
-
-        # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
-        if st.session_state.get("usar_falas_mary", False):
-            falas = st.session_state.get("_falas_mary_list", []) or []
-            if falas and visible_txt:
-                tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
-                if not tem_fala:
-                    escolha = random.choice(falas)
-                    if st.session_state.get("interpretar_apenas_mary", False):
-                        inj = f"— {escolha}\n\n"
-                    else:
-                        inj = f"— {escolha} — diz Mary.\n\n"
-                    visible_txt = inj + visible_txt
 
         # Render final
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
@@ -1253,6 +1297,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
