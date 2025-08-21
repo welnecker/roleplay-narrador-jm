@@ -633,15 +633,31 @@ A família se amontoa em um SUV para ir à praia, deixando a tia {{char}} mais j
         if not falas:
             falas = FALAS_EXPLICITAS_MARY
         if falas:
-            falas_mary_bloco = "### Falas de Mary (usar literalmente)\n" + "\n".join(f"- {s}" for s in falas)
-    sintonia_bloco = ""
-    if modo_sintonia:
-        sintonia_bloco = (
-            "### Sintonia & Ritmo (prioritário)\n"
-            f"- Ritmo da cena: **{ritmo_label}**.\n"
-            "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites e pedidos gentis.\n"
-            "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
+            # Falas Mary
+falas_mary_bloco = ""
+st.session_state["_falas_mary_list"] = []  # guarda lista p/ enforcer no streaming
+if st.session_state.get("usar_falas_mary", False):
+    falas = carregar_falas_mary()
+    if not falas:
+        falas = FALAS_EXPLICITAS_MARY  # fallback brando
+    if falas:
+        st.session_state["_falas_mary_list"] = falas[:]  # salva na sessão p/ etapa de pós-processamento
+        falas_mary_bloco = (
+            "### Falas de Mary — use literalmente 1–2 destas (no máximo 1 por parágrafo)\n"
+            "NÃO reescreva as frases abaixo; quando usar, mantenha exatamente como está.\n"
+            + "\n".join(f"- {s}" for s in falas)
         )
+
+# Sintonia
+sintonia_bloco = ""
+if modo_sintonia:
+    sintonia_bloco = (
+        "### Sintonia & Ritmo (prioritário)\n"
+        f"- Ritmo da cena: **{ritmo_label}**.\n"
+        "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites e pedidos gentis.\n"
+        "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
+    )
+
     virg_bloco = montar_bloco_virgindade(ativar=detectar_virgindade_mary(memos, ate_ts))
     climax_bloco = ""
     if bool(st.session_state.get("app_bloqueio_intimo", True)) and fase < 5:
@@ -1206,6 +1222,20 @@ if entrada:
             if (fase_atual < 5) and (not _user_allows_climax(st.session_state.session_msgs)):
                 visible_txt = _strip_or_soften_climax(visible_txt)
 
+        # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
+if st.session_state.get("usar_falas_mary", False):
+    falas = st.session_state.get("_falas_mary_list", []) or []
+    if falas and visible_txt:
+        tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
+        if not tem_fala:
+            escolha = random.choice(falas)
+            if st.session_state.get("interpretar_apenas_mary", False):
+                inj = f"— {escolha}\n\n"
+            else:
+                inj = f"— {escolha} — diz Mary.\n\n"
+            visible_txt = inj + visible_txt
+
+
         # Render final
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
 
@@ -1230,6 +1260,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
