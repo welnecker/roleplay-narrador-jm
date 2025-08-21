@@ -175,6 +175,119 @@ def _ws(name: str, create_if_missing: bool = True):
 # =========================
 # UTILIDADES: MEMÓRIAS / HISTÓRICO
 # =========================
+from typing import Dict, List
+from datetime import datetime
+
+# --- Constantes de abas (ajuste se necessário) ---
+TAB_MEMORIAS   = "memoria_jm"       # cabeçalho: tipo | conteudo | timestamp
+TAB_INTERACOES = "interacoes_jm"  # ou "interacoes_jm", conforme seu projeto
+TAB_PERFIL     = "perfil_jm"        # aba que guarda 'resumo'
+
+# ---------------------------------------------
+# VIRGINDADE — leitura memoria_jm + fallback (interacoes_jm) e inferência temporal
+# ---------------------------------------------
+from typing import Optional, Tuple, List
+import re
+from datetime import datetime
+
+# Padrões (priorize "não virgem" sobre "virgem")
+PADROES_NAO_VIRGEM = [
+    r"\b(n[aã]o\s+sou\s+mais\s+virgem)\b",
+    r"\b(deix(ei|ou)\s+de\s+ser\s+virgem)\b",
+    r"\b(perd[ei]u?\s+a\s+virgindade)\b",
+    r"\b(minha|sua|nossa)\s+primeira\s+vez\s+(foi|aconteceu|rolou)\b",
+    r"\b(tivemos|tive)\s+(a\s+)?primeira\s+vez\b",
+]
+PADROES_VIRGEM = [
+    r"\b(sou|era|continuo?|permane[cç]o)\s+virgem\b",
+    r"\b(nunca\s+(tran(s|ç)ei|fiz\s+sexo|tive\s+rela[cç][oõ]es))\b",
+    r"\b(virgindade)\b(?!\s*(perd[ií]|\bn[aã]o\b))",
+]
+
+def _to_dt(ts: str) -> Optional[datetime]:
+    """Converte timestamp em datetime. Aceita formatos comuns; retorna None se falhar."""
+    ts = (ts or "").strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(ts, fmt)
+        except Exception:
+            pass
+    return None
+
+def _ultimo_evento_virgindade_memoria(ate: Optional[datetime] = None) -> Optional[Tuple[bool, datetime, str]]:
+    """
+    Varre a aba memoria_jm (via carregar_memorias_brutas) nos tipos [mary] e [all].
+    Retorna (estado_bool, ts, "memoria_jm") com o evento mais recente <= ate.
+    """
+    try:
+        buckets = carregar_memorias_brutas()  # {'[tag]': [{'conteudo','timestamp'}, ...]}
+    except Exception:
+        buckets = {}
+    candidatos: List[Tuple[bool, datetime]] = []
+    ate = ate or datetime.now()
+
+    for tag in ("[mary]", "[all]"):
+        for item in buckets.get(tag, []) or []:
+            txt = (item.get("conteudo") or "").strip()
+            ts = _to_dt(item.get("timestamp"))
+            if ts and ts > ate:
+                continue
+            low = txt.lower()
+            # não virgem tem prioridade
+            if any(re.search(p, low, re.IGNORECASE) for p in PADROES_NAO_VIRGEM):
+                candidatos.append((False, ts or datetime.min))
+            elif any(re.search(p, low, re.IGNORECASE) for p in PADROES_VIRGEM):
+                candidatos.append((True, ts or datetime.min))
+
+    if not candidatos:
+        return None
+
+    # mais recente; em empate, False (não virgem) vence
+    candidatos.sort(key=lambda x: (x[1], 0 if x[0] is False else 1))
+    estado, ts = candidatos[-1]
+    return (estado, ts, "memoria_jm")
+
+def _ultimo_evento_virgindade_interacoes(ate: Optional[datetime] = None) -> Optional[Tuple[bool, datetime, str]]:
+    """
+    Fallback: varre interacoes_jm (via carregar_interacoes) e tenta inferir.
+    Retorna (estado_bool, ts, "interacoes_jm").
+    """
+    ate = ate or datetime.now()
+    inter = carregar_interacoes(n=10000)  # pega um histórico grande
+    if not inter:
+        return None
+
+    candidatos: List[Tuple[bool, datetime]] = []
+    for r in inter:
+        ts = _to_dt(r.get("timestamp"))
+        if ts and ts > ate:
+            continue
+        low = (r.get("content") or "").strip().lower()
+        if any(re.search(p, low, re.IGNORECASE) for p in PADROES_NAO_VIRGEM):
+            candidatos.append((False, ts or datetime.min))
+        elif any(re.search(p, low, re.IGNORECASE) for p in PADROES_VIRGEM):
+            candidatos.append((True, ts or datetime.min))
+
+    if not candidatos:
+        return None
+
+    candidatos.sort(key=lambda x: (x[1], 0 if x[0] is False else 1))
+    estado, ts = candidatos[-1]
+    return (estado, ts, "interacoes_jm")
+
+def estado_virgindade_ate(ate: Optional[datetime] = None) -> Optional[bool]:
+    """
+    Público p/ o prompt builder:
+      True  -> virgem
+      False -> não virgem
+      None  -> desconhecido (sem evidências)
+    """
+    ate = ate or datetime.now()
+    res = _ultimo_evento_virgindade_memoria(ate)
+    if res is None:
+        res = _ultimo_evento_virgindade_interacoes(ate)
+    return None if res is None else res[0]
+
 
 def _normalize_tag(raw: str) -> str:
     t = (raw or "").strip().lower()
@@ -191,6 +304,7 @@ def _parse_ts(s: str) -> str:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def carregar_memorias_brutas() -> Dict[str, List[dict]]:
+    """Lê a aba TAB_MEMORIAS e devolve um dicionário {'[tag]': [{'conteudo':..., 'timestamp':...}, ...]}."""
     try:
         regs = _sheet_all_records_cached(TAB_MEMORIAS)
         buckets: Dict[str, List[dict]] = {}
@@ -206,6 +320,10 @@ def carregar_memorias_brutas() -> Dict[str, List[dict]]:
         return {}
 
 def persona_block_temporal(nome: str, buckets: dict, ate_ts: str, max_linhas: int = 8) -> str:
+    """
+    Monta um bloco textual (linhas) da persona 'nome' até o timestamp ate_ts (YYYY-MM-DD HH:MM:SS).
+    Busca no buckets['[nome]'] e filtra por timestamp <= ate_ts.
+    """
     tag = f"[{nome}]"
     linhas = []
     for d in buckets.get(tag, []) or []:
@@ -222,10 +340,11 @@ def persona_block_temporal(nome: str, buckets: dict, ate_ts: str, max_linhas: in
     ult = [c for _, c in linhas][-max_linhas:]
     if not ult:
         return ""
-    titulo = "Jânio" if nome in ("janio","jânio") else "Mary" if nome=="mary" else nome.capitalize()
+    titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
     return f"{titulo}:\n- " + "\n- ".join(ult)
 
 def carregar_resumo_salvo() -> str:
+    """Lê a última linha com coluna 'resumo' não vazia em TAB_PERFIL."""
     try:
         registros = _sheet_all_records_cached(TAB_PERFIL)
         for r in reversed(registros):
@@ -238,6 +357,7 @@ def carregar_resumo_salvo() -> str:
         return ""
 
 def salvar_resumo(resumo: str):
+    """Salva uma nova linha [timestamp, resumo] na aba TAB_PERFIL."""
     try:
         aba = _ws(TAB_PERFIL)
         if not aba:
@@ -249,6 +369,10 @@ def salvar_resumo(resumo: str):
         st.error(f"Erro ao salvar resumo: {e}")
 
 def carregar_interacoes(n: int = 20):
+    """
+    Carrega as interações da aba TAB_INTERACOES com cache em sessão.
+    Retorna as últimas n interações normalizadas: [{timestamp, role, content}, ...]
+    """
     cache = st.session_state.get("_cache_interacoes", None)
     if cache is None:
         regs = _sheet_all_records_cached(TAB_INTERACOES)
@@ -265,6 +389,7 @@ def carregar_interacoes(n: int = 20):
     return cache[-n:] if len(cache) > n else cache
 
 def salvar_interacao(role: str, content: str):
+    """Acrescenta uma linha em TAB_INTERACOES e atualiza o cache em sessão."""
     if not planilha:
         return
     try:
@@ -652,7 +777,34 @@ A família se amontoa em um SUV para ir à praia, deixando a tia {{char}} mais j
             "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
         )
 
-    virg_bloco = montar_bloco_virgindade(ativar=detectar_virgindade_mary(memos, ate_ts))
+        # --- VIRGINDADE (temporal) ---
+    try:
+        # Se você colou o Patch D, _to_dt deve existir; senão, passa None e usa "agora"
+        _ref_dt = _to_dt(ate_ts) if " _to_dt" in globals() or "_to_dt" in dir() else None
+        est = estado_virgindade_ate(_ref_dt)
+        if est is True:
+            virg_bloco = (
+                "### Estado canônico — Virgindade\n"
+                "- Mary é **virgem** neste momento da história.\n"
+                "- Mantenha coerência: sem histórico de penetração; se houver exploração íntima, trate como **primeira descoberta**, cuidadosa e sem contradições.\n"
+            )
+        elif est is False:
+            virg_bloco = (
+                "### Estado canônico — Virgindade\n"
+                "- Mary **não é mais virgem** (evento passado registrado).\n"
+                "- Não reescreva o passado; mantenha consistência com a cena que marcou a primeira vez.\n"
+            )
+        else:
+            virg_bloco = (
+                "### Estado canônico — Virgindade\n"
+                "- **Sem evidência temporal** suficiente: **não** afirme que é a primeira vez e **não** invente perda de virgindade.\n"
+            )
+    except Exception:
+        virg_bloco = (
+            "### Estado canônico — Virgindade\n"
+            "- Falha ao ler o estado; **evite** afirmar status e **não** contradiga cenas anteriores.\n"
+        )
+
     climax_bloco = ""
     if bool(st.session_state.get("app_bloqueio_intimo", True)) and fase < 5:
         climax_bloco = (
@@ -1259,7 +1411,7 @@ if entrada:
         if not _user_allows_climax(st.session_state.session_msgs):
             visible_txt = _strip_or_soften_climax(visible_txt)
 
-    # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
+        # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
     if st.session_state.get("usar_falas_mary", False):
         falas = st.session_state.get("_falas_mary_list", []) or []
         if falas and visible_txt:
@@ -1271,32 +1423,32 @@ if entrada:
                 else:
                     inj = f"— {escolha} — diz Mary.\n\n"
                 visible_txt = inj + visible_txt
+    
+    # ===== Render final (sempre) =====
+    placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
+    
+    # ===== Persistência (sempre) =====
+    if visible_txt and visible_txt != "[Sem conteúdo]":
+        salvar_interacao("assistant", visible_txt)
+        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
+    else:
+        salvar_interacao("assistant", "[Sem conteúdo]")
+        st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
+    
+    # ===== Reforço pós-resposta (sempre) =====
+    try:
+        usados = []
+        topk_usadas = memoria_longa_buscar_topk(
+            query_text=visible_txt,
+            k=int(st.session_state.get("k_memoria_longa", 3)),
+            limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
+        )
+        for t, _sc, _sim, _rr in topk_usadas:
+            usados.append(t)
+        memoria_longa_reforcar(usados)
+    except Exception:
+        pass
 
-
-        # Render final
-        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
-
-        # Persistência
-        if visible_txt and visible_txt != "[Sem conteúdo]":
-            salvar_interacao("assistant", visible_txt)
-            st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
-        else:
-            salvar_interacao("assistant", "[Sem conteúdo]")
-            st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
-
-        # Reforço pós-resposta
-        try:
-            usados = []
-            topk_usadas = memoria_longa_buscar_topk(
-                query_text=visible_txt,
-                k=int(st.session_state.get("k_memoria_longa", 3)),
-                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
-            )
-            for t, _sc, _sim, _rr in topk_usadas:
-                usados.append(t)
-            memoria_longa_reforcar(usados)
-        except Exception:
-            pass
 
 
 
