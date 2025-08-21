@@ -634,29 +634,29 @@ A família se amontoa em um SUV para ir à praia, deixando a tia {{char}} mais j
             falas = FALAS_EXPLICITAS_MARY
         if falas:
             # Falas Mary
-falas_mary_bloco = ""
-st.session_state["_falas_mary_list"] = []  # guarda lista p/ enforcer no streaming
-if st.session_state.get("usar_falas_mary", False):
-    falas = carregar_falas_mary()
-    if not falas:
-        falas = FALAS_EXPLICITAS_MARY  # fallback brando
-    if falas:
-        st.session_state["_falas_mary_list"] = falas[:]  # salva na sessão p/ etapa de pós-processamento
-        falas_mary_bloco = (
-            "### Falas de Mary — use literalmente 1–2 destas (no máximo 1 por parágrafo)\n"
-            "NÃO reescreva as frases abaixo; quando usar, mantenha exatamente como está.\n"
-            + "\n".join(f"- {s}" for s in falas)
-        )
+            falas_mary_bloco = ""
+            st.session_state["_falas_mary_list"] = []  # guarda lista p/ enforcer no streaming
+            if st.session_state.get("usar_falas_mary", False):
+                falas = carregar_falas_mary()
+                if not falas:
+                    falas = FALAS_EXPLICITAS_MARY  # fallback brando
+                if falas:
+                    st.session_state["_falas_mary_list"] = falas[:]  # salva na sessão p/ etapa de pós-processamento
+                    falas_mary_bloco = (
+                        "### Falas de Mary — use literalmente 1–2 destas (no máximo 1 por parágrafo)\n"
+                        "NÃO reescreva as frases abaixo; quando usar, mantenha exatamente como está.\n"
+                        + "\n".join(f"- {s}" for s in falas)
+                    )
 
-# Sintonia
-sintonia_bloco = ""
-if modo_sintonia:
-    sintonia_bloco = (
-        "### Sintonia & Ritmo (prioritário)\n"
-        f"- Ritmo da cena: **{ritmo_label}**.\n"
-        "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites e pedidos gentis.\n"
-        "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
-    )
+            # Sintonia
+            sintonia_bloco = ""
+            if modo_sintonia:
+                sintonia_bloco = (
+                    "### Sintonia & Ritmo (prioritário)\n"
+                    f"- Ritmo da cena: **{ritmo_label}**.\n"
+                    "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites e pedidos gentis.\n"
+                    "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
+                )
 
     virg_bloco = montar_bloco_virgindade(ativar=detectar_virgindade_mary(memos, ate_ts))
     climax_bloco = ""
@@ -1260,6 +1260,7 @@ if st.session_state.get("usar_falas_mary", False):
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
