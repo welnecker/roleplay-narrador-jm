@@ -627,36 +627,30 @@ A família se amontoa em um SUV para ir à praia, deixando a tia {{char}} mais j
     if mary: dossie.append(mary)
     if janio: dossie.append(janio)
     dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
+    # --- Falas da Mary (planilha/placeholder) ---
     falas_mary_bloco = ""
+    st.session_state["_falas_mary_list"] = []  # reset em toda chamada do prompt
+    
     if st.session_state.get("usar_falas_mary", False):
-        falas = carregar_falas_mary()
-        if not falas:
-            falas = FALAS_EXPLICITAS_MARY
+        falas = carregar_falas_mary() or FALAS_EXPLICITAS_MARY
         if falas:
-            # Falas Mary
-            falas_mary_bloco = ""
-            st.session_state["_falas_mary_list"] = []  # guarda lista p/ enforcer no streaming
-            if st.session_state.get("usar_falas_mary", False):
-                falas = carregar_falas_mary()
-                if not falas:
-                    falas = FALAS_EXPLICITAS_MARY  # fallback brando
-                if falas:
-                    st.session_state["_falas_mary_list"] = falas[:]  # salva na sessão p/ etapa de pós-processamento
-                    falas_mary_bloco = (
-                        "### Falas de Mary — use literalmente 1–2 destas (no máximo 1 por parágrafo)\n"
-                        "NÃO reescreva as frases abaixo; quando usar, mantenha exatamente como está.\n"
-                        + "\n".join(f"- {s}" for s in falas)
-                    )
-
-            # Sintonia
-            sintonia_bloco = ""
-            if modo_sintonia:
-                sintonia_bloco = (
-                    "### Sintonia & Ritmo (prioritário)\n"
-                    f"- Ritmo da cena: **{ritmo_label}**.\n"
-                    "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites e pedidos gentis.\n"
-                    "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
-                )
+            # guarda lista para o enforcer no streaming
+            st.session_state["_falas_mary_list"] = falas[:]
+            falas_mary_bloco = (
+                "### Falas de Mary — use literalmente 1–2 destas (no máximo 1 por parágrafo)\n"
+                "NÃO reescreva as frases abaixo; quando usar, mantenha exatamente como está.\n"
+                + "\n".join(f"- {s}" for s in falas)
+            )
+    
+    # --- Sintonia & Ritmo (fora do bloco de falas!) ---
+    sintonia_bloco = ""
+    if modo_sintonia:
+        sintonia_bloco = (
+            "### Sintonia & Ritmo (prioritário)\n"
+            f"- Ritmo da cena: **{ritmo_label}**.\n"
+            "- Condução harmônica: Mary sintoniza com o parceiro; evite ordens ríspidas/imperativas. Prefira convites e pedidos gentis.\n"
+            "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
+        )
 
     virg_bloco = montar_bloco_virgindade(ativar=detectar_virgindade_mary(memos, ate_ts))
     climax_bloco = ""
@@ -1216,25 +1210,24 @@ if entrada:
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # BLOQUEIO DE CLÍMAX FINAL (fase + gatilho do usuário)
+                # BLOQUEIO DE CLÍMAX FINAL (fase + gatilho do usuário)
         if st.session_state.get("app_bloqueio_intimo", True):
             fase_atual = int(st.session_state.get("mj_fase", 0))
             if (fase_atual < 5) and (not _user_allows_climax(st.session_state.session_msgs)):
                 visible_txt = _strip_or_soften_climax(visible_txt)
 
         # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
-if st.session_state.get("usar_falas_mary", False):
-    falas = st.session_state.get("_falas_mary_list", []) or []
-    if falas and visible_txt:
-        tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
-        if not tem_fala:
-            escolha = random.choice(falas)
-            if st.session_state.get("interpretar_apenas_mary", False):
-                inj = f"— {escolha}\n\n"
-            else:
-                inj = f"— {escolha} — diz Mary.\n\n"
-            visible_txt = inj + visible_txt
-
+        if st.session_state.get("usar_falas_mary", False):
+            falas = st.session_state.get("_falas_mary_list", []) or []
+            if falas and visible_txt:
+                tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
+                if not tem_fala:
+                    escolha = random.choice(falas)
+                    if st.session_state.get("interpretar_apenas_mary", False):
+                        inj = f"— {escolha}\n\n"
+                    else:
+                        inj = f"— {escolha} — diz Mary.\n\n"
+                    visible_txt = inj + visible_txt
 
         # Render final
         placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
@@ -1260,6 +1253,7 @@ if st.session_state.get("usar_falas_mary", False):
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
