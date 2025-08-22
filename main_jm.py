@@ -66,7 +66,7 @@ MODELOS_TOGETHER_UI = {
 
 MODELOS_HF = {
     "Llama 3.1 8B Instruct (HF)": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-    "Qwen2.5 7B Instruct (HF)":   "Qwen/Qwen2.5-7B-Instruct",
+    "Qwen2.5 7B Instruct (HF)":   "Qwen/Qwen3-235B-A22B-Instruct-2507",
     "Mixtral 8x7B Instruct (HF)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
     "DeepSeek R1 (HF)":           "deepseek-ai/DeepSeek-R1",
 }
@@ -1538,6 +1538,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
