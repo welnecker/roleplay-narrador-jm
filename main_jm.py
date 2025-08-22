@@ -16,6 +16,8 @@ import gspread
 import numpy as np
 from gspread.exceptions import APIError
 from oauth2client.service_account import ServiceAccountCredentials
+from huggingface_hub import InferenceClient  # <= ADICIONE ESTA LINHA
+
 
 # =========================
 # CONFIG BÁSICA DO APP
@@ -62,6 +64,14 @@ MODELOS_TOGETHER_UI = {
     "👑 DeepSeek R1-0528 (Together)": "deepseek-ai/DeepSeek-R1",
 }
 
+MODELOS_HF = {
+    "Llama 3.1 8B Instruct (HF)": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "Qwen2.5 7B Instruct (HF)":   "Qwen/Qwen2.5-7B-Instruct",
+    "Mixtral 8x7B Instruct (HF)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "DeepSeek R1 (HF)":           "deepseek-ai/DeepSeek-R1",
+}
+
+
 
 def api_config_for_provider(provider: str):
     if provider == "OpenRouter":
@@ -85,6 +95,28 @@ def model_id_for_together(api_ui_model_id: str) -> str:
     if low.startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
         return "mistralai/Mixtral-8x7B-Instruct-V0.1"
     return key or "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    
+def api_config_for_provider(provider: str):
+    if provider == "OpenRouter":
+        return (
+            "https://openrouter.ai/api/v1/chat/completions",
+            st.secrets.get("OPENROUTER_API_KEY", ""),
+            MODELOS_OPENROUTER,
+        )
+    elif provider == "Hugging Face":  # <= NOVO RAMO
+        return (
+            "HF_CLIENT",                                  # marcador especial (não usa requests)
+            st.secrets.get("HUGGINGFACE_API_KEY", ""),    # token do HF
+            MODELOS_HF,
+        )
+    else:
+        return (
+            "https://api.together.xyz/v1/chat/completions",
+            st.secrets.get("TOGETHER_API_KEY", ""),
+            MODELOS_TOGETHER_UI,
+        )
+
+
 
 # =========================
 # BACKOFF + CACHES
@@ -956,7 +988,7 @@ with st.sidebar:
     st.title("🧭 Painel do Roteirista")
 
     # Provedor / modelos
-    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together"], index=0, key="provedor_ia")
+    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
     if not api_key:
         st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
@@ -1066,7 +1098,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📝 Utilitários")
 
-    # Gerar resumo do capítulo (pega as últimas interações do Sheets)
+        # Gerar resumo do capítulo (pega as últimas interações do Sheets)
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             inter = carregar_interacoes(n=6)
@@ -1075,7 +1107,7 @@ with st.sidebar:
                 "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
                 + texto + "\n\nResumo:"
             )
-
+    
             # Usa o provedor/modelo selecionados no topo do sidebar
             provedor = st.session_state.get("provedor_ia", "OpenRouter")
             api_url_local = api_url
@@ -1085,59 +1117,52 @@ with st.sidebar:
                 if provedor == "Together"
                 else st.session_state.modelo_escolhido_id
             )
-
+    
             if not api_key_local:
                 st.error("⚠️ API key ausente para o provedor selecionado (defina em st.secrets).")
             else:
-                r = requests.post(
-                    api_url_local,
-                    headers={"Authorization": f"Bearer {api_key_local}", "Content-Type": "application/json"},
-                    json={
-                        "model": model_id_call,
-                        "messages": [{"role": "user", "content": prompt_resumo}],
-                        "max_tokens": 800,
-                        "temperature": 0.85
-                    },
-                    timeout=int(st.session_state.get("timeout_s", 300)),
-                )
-                if r.status_code == 200:
-                    resumo = r.json()["choices"][0]["message"]["content"].strip()
-                    st.session_state.resumo_capitulo = resumo
-                    salvar_resumo(resumo)
-                    st.success("Resumo gerado e salvo com sucesso!")
+                if provedor == "Hugging Face":
+                    # --- HF sem requests: usa InferenceClient ---
+                    try:
+                        hf_client = InferenceClient(
+                            token=api_key_local,
+                            timeout=int(st.session_state.get("timeout_s", 300))
+                        )
+                        out = hf_client.chat.completions.create(
+                            model=model_id_call,
+                            messages=[{"role": "user", "content": prompt_resumo}],
+                            max_tokens=800,
+                            temperature=0.85,
+                            stream=False,
+                        )
+                        resumo = out.choices[0].message.content.strip()
+                        st.session_state.resumo_capitulo = resumo
+                        salvar_resumo(resumo)
+                        st.success("Resumo gerado e salvo com sucesso!")
+                    except Exception as e:
+                        st.error(f"Erro ao resumir (HF): {e}")
                 else:
-                    st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
+                    # OpenRouter / Together (requests)
+                    r = requests.post(
+                        api_url_local,
+                        headers={"Authorization": f"Bearer {api_key_local}", "Content-Type": "application/json"},
+                        json={
+                            "model": model_id_call,
+                            "messages": [{"role": "user", "content": prompt_resumo}],
+                            "max_tokens": 800,
+                            "temperature": 0.85
+                        },
+                        timeout=int(st.session_state.get("timeout_s", 300)),
+                    )
+                    if r.status_code == 200:
+                        resumo = r.json()["choices"][0]["message"]["content"].strip()
+                        st.session_state.resumo_capitulo = resumo
+                        salvar_resumo(resumo)
+                        st.success("Resumo gerado e salvo com sucesso!")
+                    else:
+                        st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
-
-    # Salvar última resposta do assistente como memória longa
-    if st.button("💾 Salvar última resposta como memória"):
-        ultimo_assist = ""
-        for m in reversed(st.session_state.get("session_msgs", [])):
-            if m.get("role") == "assistant":
-                ultimo_assist = (m.get("content") or "").strip()
-                break
-        if ultimo_assist:
-            ok = memoria_longa_salvar(ultimo_assist, tags="auto")
-            st.success("Memória de longo prazo salva!" if ok else "Falha ao salvar memória.")
-        else:
-            st.info("Ainda não há resposta do assistente nesta sessão.")
-
-    # Reforçar memórias biográficas (Mary / Jânio / All) na memória longa
-    if st.button("🔁 Reforçar memórias biográficas"):
-        try:
-            memos = carregar_memorias_brutas()
-            count = 0
-            for k in ["[mary]", "[janio]", "[all]"]:
-                for entrada in memos.get(k, []):
-                    texto = (entrada.get("conteudo") or "").strip()
-                    if texto:
-                        ok = memoria_longa_salvar(texto, tags=k)
-                        if ok:
-                            count += 1
-            st.success(f"{count} memórias biográficas reforçadas na memória longa!")
-        except Exception as e:
-            st.error(f"Erro ao reforçar memórias: {e}")
 
 
 # =========================
@@ -1188,17 +1213,21 @@ if entrada:
             content = f"JÂNIO: {content}"
         historico.append({"role": role, "content": content})
 
-    # Provedor / modelo
+        # Provedor / modelo
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
         auth = st.secrets.get("TOGETHER_API_KEY", "")
         model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
+    elif prov == "Hugging Face":
+        endpoint = "HF_CLIENT"  # marcador: não usa requests
+        auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
+        model_to_call = st.session_state.modelo_escolhido_id
     else:
         endpoint = "https://openrouter.ai/api/v1/chat/completions"
         auth = st.secrets.get("OPENROUTER_API_KEY", "")
         model_to_call = st.session_state.modelo_escolhido_id
-
+    
     if not auth:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
@@ -1315,47 +1344,86 @@ if entrada:
         except Exception:
             pass
 
-        # ======================
-    # STREAM (PATCH C)
+       # ======================
+    # STREAM (PATCH C) — com suporte a HF
     # ======================
     try:
-        with requests.post(
-            endpoint, headers=headers, json=payload, stream=True,
-            timeout=int(st.session_state.get("timeout_s", 300))
-        ) as r:
-            if r.status_code == 200:
-                for raw in r.iter_lines(decode_unicode=False):
-                    if not raw:
-                        continue
-                    line = raw.decode("utf-8", errors="ignore").strip()
-                    if not line.startswith("data:"):
-                        continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        j = json.loads(data)
-                        delta = j["choices"][0]["delta"].get("content", "")
-                        if not delta:
+        if prov == "Hugging Face":
+            # --- STREAM via InferenceClient (sem SSE) ---
+            hf_client = InferenceClient(
+                token=auth,
+                timeout=int(st.session_state.get("timeout_s", 300))
+            )
+            for chunk in hf_client.chat.completions.create(
+                model=model_to_call,
+                messages=messages,
+                temperature=0.9,
+                max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
+                stream=True,
+            ):
+                delta = getattr(chunk.choices[0].delta, "content", None)
+                if not delta:
+                    continue
+                resposta_txt += delta
+    
+                # Atualização parcial
+                if time.time() - last_update > 0.10:
+                    parcial = _render_visible(resposta_txt) + "▌"
+    
+                    # BLOQUEIO ON-THE-FLY (sempre ativo se a opção estiver ligada)
+                    if st.session_state.get("app_bloqueio_intimo", True):
+                        if not _user_allows_climax(st.session_state.session_msgs):
+                            parcial = _strip_or_soften_climax(parcial)
+    
+                    placeholder.markdown(parcial)
+                    last_update = time.time()
+    
+        else:
+            # --- STREAM via SSE (OpenRouter/Together) — mantém seu fluxo atual via requests ---
+            headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
+            payload = {
+                "model": model_to_call,
+                "messages": messages,
+                "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                "temperature": 0.9,
+                "stream": True,
+            }
+            with requests.post(
+                endpoint, headers=headers, json=payload, stream=True,
+                timeout=int(st.session_state.get("timeout_s", 300))
+            ) as r:
+                if r.status_code == 200:
+                    for raw in r.iter_lines(decode_unicode=False):
+                        if not raw:
                             continue
-                        resposta_txt += delta
-
-                        # Atualização parcial
-                        if time.time() - last_update > 0.10:
-                            parcial = _render_visible(resposta_txt) + "▌"
-
-                            # BLOQUEIO ON-THE-FLY (sempre ativo se a opção estiver ligada)
-                            # Obs.: Agora NÃO depende mais da fase. Só libera se o usuário autorizou.
-                            if st.session_state.get("app_bloqueio_intimo", True):
-                                if not _user_allows_climax(st.session_state.session_msgs):
-                                    parcial = _strip_or_soften_climax(parcial)
-
-                            placeholder.markdown(parcial)
-                            last_update = time.time()
-                    except Exception:
-                        continue
-            else:
-                st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+                        line = raw.decode("utf-8", errors="ignore").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            j = json.loads(data)
+                            delta = j["choices"][0]["delta"].get("content", "")
+                            if not delta:
+                                continue
+                            resposta_txt += delta
+    
+                            # Atualização parcial
+                            if time.time() - last_update > 0.10:
+                                parcial = _render_visible(resposta_txt) + "▌"
+    
+                                # BLOQUEIO ON-THE-FLY (sempre ativo se a opção estiver ligada)
+                                if st.session_state.get("app_bloqueio_intimo", True):
+                                    if not _user_allows_climax(st.session_state.session_msgs):
+                                        parcial = _strip_or_soften_climax(parcial)
+    
+                                placeholder.markdown(parcial)
+                                last_update = time.time()
+                        except Exception:
+                            continue
+                else:
+                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
     except Exception as e:
         st.error(f"Erro no streaming: {e}")
 
@@ -1365,44 +1433,66 @@ if entrada:
     # Fallback sem stream
     if not visible_txt:
         try:
-            r2 = requests.post(
-                endpoint, headers=headers,
-                json={**payload, "stream": False},
-                timeout=int(st.session_state.get("timeout_s", 300))
-            )
-            if r2.status_code == 200:
-                try:
-                    resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
-                except Exception:
-                    resposta_txt = ""
+            if prov == "Hugging Face":
+                out = InferenceClient(token=auth).chat.completions.create(
+                    model=model_to_call,
+                    messages=messages,
+                    temperature=0.9,
+                    max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
+                    stream=False,
+                )
+                resposta_txt = (out.choices[0].message.content or "").strip()
                 visible_txt = _render_visible(resposta_txt).strip()
             else:
-                st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
+                r2 = requests.post(
+                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
+                    json={**payload, "stream": False},
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
+                if r2.status_code == 200:
+                    try:
+                        resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
+                    visible_txt = _render_visible(resposta_txt).strip()
+                else:
+                    st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
         except Exception as e:
             st.error(f"Fallback (sem stream) erro: {e}")
 
-    # Fallback com prompts limpos
+        # Fallback com prompts limpos
     if not visible_txt:
         try:
-            r3 = requests.post(
-                endpoint, headers=headers,
-                json={
-                    "model": model_to_call,
-                    "messages": [{"role": "system", "content": prompt}] + historico,
-                    "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
-                    "temperature": 0.9,
-                    "stream": False,
-                },
-                timeout=int(st.session_state.get("timeout_s", 300))
-            )
-            if r3.status_code == 200:
-                try:
-                    resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
-                except Exception:
-                    resposta_txt = ""
+            if prov == "Hugging Face":
+                out2 = InferenceClient(token=auth).chat.completions.create(
+                    model=model_to_call,
+                    messages=[{"role": "system", "content": prompt}] + historico,
+                    temperature=0.9,
+                    max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
+                    stream=False,
+                )
+                resposta_txt = (out2.choices[0].message.content or "").strip()
                 visible_txt = _render_visible(resposta_txt).strip()
             else:
-                st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
+                r3 = requests.post(
+                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
+                    json={
+                        "model": model_to_call,
+                        "messages": [{"role": "system", "content": prompt}] + historico,
+                        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                        "temperature": 0.9,
+                        "stream": False,
+                    },
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
+                if r3.status_code == 200:
+                    try:
+                        resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
+                    visible_txt = _render_visible(resposta_txt).strip()
+                else:
+                    st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
         except Exception as e:
             st.error(f"Fallback (prompts limpos) erro: {e}")
 
@@ -1448,6 +1538,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
