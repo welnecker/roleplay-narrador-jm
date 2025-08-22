@@ -4,4 +4,4 @@ gspread
 oauth2client
 openai
 numpy
-
+huggingface_hub>=0.33.0
