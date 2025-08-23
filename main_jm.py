@@ -315,7 +315,7 @@ def _ultimo_evento_virgindade_interacoes(ate: Optional[datetime] = None) -> Opti
     Retorna (estado_bool, ts, "interacoes_jm").
     """
     ate = ate or datetime.now()
-    inter = carregar_interacoes(n=10000)  # pega um histórico grande
+    inter = carregar_interacoes(n=20)  # pega um histórico grande
     if not inter:
         return None
 
@@ -1693,6 +1693,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
