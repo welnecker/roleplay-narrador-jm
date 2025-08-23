@@ -802,22 +802,37 @@ Respostas devem ser curtas e diretas.
     # Blocos de voz curta (regras) e cena (abertura)
     ctx = st.session_state.get("ctx_cena", {})  # vem do passo #1
     try:
-        # Se instrucao_llm() existir (passo 4), usa como "voz curtinha"
         voz_bloco = instrucao_llm(st.session_state.get("finalizacao_modo", "ponto de gancho"), ctx)
-    except NameError:
-        # Fallback: usa o próprio prompt_da_cena como voz
+    except Exception:
         voz_bloco = prompt_da_cena(ctx, st.session_state.get("finalizacao_modo", "ponte"))
     cena_bloco = prompt_da_cena(ctx, st.session_state.get("finalizacao_modo", "ponte"))
 
     # ========== FIM DO BLOCO DE RESTRIÇÃO ==========
 
+    # ---------- Sanitizador mínimo de histórico (remove cenário/clima antes de ir pro LLM)
+    scenery_terms = r"(c[ée]u|nuvens?|horizonte|luar|mar|onda?s?|areia|pier|praia|vento|brisa|neblina|chuva|garoa|sereno|amanhecer|entardecer|p[ôo]r do sol|paisage?m|cen[áa]rio)"
+    _sent_split = re.compile(r'(?<=[\.\!\?])\s+')
+    _scenery = re.compile(rf"\b{scenery_terms}\b", re.IGNORECASE)
+
+    def _hist_sanitizado_para_modelo(hist):
+        linhas = []
+        for r in (hist or []):
+            role = r.get("role", "user")
+            txt = (r.get("content", "") or "").strip()
+            if not txt:
+                continue
+            sentencas = [s.strip() for s in _sent_split.split(txt) if s.strip()]
+            sentencas = [s for s in sentencas if not _scenery.search(s)]
+            if not sentencas:
+                continue
+            limpo = " ".join(sentencas)[:900]
+            linhas.append(f"{role}: {limpo}")
+        return "\n".join(linhas) if linhas else "(sem histórico)"
+
     memos = carregar_memorias_brutas()
     perfil = carregar_resumo_salvo()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
-    momento_atual = 0
-    mdata = {"nome": "(desligado)", "objetivo": "", "permitidos": "", "proibidos": "", "proximo": 0}
-    proximo_nome = ""
     estilo = st.session_state.get("estilo_escrita", "AÇÃO")
     modo_mary = bool(st.session_state.get("interpretar_apenas_mary", False))
 
@@ -834,7 +849,7 @@ Respostas devem ser curtas e diretas.
 
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
-    hist_txt = "\n".join(f"{r.get('role','user')}: {r.get('content','')}" for r in hist) if hist else "(sem histórico)"
+    hist_txt = _hist_sanitizado_para_modelo(hist)
     ultima_fala_user = _last_user_text(hist)
 
     # REMOVE ÂNCORA DE CENÁRIO DO PROMPT!
@@ -873,10 +888,8 @@ Respostas devem ser curtas e diretas.
     dossie = []
     mary = persona_block_temporal("mary", memos, ate_ts, 8)
     janio = persona_block_temporal("janio", memos, ate_ts, 8)
-    if mary:
-        dossie.append(mary)
-    if janio:
-        dossie.append(janio)
+    if mary: dossie.append(mary)
+    if janio: dossie.append(janio)
     dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
 
     # --- Falas da Mary (planilha/placeholder) ---
@@ -938,8 +951,6 @@ Respostas devem ser curtas e diretas.
             "- Encerre em **pausa sensorial** (respiração, silêncio, carinho), **sem** 'fade-to-black'.\n"
         )
 
-    flag_parallel = bool(st.session_state.get("no_coincidencias", True))
-
     # Papel/estilo por modo
     if modo_mary:
         papel_header = "Você é **Mary**, responda **em primeira pessoa**, sem narrador externo. Use apenas o que Mary vê/sente/ouve. Não descreva pensamentos de Jânio. Não use títulos nem repita instruções."
@@ -954,7 +965,6 @@ Respostas devem ser curtas e diretas.
         formato_cena = (
             "- Inclua **DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação física/visual (mínimo 4 falas quando ambos estiverem na cena)."
         )
-        # Regra permanente de clímax (sem fade-to-black) — sempre aplicada ao Narrador
         climax_bloco += (
             "### Regra permanente de clímax\n"
             "- **Não** descreva orgasmo/ejaculação/clímax **sem liberação explícita na ÚLTIMA fala do usuário**.\n"
@@ -963,7 +973,7 @@ Respostas devem ser curtas e diretas.
             "- Exemplos de liberação: 'finaliza', 'pode gozar', 'chegou ao clímax', 'goza agora', 'liberado o orgasmo'.\n"
         )
 
-    # --- Montagem final do prompt ---
+    # --- Montagem final do prompt (com anti-monólogo, parágrafo e tom vivo) ---
     prompt = f"""
 {BLOCO_RESTRICAO_SENSORY}
 {voz_bloco}
@@ -976,12 +986,15 @@ Respostas devem ser curtas e diretas.
 {chr(10).join(f"- {c}" for c in memos_all) if memos_all else "(vazio)"}
 ### Perfil (resumo mais recente)
 {perfil or "(vazio)"}
-### Histórico recente (planilha)
+### Histórico recente (sanitizado)
 {hist_txt}
-### Estilo
-- Texto obrigatoriamente sensorial, físico e direto. NUNCA mencione ambiente, natureza, paisagem, cenário ou clima.
-- Frases curtas, só sensação física e falas.
-- NÃO use ambientação, nem metáforas.
+### Estilo & Tom (OBRIGATÓRIO)
+- Português **claro (PT-BR)** e sem erros ortográficos.
+- **Sem monólogo interno**. Evite "penso", "achei", "na minha cabeça". Mostre ação e fala.
+- **Parágrafos curtos** (2–4 frases) e/ou **alternância de falas**. Linha em branco entre parágrafos.
+- **Diálogo alternado**: garanta no mínimo 4 falas, com pelo menos 2 do parceiro.
+- Ritmo **vivo** e **assertivo** (sem enfado): troque queixa por gesto/decisão.
+- Proibido fechar com clichés: "A tensão fica no ar...", "Um silêncio elétrico...", "Eles param no limiar...".
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Apenas sensações físicas, nunca ambiente."}
 ### Memória longa — Top-K relevantes
@@ -992,8 +1005,7 @@ Respostas devem ser curtas e diretas.
 - Permitidos: {fdata['permitidos']}
 - Proibidos: {fdata['proibidos']}
 ### Geografia & Montagem
-- Não force coincidências, não descreva cenário.
-- Sem teletransporte.
+- Não force coincidências. Sem teletransporte.
 ### Formato OBRIGATÓRIO da cena
 {formato_cena}
 ### Regra de saída
@@ -1681,6 +1693,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
