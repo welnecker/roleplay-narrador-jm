@@ -841,6 +841,14 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
 # =========================
 
 def construir_prompt_com_narrador() -> str:
+
+### OBRIGATÓRIO — FORMATO ESTRUTURADO DE ROLEPLAY
+
+- Cada fala (“—”) deve começar linha nova isolada, SEMPRE seguida ou precedida de bloco de ação/descrição corporal.
+- Nunca una mais de 2 frases no mesmo parágrafo narrativo; em narração, troque de linha a cada ação/reação física importante.
+- O texto final sempre terá parágrafos curtos: bloco de ação (máx. 2 frases), bloco de fala, bloco de reação, bloco de fala. Nunca prosa longa.
+- NÃO formate como prosa de romance/livro; sempre como roteiro estruturado de roleplay moderno e comercial.
+
     BLOCO_RESTRICAO_SENSORY = """
 NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
 NÃO inicie textos com lugar ou “Pier de Camburi — Noite —”, nem descreva onde estão ou o horário.
@@ -1099,7 +1107,9 @@ def _render_visible(t: str) -> str:
         out = sanitize_explicit(out, int(st.session_state.get("nsfw_max_level", 0)), action="soften")
     return out
 
-
+def force_linebreak_on_falas(txt):
+    return re.sub(r"([^\n])\s*(—)", r"\1\n\n\2", txt)
+visible_txt = force_linebreak_on_falas(_render_visible(resposta_txt).strip())
 
 def render_tail(t: str) -> str:
     if not t:
@@ -1544,6 +1554,9 @@ if entrada:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
+        # FINALIZA TEXTO VISÍVEL
+        visible_txt = _render_visible(resposta_txt).strip()
+
         last_update = time.time()
 
         # Reforço memórias usadas no prompt
@@ -1751,6 +1764,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
