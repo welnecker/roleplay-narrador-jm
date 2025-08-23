@@ -785,13 +785,12 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
 # =========================
 
 def construir_prompt_com_narrador() -> str:
-    # ========== NOVA RESTRIÇÃO SUPER FORTE ==========
     BLOCO_RESTRICAO_SENSORY = """
-NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas. 
+NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
 NÃO inicie textos com lugar ou “Pier de Camburi — Noite —”, nem descreva onde estão ou o horário.
 PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
-Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico. 
-Respostas devem ser curtas e diretas. 
+Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
+Respostas devem ser curtas e diretas.
 
 # EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
 # Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
@@ -799,68 +798,51 @@ Respostas devem ser curtas e diretas.
 # (Sem metáforas, sem descrever cenário/clima. Após essa linha, volte ao estilo seco acima.)
 """.strip()
 
-    # Blocos de voz curta (regras) e cena (abertura)
-    ctx = st.session_state.get("ctx_cena", {})  # vem do passo #1
+    ctx = st.session_state.get("ctx_cena", {})
     try:
         voz_bloco = instrucao_llm(st.session_state.get("finalizacao_modo", "ponto de gancho"), ctx)
     except Exception:
         voz_bloco = prompt_da_cena(ctx, st.session_state.get("finalizacao_modo", "ponte"))
     cena_bloco = prompt_da_cena(ctx, st.session_state.get("finalizacao_modo", "ponte"))
 
-    # ========== FIM DO BLOCO DE RESTRIÇÃO ==========
-
-    # ---------- Sanitizador mínimo de histórico (remove cenário/clima antes de ir pro LLM)
-    scenery_terms = r"(c[ée]u|nuvens?|horizonte|luar|mar|onda?s?|areia|pier|praia|vento|brisa|neblina|chuva|garoa|sereno|amanhecer|entardecer|p[ôo]r do sol|paisage?m|cen[áa]rio)"
-    _sent_split = re.compile(r'(?<=[\.\!\?])\s+')
-    _scenery = re.compile(rf"\b{scenery_terms}\b", re.IGNORECASE)
-
-    def _hist_sanitizado_para_modelo(hist):
-        linhas = []
-        for r in (hist or []):
-            role = r.get("role", "user")
-            txt = (r.get("content", "") or "").strip()
-            if not txt:
-                continue
-            sentencas = [s.strip() for s in _sent_split.split(txt) if s.strip()]
-            sentencas = [s for s in sentencas if not _scenery.search(s)]
-            if not sentencas:
-                continue
-            limpo = " ".join(sentencas)[:900]
-            linhas.append(f"{role}: {limpo}")
-        return "\n".join(linhas) if linhas else "(sem histórico)"
+    # --------- Sanitizador leve de histórico (sem praia/clima)
+    import re
+    _split = re.compile(r'(?<=[\.\!\?])\s+')
+    _amb = re.compile(r'\b(c[ée]u|nuvens?|horizonte|luar|mar|onda?s?|areia|pier|praia|vento|brisa|chuva|garoa|sereno|amanhecer|entardecer|p[ôo]r do sol|paisage?m|cen[áa]rio|temperatura|verão|quiosques?)\b', re.I)
+    def _hist_sanitizado(hist):
+        L=[]
+        for r in hist or []:
+            role=r.get("role","user"); txt=(r.get("content") or "").strip()
+            if not txt: continue
+            s=[t for t in _split.split(txt) if t.strip() and not _amb.search(t)]
+            if s: L.append(f"{role}: {' '.join(s)[:900]}")
+        return "\n".join(L) if L else "(sem histórico)"
 
     memos = carregar_memorias_brutas()
     perfil = carregar_resumo_salvo()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
-    estilo = st.session_state.get("estilo_escrita", "AÇÃO")
     modo_mary = bool(st.session_state.get("interpretar_apenas_mary", False))
 
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
-    mary_sens_txt = gerar_mary_sensorial(
-        _sens_level, n=_sens_n, sintonia=bool(st.session_state.get("modo_sintonia", True))
-    ) if _sens_on else ""
+    mary_sens_txt = gerar_mary_sensorial(_sens_level, n=_sens_n, sintonia=bool(st.session_state.get("modo_sintonia", True))) if _sens_on else ""
 
     ritmo_cena = int(st.session_state.get("ritmo_cena", 0))
-    ritmo_label = ["muito lento", "lento", "médio", "rápido"][max(0, min(3, ritmo_cena))]
+    ritmo_label = ["muito lento","lento","médio","rápido"][max(0,min(3,ritmo_cena))]
     modo_sintonia = bool(st.session_state.get("modo_sintonia", True))
 
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
     hist = carregar_interacoes(n=n_hist)
-    hist_txt = _hist_sanitizado_para_modelo(hist)
+    hist_txt = _hist_sanitizado(hist)
     ultima_fala_user = _last_user_text(hist)
 
-    # REMOVE ÂNCORA DE CENÁRIO DO PROMPT!
     ancora_bloco = ""
+    ate_ts = _parse_ts(hist[-1].get("timestamp","")) if hist else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Corte temporal etc.
-    ate_ts = _parse_ts(hist[-1].get("timestamp", "")) if hist else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Memória longa (Top-K)
     ml_topk_txt = "(nenhuma)"
-    st.session_state["_ml_topk_texts"] = []
+    st.session_state["_ml_topk_texts"]=[]
     if st.session_state.get("use_memoria_longa", True) and hist:
         try:
             topk = memoria_longa_buscar_topk(
@@ -870,43 +852,39 @@ Respostas devem ser curtas e diretas.
                 ate_ts=ate_ts,
             )
             if topk:
-                ml_topk_txt = "\n".join([f"- {t}" for (t, _sc, _sim, _rr) in topk])
-                st.session_state["_ml_topk_texts"] = [t for (t, *_rest) in topk]
+                ml_topk_txt = "\n".join([f"- {t}" for (t, *_rest) in topk])
+                st.session_state["_ml_topk_texts"] = [t for (t, *_r) in topk]
         except Exception:
-            st.session_state["_ml_topk_texts"] = []
+            st.session_state["_ml_topk_texts"]=[]
 
-    # Memórias [all] até o recorte temporal
     memos_all = [
         (d.get("conteudo") or "").strip()
         for d in memos.get("[all]", [])
         if isinstance(d, dict) and d.get("conteudo")
         and (not d.get("timestamp") or d.get("timestamp") <= ate_ts)
     ]
-    st.session_state["_ml_recorrentes"] = memos_all
+    st.session_state["_ml_recorrentes"]=memos_all
 
-    # Dossiê (personas temporais)
-    dossie = []
-    mary = persona_block_temporal("mary", memos, ate_ts, 8)
-    janio = persona_block_temporal("janio", memos, ate_ts, 8)
-    if mary: dossie.append(mary)
-    if janio: dossie.append(janio)
-    dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
+    dossie=[]
+    m=persona_block_temporal("mary", memos, ate_ts, 8)
+    j=persona_block_temporal("janio", memos, ate_ts, 8)
+    if m: dossie.append(m)
+    if j: dossie.append(j)
+    dossie_txt="\n\n".join(dossie) if dossie else "(sem personas definidas)"
 
-    # --- Falas da Mary (planilha/placeholder) ---
-    falas_mary_bloco = ""
-    st.session_state["_falas_mary_list"] = []  # reset em toda chamada do prompt
+    falas_mary_bloco=""
+    st.session_state["_falas_mary_list"]=[]
     if st.session_state.get("usar_falas_mary", False):
         falas = carregar_falas_mary() or FALAS_EXPLICITAS_MARY
         if falas:
-            st.session_state["_falas_mary_list"] = falas[:]
+            st.session_state["_falas_mary_list"]=falas[:]
             falas_mary_bloco = (
                 "### Falas de Mary — use literalmente 1–2 destas (no máximo 1 por parágrafo)\n"
                 "NÃO reescreva as frases abaixo; quando usar, mantenha exatamente como está.\n"
                 + "\n".join(f"- {s}" for s in falas)
             )
 
-    # --- Sintonia & Ritmo (fora do bloco de falas!) ---
-    sintonia_bloco = ""
+    sintonia_bloco=""
     if modo_sintonia:
         sintonia_bloco = (
             "### Sintonia & Ritmo (prioritário)\n"
@@ -915,7 +893,6 @@ Respostas devem ser curtas e diretas.
             "- Pausas e respiração contam; mostre desejo pela troca, não por imposição.\n"
         )
 
-    # --- VIRGINDADE (temporal) ---
     try:
         _ref_dt = _to_dt(ate_ts) if ("_to_dt" in globals() or "_to_dt" in dir()) else None
         est = estado_virgindade_ate(_ref_dt)
@@ -942,8 +919,7 @@ Respostas devem ser curtas e diretas.
             "- Falha ao ler o estado; **evite** afirmar status e **não** contradiga cenas anteriores.\n"
         )
 
-    # Bloqueio de clímax por fase/config
-    climax_bloco = ""
+    climax_bloco=""
     if bool(st.session_state.get("app_bloqueio_intimo", True)) and fase < 5:
         climax_bloco = (
             "### Proteção de avanço íntimo (ATIVA)\n"
@@ -951,29 +927,23 @@ Respostas devem ser curtas e diretas.
             "- Encerre em **pausa sensorial** (respiração, silêncio, carinho), **sem** 'fade-to-black'.\n"
         )
 
-    # Papel/estilo por modo
     if modo_mary:
         papel_header = "Você é **Mary**, responda **em primeira pessoa**, sem narrador externo. Use apenas o que Mary vê/sente/ouve. Não descreva pensamentos de Jânio. Não use títulos nem repita instruções."
         regra_saida = "- Narre **em primeira pessoa (eu)** como Mary; nunca use narrador onisciente.\n- Produza uma cena fechada e natural, sem comentários externos."
         formato_cena = (
-            "- Inclua **DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação **em 1ª pessoa (Mary)**.\n"
-            "- Quando Jânio falar, use travessão normalmente; mantenha minha voz (Mary) como base."
+            "- DIÁLOGOS diretos com travessão (—), intercalados com ação/reação **em 1ª pessoa (Mary)**."
         )
     else:
         papel_header = "Você é o **Narrador** de um roleplay dramático brasileiro; foque em Mary e Jânio. Não repita instruções nem títulos."
         regra_saida = "- Narre **em terceira pessoa**; nunca fale com 'você'.\n- Produza uma cena fechada e natural, sem comentários externos."
-        formato_cena = (
-            "- Inclua **DIÁLOGOS diretos** com travessão (—), intercalados com ação/reação física/visual (mínimo 4 falas quando ambos estiverem na cena)."
-        )
+        formato_cena = "- DIÁLOGOS diretos com travessão (—), intercalados com ação/reação física/visual."
         climax_bloco += (
             "### Regra permanente de clímax\n"
             "- **Não** descreva orgasmo/ejaculação/clímax **sem liberação explícita na ÚLTIMA fala do usuário**.\n"
             "- Se não houver liberação, pare no **limiar**: respiração, tremor, pausa; **sem finalizar**.\n"
             "- **Sem fade-to-black** em qualquer circunstância.\n"
-            "- Exemplos de liberação: 'finaliza', 'pode gozar', 'chegou ao clímax', 'goza agora', 'liberado o orgasmo'.\n"
         )
 
-    # --- Montagem final do prompt (com anti-monólogo, parágrafo e tom vivo) ---
     prompt = f"""
 {BLOCO_RESTRICAO_SENSORY}
 {voz_bloco}
@@ -988,13 +958,13 @@ Respostas devem ser curtas e diretas.
 {perfil or "(vazio)"}
 ### Histórico recente (sanitizado)
 {hist_txt}
-### Estilo & Tom (OBRIGATÓRIO)
-- Português **claro (PT-BR)** e sem erros ortográficos.
-- **Sem monólogo interno**. Evite "penso", "achei", "na minha cabeça". Mostre ação e fala.
-- **Parágrafos curtos** (2–4 frases) e/ou **alternância de falas**. Linha em branco entre parágrafos.
-- **Diálogo alternado**: garanta no mínimo 4 falas, com pelo menos 2 do parceiro.
-- Ritmo **vivo** e **assertivo** (sem enfado): troque queixa por gesto/decisão.
-- Proibido fechar com clichés: "A tensão fica no ar...", "Um silêncio elétrico...", "Eles param no limiar...".
+### ESTILO & TOM — OBRIGATÓRIO
+- Português **claro (PT-BR)**, sem erros.
+- **Sem monólogo** e **sem pensamento interno**. Priorize gesto/ação + fala.
+- **Parágrafos curtos** (2–4 frases) com **linha em branco** entre eles.
+- **Diálogo alternado**: no mínimo 4 falas (2 de cada), começando com “—”.
+- Ritmo **vivo** e **assertivo**; evite litanias (“quero X, quero Y…”).
+- PROIBIDO fechar com: “A tensão fica no ar…”, “Um silêncio elétrico…”, “Eles param no limiar…”.
 ### Camada sensorial — Mary (OBRIGATÓRIA no 1º parágrafo)
 {mary_sens_txt or "- Apenas sensações físicas, nunca ambiente."}
 ### Memória longa — Top-K relevantes
@@ -1014,6 +984,7 @@ Respostas devem ser curtas e diretas.
 
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
+
 
 
 # =========================
@@ -1693,6 +1664,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
