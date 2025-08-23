@@ -9,7 +9,6 @@ import time
 import random
 from datetime import datetime
 from typing import List, Tuple, Dict, Any
-
 import streamlit as st
 import requests
 import gspread
@@ -17,6 +16,7 @@ import numpy as np
 from gspread.exceptions import APIError
 from oauth2client.service_account import ServiceAccountCredentials
 from huggingface_hub import InferenceClient  # <= ADICIONE ESTA LINHA
+import re
 
 
 # =========================
@@ -71,6 +71,75 @@ MODELOS_HF = {
     "Mixtral 8x7B Instruct (HF)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
     "DeepSeek R1 (HF)":           "deepseek-ai/DeepSeek-R1",
 }
+
+# --- Formatação de roleplay: parágrafos curtos e falas em linhas separadas ---
+import re
+
+def format_roleplay_output(t: str) -> str:
+    if not t:
+        return ""
+
+    # 1) Normaliza travessões e garante fala em nova linha
+    # converte -- ou – para travessão padrão
+    t = re.sub(r"\s*--\s*", " — ", t)
+    t = re.sub(r"\s*–\s*", " — ", t)
+
+    # quebra antes de qualquer " — " que esteja colado no parágrafo
+    t = re.sub(r"\s+—\s*", r"\n— ", t)
+    # se houver "—" não precedido por quebra de linha, força quebra
+    t = re.sub(r"(?<!\n) — ", r"\n— ", t)
+
+    # 2) Quebra sentenças longas para virar parágrafos curtos
+    # insere quebra de linha após . ! ? quando vier letra maiúscula, número ou nova fala
+    t = re.sub(r"([.!?])\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÀÇ0-9“\"—])", r"\1\n", t)
+
+    # 3) Monta parágrafos com até 3 frases; falas sempre isoladas em linha única
+    linhas = [ln.strip() for ln in t.splitlines()]
+    out_lines = []
+    buf = []
+    sent_count = 0
+
+    for ln in linhas:
+        if not ln:
+            continue
+
+        if ln.startswith("—"):
+            # fecha parágrafo pendente antes de inserir fala
+            if buf:
+                out_lines.append(" ".join(buf).strip())
+                out_lines.append("")  # linha em branco entre parágrafos
+                buf, sent_count = [], 0
+            # fala fica sozinha em uma linha
+            out_lines.append(ln)
+        else:
+            # acumula frases no parágrafo corrido
+            buf.append(ln)
+            sent_count += len(re.findall(r"[.!?](?=\s|$)", ln))
+            if sent_count >= 3:
+                out_lines.append(" ".join(buf).strip())
+                out_lines.append("")  # separa parágrafos
+                buf, sent_count = [], 0
+
+    if buf:
+        out_lines.append(" ".join(buf).strip())
+
+    # 4) Limpa linhas em branco duplicadas
+    final = []
+    prev_blank = False
+    for item in out_lines:
+        if item == "":
+            if not prev_blank:
+                final.append("")
+            prev_blank = True
+        else:
+            final.append(item)
+            prev_blank = False
+
+    # remove brancos finais
+    while final and final[-1] == "":
+        final.pop()
+
+    return "\n".join(final).strip()
 
 
 
@@ -1013,6 +1082,15 @@ def sanitize_scenery(t: str) -> str:
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()
 
+def _render_visible(t: str) -> str:
+    t = sanitize_scenery(t)          # já existia no seu projeto
+    t = format_roleplay_output(t)    # <<< NOVO: força parágrafos e falas em linhas
+    out = render_tail(t)
+    if st.session_state.get("app_bloqueio_intimo", True):
+        out = sanitize_explicit(out, int(st.session_state.get("nsfw_max_level", 0)), action="soften")
+    return out
+
+
 
 def render_tail(t: str) -> str:
     if not t:
@@ -1664,6 +1742,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
