@@ -1176,12 +1176,12 @@ def sanitize_scenery_preserve_opening(t: str) -> str:
         return primeira_linha
 
 def _render_visible(t: str) -> str:
-    t = sanitize_scenery_preserve_opening(t)  # NOVO: preserva linha de abertura
-    t = roleplay_paragraphizer(t)             # Força parágrafos e falas em linhas
-    out = render_tail(t)
+    t = sanitize_scenery_preserve_opening(t)  # preserva linha de abertura
+    t = roleplay_paragraphizer(t)             # força parágrafos e falas em linhas
     if st.session_state.get("app_bloqueio_intimo", True):
-        out = sanitize_explicit(out, int(st.session_state.get("nsfw_max_level", 0)), action="soften")
-    return out
+        t = sanitize_explicit(t, int(st.session_state.get("nsfw_max_level", 0)), action="soften")
+    return t
+
 
 
 def force_linebreak_on_falas(txt):
@@ -1857,5 +1857,6 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
