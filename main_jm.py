@@ -291,20 +291,25 @@ CTX_INICIAL = {
 
 def extrair_diretriz_contexto(texto_usuario: str, ctx: dict | None = None) -> dict:
     import re
+
+    # Inicializa
     ctx = dict(ctx) if ctx else dict(CTX_INICIAL)
     t = (texto_usuario or "").strip()
-
     ctx["diretiva"] = t
 
+    # Extração padrão
     # Tempo (ex.: “domingo de manhã”, “hoje à noite”)
-    m_tempo = re.search(r"(?i)\b(hoje|amanh[ãa]|ontem|segunda|ter[cç]a|quarta|quinta|sexta|s[áa]bado|domingo)(?:\s+de\s+(manh[ãa]|tarde|noite))?", t)
+    m_tempo = re.search(
+        r"(?i)\b(hoje|amanh[ãa]|ontem|segunda|ter[cç]a|quarta|quinta|sexta|s[áa]bado|domingo)(?:\s+de\s+(manh[ãa]|tarde|noite))?",
+        t)
     if m_tempo:
         p1 = m_tempo.group(1).capitalize()
         p2 = f" de {m_tempo.group(2)}" if m_tempo.group(2) else ""
         ctx["tempo"] = f"{p1}{p2}"
 
     # Lugar curto (rótulo)
-    m_lugar = re.search(r"(?i)\b(em casa|no apartamento|na lanchonete|no shopping|na escola|no est[úu]dio|no quarto|no bar|na praia)\b", t)
+    m_lugar = re.search(
+        r"(?i)\b(em casa|no apartamento|na lanchonete|no shopping|na escola|no est[úu]dio|no quarto|no bar|na praia)\b", t)
     if m_lugar:
         ctx["lugar"] = m_lugar.group(1)
 
@@ -316,6 +321,14 @@ def extrair_diretriz_contexto(texto_usuario: str, ctx: dict | None = None) -> di
     # Tópico do turno (se houver “:”, pega o pós-dois-pontos; senão, o texto todo resumido)
     m_top = re.search(r":\s*(.+)$", t)
     ctx["topico"] = (m_top.group(1).strip() if m_top else t)[:140]
+
+    #--------------#
+    # Persistência: herda o último valor "ctx_cena" se campo não for atualizado
+    for campo in ["tempo", "lugar", "figurino"]:
+        if not ctx.get(campo):  # Se não houve nova detecção, mantém o anterior
+            ultimo_ctx = st.session_state.get("ctx_cena", {})
+            if ultimo_ctx and ultimo_ctx.get(campo):
+                ctx[campo] = ultimo_ctx.get(campo)
 
     return ctx
 
@@ -1853,6 +1866,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
