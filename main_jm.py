@@ -1085,9 +1085,7 @@ Respostas devem ser curtas e diretas.
 
 
 
-# =========================
-# FILTROS DE SAÍDA
-# =========================
+import re
 # --- Remoção de "paisagem/clima" (sem mexer em sentido da cena) ---
 SCENERY_TERMS = [
     r"c[ée]u", r"nuvens?", r"horizonte", r"luar",
@@ -1111,6 +1109,14 @@ def sanitize_scenery(t: str) -> str:
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()
 
+def render_tail(t: str) -> str:
+    if not t:
+        return ""
+    t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$', '', t, flags=re.I|re.M)
+    t = re.sub(r'<\s*think\s*>.*?<\s*/\s*think\s*>', '', t, flags=re.I|re.S)
+    t = re.sub(r'\n{3,}', '\n\n', t).strip()
+    return t
+
 def _render_visible(t: str) -> str:
     t = sanitize_scenery(t)          # se já existe no seu projeto
     t = roleplay_paragraphizer(t)    # <<< AQUI: força parágrafos e falas em linhas
@@ -1121,15 +1127,6 @@ def _render_visible(t: str) -> str:
 
 def force_linebreak_on_falas(txt):
     return re.sub(r"([^\n])\s*(—)", r"\1\n\n\2", txt)
-visible_txt = force_linebreak_on_falas(_render_visible(resposta_txt).strip())
-
-def render_tail(t: str) -> str:
-    if not t:
-        return ""
-    t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$', '', t, flags=re.I|re.M)
-    t = re.sub(r'&lt;\s*think\s*&gt;.*?&lt;\s*/\s*think\s*&gt;', '', t, flags=re.I|re.S)
-    t = re.sub(r'\n{3,}', '\n\n', t).strip()
-    return t
 
 EXPL_PAT = re.compile(
     r"\b(mamilos?|genit[aá]lia|ere[cç][aã]o|penetra[cç][aã]o|boquete|gozada|gozo|sexo oral|chupar|enfiar)\b",
@@ -1163,6 +1160,9 @@ def resposta_valida(t: str) -> bool:
     if len(t.strip()) < 5:
         return False
     return True
+
+# Use APÓS as funções acima:
+# visible_txt = force_linebreak_on_falas(_render_visible(resposta_txt).strip())
 
 # =========================
 # UI — CABEÇALHO
@@ -1776,6 +1776,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
