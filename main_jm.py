@@ -85,6 +85,30 @@ _UPPER_OR_DASH = re.compile(r"([.!?…])\s+(?=(?:—|[A-ZÁÉÍÓÚÂÊÔÃÕÀ�
 def roleplay_paragraphizer(t: str) -> str:
     if not t:
         return ""
+def break_long_paragraphs(txt):
+    # Divide por frase (ponto, interrogação, exclamação), removendo espaços extras
+    frases = re.split(r'([.!?])\s*', txt)
+    blocos = []
+    cur = ''
+    for i in range(0, len(frases)-1, 2):
+        frase = frases[i].strip()
+        pont = frases[i+1]
+        if cur:
+            cur += ' ' + frase + pont
+            blocos.append(cur.strip())
+            cur = ''
+        else:
+            cur = frase + pont
+            blocos.append(cur.strip())
+            cur = ''
+    if cur:
+        blocos.append(cur.strip())
+    # Junta por quebra de linha simples
+    return '\n'.join([b for b in blocos if b])
+
+# No final do seu pós-processamento:
+visible_txt = break_long_paragraphs(visible_txt)
+    
 
     # 1) Normaliza travessão e força quebra antes de qualquer fala
     t = _DASHES.sub("\n— ", t)
@@ -856,6 +880,24 @@ NÃO inicie textos com lugar ou "Pier de Camburi — Noite —", nem descreva on
 PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
 Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
 Respostas devem ser curtas e diretas.
+BLOCO_RESTRICAO_SENSORY = """
+...
+Respostas devem OBRIGATORIAMENTE começar assim, sem metáforas:
+"Domingo de manhã. Mary, biquíni preto. Jacaraípe."
+- SEMPRE inicie com uma linha nesse formato: tempo. Mary[, figurino]. local.
+- Após essa linha, use somente frases de ação, sensação física ou diálogo direto, um por parágrafo.
+- Não agrupe frases em prosa. Parágrafos sempre curtos e diretos, quebra de linha explícita entre falas/ações.
+Exemplo:
+
+Domingo de manhã. Mary, biquíni preto. Jacaraípe.
+Ela bloqueia as mensagens de Ricardo. Respiração cadenciada. Mãos firmes na mochila.
+— Posso ajudar? — a atendente se aproxima.
+— Água mineral. Sem gelo.
+— Com gás ou sem?
+— Sem. E rápida.
+A tampinha estala. Mary bebe, fecha a garrafa e segue em frente, leve e decidida.
+"""
+
 
 # EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
 # Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
@@ -1098,32 +1140,29 @@ SCENERY_TERMS = [
 ]
 SCENERY_WORD = re.compile(r"\b(" + "|".join(SCENERY_TERMS) + r")\b", re.IGNORECASE)
 
-def sanitize_scenery(t: str) -> str:
-    """Apaga termos de natureza/clima e normaliza espaços/pontuação."""
+def sanitize_scenery_preserve_opening(t: str) -> str:
+    """Apaga termos de natureza/clima e normaliza espaços, mas PRESERVA a primeira linha (abertura)."""
     if not t:
         return ""
-    t = SCENERY_WORD.sub("", t)
-    # Espaços duplicados e espaçamento antes de pontuação
-    t = re.sub(r"\s{2,}", " ", t)
-    t = re.sub(r"\s+([,.;:!?])", r"\1", t)
-    t = re.sub(r"\n{3,}", "\n\n", t)
-    return t.strip()
-
-def render_tail(t: str) -> str:
-    if not t:
+    linhas = t.strip().split('\n')
+    if not linhas:
         return ""
-    t = re.sub(r'^\s*\**\s*(microconquista|gancho)\s*:\s*.*$', '', t, flags=re.I|re.M)
-    t = re.sub(r'<\s*think\s*>.*?<\s*/\s*think\s*>', '', t, flags=re.I|re.S)
-    t = re.sub(r'\n{3,}', '\n\n', t).strip()
-    return t
+    primeira_linha = linhas[0].strip()
+    resto = '\n'.join(linhas[1:]).strip()
+    if resto:
+        resto_filtrado = sanitize_scenery(resto)
+        return primeira_linha + ('\n' + resto_filtrado if resto_filtrado else '')
+    else:
+        return primeira_linha
 
 def _render_visible(t: str) -> str:
-    t = sanitize_scenery(t)          # se já existe no seu projeto
-    t = roleplay_paragraphizer(t)    # <<< AQUI: força parágrafos e falas em linhas
+    t = sanitize_scenery_preserve_opening(t)  # NOVO: preserva linha de abertura
+    t = roleplay_paragraphizer(t)             # Força parágrafos e falas em linhas
     out = render_tail(t)
     if st.session_state.get("app_bloqueio_intimo", True):
         out = sanitize_explicit(out, int(st.session_state.get("nsfw_max_level", 0)), action="soften")
     return out
+
 
 def force_linebreak_on_falas(txt):
     return re.sub(r"([^\n])\s*(—)", r"\1\n\n\2", txt)
@@ -1427,6 +1466,22 @@ if entrada:
         entrada,
         st.session_state.get("ctx_cena", CTX_INICIAL)
     )
+    ctx = st.session_state["ctx_cena"]
+
+    # Gera linha de abertura padronizada
+    linha_abertura = gerar_linha_abertura(ctx)
+
+    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
+    historico = []
+    for ix, m in enumerate(st.session_state.session_msgs):
+        role = m.get("role", "user")
+        content = m.get("content", "")
+        # Só para a ÚLTIMA mensagem do usuário, aplica o formato padronizado!
+        if ix == len(st.session_state.session_msgs) - 1 and role.lower() == "user":
+            content = linha_abertura
+        if mary_mode_active and role.lower() == "user":
+            content = f"JÂNIO: {content}"
+        historico.append({"role": role, "content": content})
 
 
     # --- MODO MARY (1ª pessoa) ---
@@ -1776,6 +1831,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
