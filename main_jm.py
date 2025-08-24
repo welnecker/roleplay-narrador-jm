@@ -1633,17 +1633,7 @@ if entrada:
             texto += random.choice(finais)
         return texto
 
-
-    def _render_visible(t: str) -> str:
-        out = render_tail(t)
-        # Se Modo Mary: remove falas explícitas atribuídas a Jânio
-        if mary_mode_active:
-            out = DIALOGO_NAO_MARY.sub("", out)
-        # Nivel de calor padrão 0 (você pode ajustar no sidebar)
-        out = sanitize_explicit(out, max_level=int(st.session_state.get("nsfw_max_level", 0)), action="livre")
-        out = sanitize_scenery(out)  # <<< NOVO: limpa paisagem/clima
-        return out
-
+    
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
@@ -1857,6 +1847,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
