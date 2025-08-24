@@ -768,7 +768,7 @@ def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True, sinto
 
     # Filtro extra de segurança contra “paisagem/clima”
     termos_banidos = re.compile(
-        r"\b(c[ée]u|mar|areia|onda?s?|vento|brisa|chuva|nublado|luar|horizonte|pier|paisage?m|cen[áa]rio|amanhecer|entardecer|p[ôo]r do sol)\b",
+        r"\b(c[ée]u|mar|onda?s?|vento|brisa|chuva|nublado|luar|horizonte|pier|paisage?m|cen[áa]rio|amanhecer|entardecer|p[ôo]r do sol)\b",
         re.IGNORECASE,
     )
     pool = [f for f in pool if not termos_banidos.search(f)]
@@ -897,7 +897,7 @@ OBRIGATÓRIO — FORMATO ESTRUTURADO DE ROLEPLAY
 """.strip()
 
     BLOCO_RESTRICAO_SENSORY = """
-NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
+NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
 NÃO inicie textos com lugar ou "Pier de Camburi — Noite —", nem descreva onde estão ou o horário.
 PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
 Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
@@ -937,7 +937,7 @@ A tampinha estala. Mary bebe, fecha a garrafa e segue em frente, leve e decidida
     import re
     _split = re.compile(r'(?<=[\.\!\?])\s+')
     _amb = re.compile(
-        r'\b(c[ée]u|nuvens?|horizonte|luar|mar|onda?s?|areia|pier|praia|vento|brisa|chuva|garoa|sereno|amanhecer|entardecer|p[ôo]r do sol|paisage?m|cen[áa]rio|temperatura|verão|quiosques?)\b',
+        r'\b(c[ée]u|nuvens?|horizonte|luar|mar|onda?s?|pier|praia|vento|brisa|chuva|garoa|sereno|amanhecer|entardecer|p[ôo]r do sol|paisage?m|cen[áa]rio|temperatura|verão|quiosques?)\b',
         re.I
     )
 
@@ -1151,7 +1151,7 @@ import re
 # --- Remoção de "paisagem/clima" (sem mexer em sentido da cena) ---
 SCENERY_TERMS = [
     r"c[ée]u", r"nuvens?", r"horizonte", r"luar",
-    r"mar", r"onda?s?", r"areia", r"pier",
+    r"mar", r"onda?s?", r"pier",
     r"vento", r"brisa", r"neblina|brumas?",
     r"chuva|garoa|sereno",
     r"amanhecer|entardecer|crep[uú]sculo|p[ôo]r do sol",
@@ -1853,6 +1853,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
