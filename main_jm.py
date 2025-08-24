@@ -840,27 +840,27 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
 # PROMPT BUILDER (APENAS FASE) — compatível com Modo Mary
 # =========================
 
-def construir_prompt_com_narrador() -> str:
-BLOCO_ROLEPLAY = """
-OBRIGATÓRIO — FORMATO ESTRUTURADO DE ROLEPLAY
-
-- Cada fala (“—”) deve começar linha nova isolada, SEMPRE seguida ou precedida de bloco de ação/descrição corporal.
-- Nunca una mais de 2 frases no mesmo parágrafo narrativo; em narração, troque de linha a cada ação/reação física importante.
-- O texto final sempre terá parágrafos curtos: bloco de ação (máx. 2 frases), bloco de fala, bloco de reação, bloco de fala. Nunca prosa longa.
-- NÃO formate como prosa de romance/livro; sempre como roteiro estruturado de roleplay moderno e comercial.
-"""
-    BLOCO_RESTRICAO_SENSORY = """
-NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
-NÃO inicie textos com lugar ou “Pier de Camburi — Noite —”, nem descreva onde estão ou o horário.
-PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
-Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
-Respostas devem ser curtas e diretas.
-
-# EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
-# Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
-# "Tempo. Mary[, figurino]. [Lugar]."
-# (Sem metáforas, sem descrever cenário/clima. Após essa linha, volte ao estilo seco acima.)
-""".strip()
+    def construir_prompt_com_narrador() -> str:
+    BLOCO_ROLEPLAY = """
+    OBRIGATÓRIO — FORMATO ESTRUTURADO DE ROLEPLAY
+    
+    - Cada fala (“—”) deve começar linha nova isolada, SEMPRE seguida ou precedida de bloco de ação/descrição corporal.
+    - Nunca una mais de 2 frases no mesmo parágrafo narrativo; em narração, troque de linha a cada ação/reação física importante.
+    - O texto final sempre terá parágrafos curtos: bloco de ação (máx. 2 frases), bloco de fala, bloco de reação, bloco de fala. Nunca prosa longa.
+    - NÃO formate como prosa de romance/livro; sempre como roteiro estruturado de roleplay moderno e comercial.
+    """
+        BLOCO_RESTRICAO_SENSORY = """
+    NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
+    NÃO inicie textos com lugar ou “Pier de Camburi — Noite —”, nem descreva onde estão ou o horário.
+    PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
+    Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
+    Respostas devem ser curtas e diretas.
+    
+    # EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
+    # Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
+    # "Tempo. Mary[, figurino]. [Lugar]."
+    # (Sem metáforas, sem descrever cenário/clima. Após essa linha, volte ao estilo seco acima.)
+    """.strip()
 
     ctx = st.session_state.get("ctx_cena", {})
     try:
@@ -1764,6 +1764,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
