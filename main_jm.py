@@ -840,27 +840,28 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
 # PROMPT BUILDER (APENAS FASE) — compatível com Modo Mary
 # =========================
 
-    def construir_prompt_com_narrador() -> str:
+def construir_prompt_com_narrador() -> str:
     BLOCO_ROLEPLAY = """
-    OBRIGATÓRIO — FORMATO ESTRUTURADO DE ROLEPLAY
-    
-    - Cada fala (“—”) deve começar linha nova isolada, SEMPRE seguida ou precedida de bloco de ação/descrição corporal.
-    - Nunca una mais de 2 frases no mesmo parágrafo narrativo; em narração, troque de linha a cada ação/reação física importante.
-    - O texto final sempre terá parágrafos curtos: bloco de ação (máx. 2 frases), bloco de fala, bloco de reação, bloco de fala. Nunca prosa longa.
-    - NÃO formate como prosa de romance/livro; sempre como roteiro estruturado de roleplay moderno e comercial.
-    """
-        BLOCO_RESTRICAO_SENSORY = """
-    NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
-    NÃO inicie textos com lugar ou “Pier de Camburi — Noite —”, nem descreva onde estão ou o horário.
-    PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
-    Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
-    Respostas devem ser curtas e diretas.
-    
-    # EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
-    # Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
-    # "Tempo. Mary[, figurino]. [Lugar]."
-    # (Sem metáforas, sem descrever cenário/clima. Após essa linha, volte ao estilo seco acima.)
-    """.strip()
+OBRIGATÓRIO — FORMATO ESTRUTURADO DE ROLEPLAY
+
+- Cada fala ("—") deve começar linha nova isolada, SEMPRE seguida ou precedida de bloco de ação/descrição corporal.
+- Nunca una mais de 2 frases no mesmo parágrafo narrativo; em narração, troque de linha a cada ação/reação física importante.
+- O texto final sempre terá parágrafos curtos: bloco de ação (máx. 2 frases), bloco de fala, bloco de reação, bloco de fala. Nunca prosa longa.
+- NÃO formate como prosa de romance/livro; sempre como roteiro estruturado de roleplay moderno e comercial.
+""".strip()
+
+    BLOCO_RESTRICAO_SENSORY = """
+NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, areia, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
+NÃO inicie textos com lugar ou "Pier de Camburi — Noite —", nem descreva onde estão ou o horário.
+PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
+Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
+Respostas devem ser curtas e diretas.
+
+# EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
+# Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
+# "Tempo. Mary[, figurino]. [Lugar]."
+# (Sem metáforas, sem descrever cenário/clima. Após essa linha, volte ao estilo seco acima.)
+""".strip()
 
     ctx = st.session_state.get("ctx_cena", {})
     try:
@@ -869,17 +870,23 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
         voz_bloco = prompt_da_cena(ctx, st.session_state.get("finalizacao_modo", "ponte"))
     cena_bloco = prompt_da_cena(ctx, st.session_state.get("finalizacao_modo", "ponte"))
 
-    # --------- Sanitizador leve de histórico (sem praia/clima)
+    # Sanitizador leve de histórico (sem praia/clima)
     import re
     _split = re.compile(r'(?<=[\.\!\?])\s+')
-    _amb = re.compile(r'\b(c[ée]u|nuvens?|horizonte|luar|mar|onda?s?|areia|pier|praia|vento|brisa|chuva|garoa|sereno|amanhecer|entardecer|p[ôo]r do sol|paisage?m|cen[áa]rio|temperatura|verão|quiosques?)\b', re.I)
+    _amb = re.compile(
+        r'\b(c[ée]u|nuvens?|horizonte|luar|mar|onda?s?|areia|pier|praia|vento|brisa|chuva|garoa|sereno|amanhecer|entardecer|p[ôo]r do sol|paisage?m|cen[áa]rio|temperatura|verão|quiosques?)\b',
+        re.I
+    )
     def _hist_sanitizado(hist):
         L=[]
         for r in hist or []:
-            role=r.get("role","user"); txt=(r.get("content") or "").strip()
-            if not txt: continue
+            role=r.get("role","user")
+            txt=(r.get("content") or "").strip()
+            if not txt:
+                continue
             s=[t for t in _split.split(txt) if t.strip() and not _amb.search(t)]
-            if s: L.append(f"{role}: {' '.join(s)[:900]}")
+            if s:
+                L.append(f"{role}: {' '.join(s)[:900]}")
         return "\n".join(L) if L else "(sem histórico)"
 
     memos = carregar_memorias_brutas()
@@ -891,10 +898,14 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
-    mary_sens_txt = gerar_mary_sensorial(_sens_level, n=_sens_n, sintonia=bool(st.session_state.get("modo_sintonia", True))) if _sens_on else ""
+    mary_sens_txt = (
+        gerar_mary_sensorial(_sens_level, n=_sens_n, sintonia=bool(st.session_state.get("modo_sintonia", True)))
+        if _sens_on
+        else ""
+    )
 
     ritmo_cena = int(st.session_state.get("ritmo_cena", 0))
-    ritmo_label = ["muito lento","lento","médio","rápido"][max(0,min(3,ritmo_cena))]
+    ritmo_label = ["muito lento", "lento", "médio", "rápido"][max(0, min(3, ritmo_cena))]
     modo_sintonia = bool(st.session_state.get("modo_sintonia", True))
 
     n_hist = int(st.session_state.get("n_sheet_prompt", 15))
@@ -903,10 +914,10 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
     ultima_fala_user = _last_user_text(hist)
 
     ancora_bloco = ""
-    ate_ts = _parse_ts(hist[-1].get("timestamp","")) if hist else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ate_ts = _parse_ts(hist[-1].get("timestamp", "")) if hist else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     ml_topk_txt = "(nenhuma)"
-    st.session_state["_ml_topk_texts"]=[]
+    st.session_state["_ml_topk_texts"] = []
     if st.session_state.get("use_memoria_longa", True) and hist:
         try:
             topk = memoria_longa_buscar_topk(
@@ -919,36 +930,37 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
                 ml_topk_txt = "\n".join([f"- {t}" for (t, *_rest) in topk])
                 st.session_state["_ml_topk_texts"] = [t for (t, *_r) in topk]
         except Exception:
-            st.session_state["_ml_topk_texts"]=[]
+            st.session_state["_ml_topk_texts"] = []
 
     memos_all = [
         (d.get("conteudo") or "").strip()
         for d in memos.get("[all]", [])
-        if isinstance(d, dict) and d.get("conteudo")
-        and (not d.get("timestamp") or d.get("timestamp") <= ate_ts)
+        if isinstance(d, dict) and d.get("conteudo") and (not d.get("timestamp") or d.get("timestamp") <= ate_ts)
     ]
-    st.session_state["_ml_recorrentes"]=memos_all
+    st.session_state["_ml_recorrentes"] = memos_all
 
-    dossie=[]
-    m=persona_block_temporal("mary", memos, ate_ts, 8)
-    j=persona_block_temporal("janio", memos, ate_ts, 8)
-    if m: dossie.append(m)
-    if j: dossie.append(j)
-    dossie_txt="\n\n".join(dossie) if dossie else "(sem personas definidas)"
+    dossie = []
+    m = persona_block_temporal("mary", memos, ate_ts, 8)
+    j = persona_block_temporal("janio", memos, ate_ts, 8)
+    if m:
+        dossie.append(m)
+    if j:
+        dossie.append(j)
+    dossie_txt = "\n\n".join(dossie) if dossie else "(sem personas definidas)"
 
-    falas_mary_bloco=""
-    st.session_state["_falas_mary_list"]=[]
+    falas_mary_bloco = ""
+    st.session_state["_falas_mary_list"] = []
     if st.session_state.get("usar_falas_mary", False):
         falas = carregar_falas_mary() or FALAS_EXPLICITAS_MARY
         if falas:
-            st.session_state["_falas_mary_list"]=falas[:]
+            st.session_state["_falas_mary_list"] = falas[:]
             falas_mary_bloco = (
                 "### Falas de Mary — use literalmente 1–2 destas (no máximo 1 por parágrafo)\n"
                 "NÃO reescreva as frases abaixo; quando usar, mantenha exatamente como está.\n"
                 + "\n".join(f"- {s}" for s in falas)
             )
 
-    sintonia_bloco=""
+    sintonia_bloco = ""
     if modo_sintonia:
         sintonia_bloco = (
             "### Sintonia & Ritmo (prioritário)\n"
@@ -983,7 +995,7 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
             "- Falha ao ler o estado; **evite** afirmar status e **não** contradiga cenas anteriores.\n"
         )
 
-    climax_bloco=""
+    climax_bloco = ""
     if bool(st.session_state.get("app_bloqueio_intimo", True)) and fase < 5:
         climax_bloco = (
             "### Proteção de avanço íntimo (ATIVA)\n"
@@ -1030,11 +1042,11 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
 
 - Descreva as reações físicas intensas de Mary: peito arfando, seios balançando, quadris se movendo, músculos tensionando, pele arrepiando, corpo se inclinando, respiração acelerada, boca entreaberta, lábios úmidos, mãos deslizando pela roupa ou corpo, gemidos, suspiros, movimentos provocantes. Jamais apenas "pensamento" ou "emoção", sempre efeito físico visível.
 
-- Use diálogos alternados e ações entre os personagens. Comece e termine com ganchos físicos/visuais: gesto, aproximação, olhar, toque, convite, microação. Jamais feche uma cena com frases clichê como “A tensão fica no ar…”, “Um silêncio elétrico…”, “Eles param no limiar…” ou qualquer variação parecida.
+- Use diálogos alternados e ações entre os personagens. Comece e termine com ganchos físicos/visuais: gesto, aproximação, olhar, toque, convite, microação. Jamais feche uma cena com frases clichê como "A tensão fica no ar…", "Um silêncio elétrico…", "Eles param no limiar…" ou qualquer variação parecida.
 
 - Parágrafos devem ser curtos (até 3 frases cada), com linhas em branco entre cada bloco de frase/fala. Nunca agrupe textos longos nem explique o contexto; sempre priorize o momento presente, corpo-a-corpo, sem retrospectiva, sem ambientação.
 
-- Nunca descreva tempo (“Domingo de manhã”), nunca local (“Praia de Jacaraípe”), nunca ambiente (“areias quentes”, “vento”, “céu azul”, “quiosques”). Proibido metáfora, poesia ambiental, ou qualquer menção implícita de natureza/cenário.
+- Nunca descreva tempo ("Domingo de manhã"), nunca local ("Praia de Jacaraípe"), nunca ambiente ("areias quentes", "vento", "céu azul", "quiosques"). Proibido metáfora, poesia ambiental, ou qualquer menção implícita de natureza/cenário.
 
 - Quando Mary se move, sempre explicitamente cite curvas, seios, quadris, boca, cabelo, toque, calor e reação física. Se o usuário der uma ordem ou direção, Mary sempre reage com gesto físico e fala conectando o desejo explícito do momento.
 
@@ -1042,11 +1054,11 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
 
 - Se usar falas fixas da Mary, sempre intercale com ação corporal, nunca use só fala.
 
-- Se não puder avançar por limitação de fase, encerre com microação física de tensão, mas nunca diga “a tensão fica no ar”.
+- Se não puder avançar por limitação de fase, encerre com microação física de tensão, mas nunca diga "a tensão fica no ar".
 
 - Proibido monólogo introspectivo ou pensamento maior que uma frase. Priorize sempre calor, desejo, corpo, graça e sensualidade natural do encontro.
 
-- Escreva apenas o momento imediato; nunca use frases de abertura como “Naquela manhã…”, “No fim de tarde…”, “No bar…”, “Ao entardecer…”, “Na praia…”, “Enquanto o vento soprava…”, “Ela caminhava pelas areias…”.
+- Escreva apenas o momento imediato; nunca use frases de abertura como "Naquela manhã…", "No fim de tarde…", "No bar…", "Ao entardecer…", "Na praia…", "Enquanto o vento soprava…", "Ela caminhava pelas areias…".
 
 - Este é um roleplay comercial e engajante, não uma novela nem conto literário. O texto deve ser sempre vivo, sensual, direto, curto e visual.
 
@@ -1764,6 +1776,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
