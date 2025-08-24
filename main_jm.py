@@ -16,8 +16,6 @@ import numpy as np
 from gspread.exceptions import APIError
 from oauth2client.service_account import ServiceAccountCredentials
 from huggingface_hub import InferenceClient  # <= ADICIONE ESTA LINHA
-import re
-
 
 # =========================
 # CONFIG BÁSICA DO APP
@@ -28,11 +26,11 @@ ONLY_FASE_MODE = True
 
 PLANILHA_ID_PADRAO = st.secrets.get("SPREADSHEET_ID", "").strip() or "1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM"
 TAB_INTERACOES = "interacoes_jm"
-TAB_PERFIL      = "perfil_jm"
-TAB_MEMORIAS    = "memoria_jm"
-TAB_ML          = "memoria_longa_jm"
-TAB_TEMPLATES   = "templates_jm"
-TAB_FALAS_MARY  = "falas_mary_jm"   # opcional (coluna: fala)
+TAB_PERFIL = "perfil_jm"
+TAB_MEMORIAS = "memoria_jm"
+TAB_ML = "memoria_longa_jm"
+TAB_TEMPLATES = "templates_jm"
+TAB_FALAS_MARY = "falas_mary_jm"   # opcional (coluna: fala)
 
 # Modelos (pode expandir depois)
 MODELOS_OPENROUTER = {
@@ -73,42 +71,40 @@ MODELOS_HF = {
 }
 
 # === Roleplay: força parágrafos e falas em linhas separadas ===
-import re
 
 MAX_SENT_PER_PARA = 2
 MAX_CHARS_PER_PARA = 240
 
-_DASHES = re.compile(r"(?:\s*--\s*|\s*–\s*|\s*—\s*)")     # normaliza -- / – / —
-_SENT_END = re.compile(r"[.!?…](?=\s|$)")                 # fim de frase
+_DASHES = re.compile(r"(?:\s*--\s*|\s*–\s*|\s*—\s*)")    # normaliza -- / – / —
+_SENT_END = re.compile(r"[.!?…](?=\s|$)")                # fim de frase
 _UPPER_OR_DASH = re.compile(r"([.!?…])\s+(?=(?:—|[A-ZÁÉÍÓÚÂÊÔÃÕÀÇ0-9]))")
 
 def roleplay_paragraphizer(t: str) -> str:
     if not t:
         return ""
-def break_long_paragraphs(txt):
-    # Divide por frase (ponto, interrogação, exclamação), removendo espaços extras
-    frases = re.split(r'([.!?])\s*', txt)
-    blocos = []
-    cur = ''
-    for i in range(0, len(frases)-1, 2):
-        frase = frases[i].strip()
-        pont = frases[i+1]
+    def break_long_paragraphs(txt):
+        # Divide por frase (ponto, interrogação, exclamação), removendo espaços extras
+        frases = re.split(r'([.!?])\s*', txt)
+        blocos = []
+        cur = ''
+        for i in range(0, len(frases)-1, 2):
+            frase = frases[i].strip()
+            pont = frases[i+1]
+            if cur:
+                cur += ' ' + frase + pont
+                blocos.append(cur.strip())
+                cur = ''
+            else:
+                cur = frase + pont
+                blocos.append(cur.strip())
+                cur = ''
         if cur:
-            cur += ' ' + frase + pont
             blocos.append(cur.strip())
-            cur = ''
-        else:
-            cur = frase + pont
-            blocos.append(cur.strip())
-            cur = ''
-    if cur:
-        blocos.append(cur.strip())
-    # Junta por quebra de linha simples
-    return '\n'.join([b for b in blocos if b])
-
-# No final do seu pós-processamento:
-visible_txt = break_long_paragraphs(visible_txt)
+        # Junta por quebra de linha simples
+        return '\n'.join([b for b in blocos if b])
     
+    # No final do seu pós-processamento:
+    # visible_txt = break_long_paragraphs(visible_txt)  # (mova essa linha para o contexto correto se necessário)
 
     # 1) Normaliza travessão e força quebra antes de qualquer fala
     t = _DASHES.sub("\n— ", t)
@@ -151,8 +147,8 @@ visible_txt = break_long_paragraphs(visible_txt)
         final.append(ln)
     if final and final[-1] == "":
         final.pop()
-
     return "\n".join(final).strip()
+
 
 def model_id_for_together(api_ui_model_id: str) -> str:
     key = (api_ui_model_id or "").strip()
@@ -162,7 +158,7 @@ def model_id_for_together(api_ui_model_id: str) -> str:
     if low.startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
         return "mistralai/Mixtral-8x7B-Instruct-V0.1"
     return key or "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    
+
 def api_config_for_provider(provider: str):
     if provider == "OpenRouter":
         return (
@@ -172,8 +168,8 @@ def api_config_for_provider(provider: str):
         )
     elif provider == "Hugging Face":  # <= NOVO RAMO
         return (
-            "HF_CLIENT",                                  # marcador especial (não usa requests)
-            st.secrets.get("HUGGINGFACE_API_KEY", ""),    # token do HF
+            "HF_CLIENT",                                 # marcador especial (não usa requests)
+            st.secrets.get("HUGGINGFACE_API_KEY", ""),   # token do HF
             MODELOS_HF,
         )
     else:
@@ -182,8 +178,6 @@ def api_config_for_provider(provider: str):
             st.secrets.get("TOGETHER_API_KEY", ""),
             MODELOS_TOGETHER_UI,
         )
-
-
 
 # =========================
 # BACKOFF + CACHES
@@ -221,6 +215,7 @@ def _invalidate_sheet_caches():
         _sheet_all_values_cached.clear()
     except Exception:
         pass
+
 
 # =========================
 # GOOGLE SHEETS
@@ -880,13 +875,14 @@ NÃO inicie textos com lugar ou "Pier de Camburi — Noite —", nem descreva on
 PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
 Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
 Respostas devem ser curtas e diretas.
-BLOCO_RESTRICAO_SENSORY = """
+
 ...
 Respostas devem OBRIGATORIAMENTE começar assim, sem metáforas:
 "Domingo de manhã. Mary, biquíni preto. Jacaraípe."
 - SEMPRE inicie com uma linha nesse formato: tempo. Mary[, figurino]. local.
 - Após essa linha, use somente frases de ação, sensação física ou diálogo direto, um por parágrafo.
 - Não agrupe frases em prosa. Parágrafos sempre curtos e diretos, quebra de linha explícita entre falas/ações.
+
 Exemplo:
 
 Domingo de manhã. Mary, biquíni preto. Jacaraípe.
@@ -896,15 +892,13 @@ Ela bloqueia as mensagens de Ricardo. Respiração cadenciada. Mãos firmes na m
 — Com gás ou sem?
 — Sem. E rápida.
 A tampinha estala. Mary bebe, fecha a garrafa e segue em frente, leve e decidida.
-"""
-
-
-# EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
-# Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
-# "Tempo. Mary[, figurino]. [Lugar]."
-# (Sem metáforas, sem descrever cenário/clima. Após essa linha, volte ao estilo seco acima.)
 """.strip()
 
+    # EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
+    # Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
+    # "Tempo. Mary[, figurino]. [Lugar]."
+    # (Sem metáforas, sem descrever cenário/clima. Após essa linha, volte ao estilo seco acima.)
+    
     ctx = st.session_state.get("ctx_cena", {})
     try:
         voz_bloco = instrucao_llm(st.session_state.get("finalizacao_modo", "ponto de gancho"), ctx)
@@ -919,14 +913,15 @@ A tampinha estala. Mary bebe, fecha a garrafa e segue em frente, leve e decidida
         r'\b(c[ée]u|nuvens?|horizonte|luar|mar|onda?s?|areia|pier|praia|vento|brisa|chuva|garoa|sereno|amanhecer|entardecer|p[ôo]r do sol|paisage?m|cen[áa]rio|temperatura|verão|quiosques?)\b',
         re.I
     )
+
     def _hist_sanitizado(hist):
-        L=[]
+        L = []
         for r in hist or []:
-            role=r.get("role","user")
-            txt=(r.get("content") or "").strip()
+            role = r.get("role", "user")
+            txt = (r.get("content") or "").strip()
             if not txt:
                 continue
-            s=[t for t in _split.split(txt) if t.strip() and not _amb.search(t)]
+            s = [t for t in _split.split(txt) if t.strip() and not _amb.search(t)]
             if s:
                 L.append(f"{role}: {' '.join(s)[:900]}")
         return "\n".join(L) if L else "(sem histórico)"
@@ -1831,27 +1826,3 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
