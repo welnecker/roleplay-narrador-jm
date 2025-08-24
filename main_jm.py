@@ -319,6 +319,33 @@ def extrair_diretriz_contexto(texto_usuario: str, ctx: dict | None = None) -> di
 
     return ctx
 
+def gerar_linha_abertura(ctx: dict) -> str:
+    """
+    Gera a linha de abertura padronizada para a cena, com base no contexto.
+    Exemplo: "Domingo de manhã. Mary, biquíni preto. Jacaraípe."
+    """
+    if not ctx:
+        return ""
+    tempo = (ctx.get("tempo") or "").strip().rstrip(".")
+    figurino = (ctx.get("figurino") or "").strip().rstrip(".")
+    lugar = (ctx.get("lugar") or "").strip().rstrip(".")
+
+    pedacos = []
+    if tempo:
+        pedacos.append(tempo.capitalize())
+    mary_part = "Mary"
+    if figurino:
+        mary_part += f", {figurino}"
+    pedacos.append(mary_part)
+    if lugar:
+        pedacos.append(lugar)
+
+    if not any(pedacos):
+        return ""
+    return ". ".join(pedacos) + "."
+
+
+
 
 # ---------------------------------------------
 # VIRGINDADE — leitura memoria_jm + fallback (interacoes_jm) e inferência temporal
@@ -1120,8 +1147,6 @@ A tampinha estala. Mary bebe, fecha a garrafa e segue em frente, leve e decidida
     prompt = inserir_regras_mary_e_janio(prompt)
     return prompt
 
-
-
 import re
 # --- Remoção de "paisagem/clima" (sem mexer em sentido da cena) ---
 SCENERY_TERMS = [
@@ -1826,3 +1851,4 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
