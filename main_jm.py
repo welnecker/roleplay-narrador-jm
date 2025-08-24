@@ -1491,6 +1491,12 @@ if entrada:
     # Gera linha de abertura padronizada
     linha_abertura = gerar_linha_abertura(ctx)
 
+    # Defina se o modo Mary está ativo ANTES do for!
+    mary_mode_active = bool(
+        st.session_state.get("interpretar_apenas_mary")
+        or st.session_state.get("modo_resposta") == "Mary (1ª pessoa)"
+    )
+
     # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
     historico = []
     for ix, m in enumerate(st.session_state.session_msgs):
@@ -1851,4 +1857,5 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
