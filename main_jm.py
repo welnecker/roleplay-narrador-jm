@@ -1160,6 +1160,12 @@ SCENERY_TERMS = [
 ]
 SCENERY_WORD = re.compile(r"\b(" + "|".join(SCENERY_TERMS) + r")\b", re.IGNORECASE)
 
+def sanitize_scenery(text: str) -> str:
+    """Remove termos de natureza/clima definidos em SCENERY_WORD do texto."""
+    if not text:
+        return ""
+    return SCENERY_WORD.sub("", text)
+
 def sanitize_scenery_preserve_opening(t: str) -> str:
     """Apaga termos de natureza/clima e normaliza espaços, mas PRESERVA a primeira linha (abertura)."""
     if not t:
@@ -1847,6 +1853,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
