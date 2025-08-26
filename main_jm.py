@@ -1233,6 +1233,7 @@ def redact_for_logs(t: str) -> str:
     return re.sub(r'\n{3,}', '\n\n', t).strip()
 
 def resposta_valida(t: str) -> bool:
+    """Verifica se há conteúdo suficiente para ser considerado uma resposta válida."""
     if not t or t.strip() == "[Sem conteúdo]":
         return False
     if len(t.strip()) < 5:
@@ -1866,6 +1867,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
