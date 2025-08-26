@@ -8,22 +8,29 @@ import json
 import time
 import random
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Tuple, Dict, Any
 import streamlit as st
 import requests
 import gspread
+import numpy as np
 from gspread.exceptions import APIError
 from oauth2client.service_account import ServiceAccountCredentials
-from huggingface_hub import InferenceClient
+from huggingface_hub import InferenceClient  # <= ADICIONE ESTA LINHA
 
 # =========================
 # CONFIG BÁSICA DO APP
 # =========================
 
+# ATENÇÃO: este modo ignora “Momento atual”. Só a FASE manda.
 ONLY_FASE_MODE = True
 
 PLANILHA_ID_PADRAO = st.secrets.get("SPREADSHEET_ID", "").strip() or "1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM"
 TAB_INTERACOES = "interacoes_jm"
+TAB_PERFIL = "perfil_jm"
+TAB_MEMORIAS = "memoria_jm"
+TAB_ML = "memoria_longa_jm"
+TAB_TEMPLATES = "templates_jm"
+TAB_FALAS_MARY = "falas_mary_jm"   # opcional (coluna: fala)
 
 # Modelos (pode expandir depois)
 MODELOS_OPENROUTER = {
@@ -46,6 +53,7 @@ MODELOS_OPENROUTER = {
     "🧚 Rocinante 12B ★★☆": "thedrummer/rocinante-12b",
     "🍷 Magnum v2 72B ★★☆": "anthracite-org/magnum-v2-72b",
 }
+
 MODELOS_TOGETHER_UI = {
     "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
     "🧠 Qwen2.5-VL (72B) Instruct (Together)": "Qwen/Qwen2.5-VL-72B-Instruct",
@@ -53,6 +61,7 @@ MODELOS_TOGETHER_UI = {
     "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
     "👑 DeepSeek R1-0528 (Together)": "deepseek-ai/DeepSeek-R1",
 }
+
 MODELOS_HF = {
     "Llama 3.1 8B Instruct (HF)": "meta-llama/Meta-Llama-3.1-8B-Instruct",
     "Qwen2.5 7B Instruct (HF)":   "Qwen/Qwen3-235B-A22B-Instruct-2507",
@@ -61,25 +70,85 @@ MODELOS_HF = {
     "DeepSeek R1 (HF)":           "deepseek-ai/DeepSeek-R1",
 }
 
-def api_config_for_provider(provider: str):
-    if provider == "OpenRouter":
-        return (
-            "https://openrouter.ai/api/v1/chat/completions",
-            st.secrets.get("OPENROUTER_API_KEY", ""),
-            MODELOS_OPENROUTER,
-        )
-    elif provider == "Hugging Face":
-        return (
-            "HF_CLIENT",
-            st.secrets.get("HUGGINGFACE_API_KEY", ""),
-            MODELOS_HF,
-        )
-    else:
-        return (
-            "https://api.together.xyz/v1/chat/completions",
-            st.secrets.get("TOGETHER_API_KEY", ""),
-            MODELOS_TOGETHER_UI,
-        )
+# === Roleplay: força parágrafos e falas em linhas separadas ===
+
+MAX_SENT_PER_PARA = 2
+MAX_CHARS_PER_PARA = 240
+
+_DASHES = re.compile(r"(?:\s*--\s*|\s*–\s*|\s*—\s*)")    # normaliza -- / – / —
+_SENT_END = re.compile(r"[.!?…](?=\s|$)")                # fim de frase
+_UPPER_OR_DASH = re.compile(r"([.!?…])\s+(?=(?:—|[A-ZÁÉÍÓÚÂÊÔÃÕÀÇ0-9]))")
+
+def roleplay_paragraphizer(t: str) -> str:
+    if not t:
+        return ""
+    def break_long_paragraphs(txt):
+        # Divide por frase (ponto, interrogação, exclamação), removendo espaços extras
+        frases = re.split(r'([.!?])\s*', txt)
+        blocos = []
+        cur = ''
+        for i in range(0, len(frases)-1, 2):
+            frase = frases[i].strip()
+            pont = frases[i+1]
+            if cur:
+                cur += ' ' + frase + pont
+                blocos.append(cur.strip())
+                cur = ''
+            else:
+                cur = frase + pont
+                blocos.append(cur.strip())
+                cur = ''
+        if cur:
+            blocos.append(cur.strip())
+        # Junta por quebra de linha simples
+        return '\n'.join([b for b in blocos if b])
+    
+    # No final do seu pós-processamento:
+    # visible_txt = break_long_paragraphs(visible_txt)  # (mova essa linha para o contexto correto se necessário)
+
+    # 1) Normaliza travessão e força quebra antes de qualquer fala
+    t = _DASHES.sub("\n— ", t)
+
+    # 2) Quebra após ponto/exclamação/interrogação quando vier outra frase/fala
+    t = _UPPER_OR_DASH.sub(r"\1\n", t)
+
+    # 3) Limpa espaços
+    t = re.sub(r"[ \t]+", " ", t)
+    linhas = [ln.strip() for ln in t.splitlines() if ln.strip()]
+
+    # 4) Agrupa narrativa (máx 2 frases ou 240 chars); falas isoladas
+    out, buf = [], []
+    sent = chars = 0
+
+    for ln in linhas:
+        if ln.startswith("—"):
+            if buf:
+                out.append(" ".join(buf).strip())
+                out.append("")  # linha em branco entre parágrafos
+                buf, sent, chars = [], 0, 0
+            out.append(ln)      # fala fica sozinha
+        else:
+            buf.append(ln)
+            sent += len(_SENT_END.findall(ln))
+            chars += len(ln)
+            if sent >= MAX_SENT_PER_PARA or chars >= MAX_CHARS_PER_PARA:
+                out.append(" ".join(buf).strip())
+                out.append("")
+                buf, sent, chars = [], 0, 0
+
+    if buf:
+        out.append(" ".join(buf).strip())
+
+    # 5) Remove brancos duplicados e finais
+    final = []
+    for ln in out:
+        if ln == "" and (not final or final[-1] == ""):
+            continue
+        final.append(ln)
+    if final and final[-1] == "":
+        final.pop()
+    return "\n".join(final).strip()
+
 
 def model_id_for_together(api_ui_model_id: str) -> str:
     key = (api_ui_model_id or "").strip()
@@ -89,6 +158,64 @@ def model_id_for_together(api_ui_model_id: str) -> str:
     if low.startswith("mistralai/mixtral-8x7b-instruct-v0.1"):
         return "mistralai/Mixtral-8x7B-Instruct-V0.1"
     return key or "mistralai/Mixtral-8x7B-Instruct-v0.1"
+
+def api_config_for_provider(provider: str):
+    if provider == "OpenRouter":
+        return (
+            "https://openrouter.ai/api/v1/chat/completions",
+            st.secrets.get("OPENROUTER_API_KEY", ""),
+            MODELOS_OPENROUTER,
+        )
+    elif provider == "Hugging Face":  # <= NOVO RAMO
+        return (
+            "HF_CLIENT",                                 # marcador especial (não usa requests)
+            st.secrets.get("HUGGINGFACE_API_KEY", ""),   # token do HF
+            MODELOS_HF,
+        )
+    else:
+        return (
+            "https://api.together.xyz/v1/chat/completions",
+            st.secrets.get("TOGETHER_API_KEY", ""),
+            MODELOS_TOGETHER_UI,
+        )
+
+# =========================
+# BACKOFF + CACHES
+# =========================
+
+def _retry_429(callable_fn, *args, _retries=5, _base=0.6, **kwargs):
+    for i in range(_retries):
+        try:
+            return callable_fn(*args, **kwargs)
+        except APIError as e:
+            msg = str(e)
+            if "429" in msg or "quota" in msg.lower():
+                time.sleep((_base * (2 ** i)) + random.uniform(0, 0.25))
+                continue
+            raise
+    return callable_fn(*args, **kwargs)
+
+@st.cache_data(ttl=45, show_spinner=False)
+def _sheet_all_records_cached(sheet_name: str):
+    ws = _ws(sheet_name, create_if_missing=False)
+    if not ws:
+        return []
+    return _retry_429(ws.get_all_records)
+
+@st.cache_data(ttl=45, show_spinner=False)
+def _sheet_all_values_cached(sheet_name: str):
+    ws = _ws(sheet_name, create_if_missing=False)
+    if not ws:
+        return []
+    return _retry_429(ws.get_all_values)
+
+def _invalidate_sheet_caches():
+    try:
+        _sheet_all_records_cached.clear()
+        _sheet_all_values_cached.clear()
+    except Exception:
+        pass
+
 
 # =========================
 # GOOGLE SHEETS
@@ -125,73 +252,118 @@ def _ws(name: str, create_if_missing: bool = True):
             ws = planilha.add_worksheet(title=name, rows=5000, cols=10)
             if name == TAB_INTERACOES:
                 _retry_429(ws.append_row, ["timestamp", "role", "content"])
+            elif name == TAB_PERFIL:
+                _retry_429(ws.append_row, ["timestamp", "resumo"])
+            elif name == TAB_MEMORIAS:
+                _retry_429(ws.append_row, ["tipo", "conteudo", "timestamp"])
+            elif name == TAB_ML:
+                _retry_429(ws.append_row, ["texto", "embedding", "tags", "timestamp", "score"])
+            elif name == TAB_TEMPLATES:
+                _retry_429(ws.append_row, ["template", "etapa", "texto"])
+            elif name == TAB_FALAS_MARY:
+                _retry_429(ws.append_row, ["fala"])
             return ws
         except Exception:
             return None
 
-def _retry_429(callable_fn, *args, _retries=5, _base=0.6, **kwargs):
-    for i in range(_retries):
-        try:
-            return callable_fn(*args, **kwargs)
-        except APIError as e:
-            msg = str(e)
-            if "429" in msg or "quota" in msg.lower():
-                time.sleep((_base * (2 ** i)) + random.uniform(0, 0.25))
-                continue
-            raise
-    return callable_fn(*args, **kwargs)
+# =========================
+# UTILIDADES: MEMÓRIAS / HISTÓRICO
+# =========================
+from typing import Dict, List
+from datetime import datetime
 
-@st.cache_data(ttl=45, show_spinner=False)
-def _sheet_all_records_cached(sheet_name: str):
-    ws = _ws(sheet_name, create_if_missing=False)
-    if not ws:
-        return []
-    return _retry_429(ws.get_all_records)
+# --- Constantes de abas (ajuste se necessário) ---
+TAB_MEMORIAS   = "memoria_jm"       # cabeçalho: tipo | conteudo | timestamp
+TAB_INTERACOES = "interacoes_jm"  # ou "interacoes_jm", conforme seu projeto
+TAB_PERFIL     = "perfil_jm"        # aba que guarda 'resumo'
 
 # =========================
-# HISTÓRICO DE TURNOS
+# CONTEXTO FIXO DE CENA (tempo/lugar/figurino/tópico)
 # =========================
 
-def carregar_interacoes(n: int = 20):
-    """Carrega as interações recentes de TAB_INTERACOES."""
-    cache = st.session_state.get("_cache_interacoes", None)
-    if cache is None:
-        regs = _sheet_all_records_cached(TAB_INTERACOES)
-        norm = []
-        for r in regs:
-            norm.append({
-                "timestamp": (r.get("timestamp") or "").strip(),
-                "role": (r.get("role") or "user").strip(),
-                "content": (r.get("content") or "").strip(),
-            })
-        st.session_state["_cache_interacoes"] = norm
-        cache = norm
-    return cache[-n:] if len(cache) > n else cache
+CTX_INICIAL = {
+    "tempo": None,        # ex: "Domingo de manhã"
+    "lugar": None,        # ex: "em casa"
+    "figurino": None,     # ex: "short jeans e regata branca"
+    "topico": None,       # assunto resumido do turno
+    "diretiva": None,     # comando bruto do usuário
+}
 
-def salvar_interacao(role: str, content: str):
-    """Salva uma interação (turno)."""
-    if not planilha:
-        return
-    try:
-        aba = _ws(TAB_INTERACOES)
-        if not aba:
-            return
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        row = [timestamp, f"{role or ''}".strip(), f"{content or ''}".strip()]
-        _retry_429(aba.append_row, row, value_input_option="RAW")
-        lst = st.session_state.get("_cache_interacoes")
-        if isinstance(lst, list):
-            lst.append({"timestamp": timestamp, "role": row[1], "content": row[2]})
-        else:
-            st.session_state["_cache_interacoes"] = [{"timestamp": timestamp, "role": row[1], "content": row[2]}]
-        _invalidate_sheet_caches()
-    except Exception as e:
-        st.error(f"Erro ao salvar interação: {e}")
+def extrair_diretriz_contexto(texto_usuario: str, ctx: dict | None = None) -> dict:
+    import re
+
+    # Inicializa
+    ctx = dict(ctx) if ctx else dict(CTX_INICIAL)
+    t = (texto_usuario or "").strip()
+    ctx["diretiva"] = t
+
+    # Extração padrão
+    # Tempo (ex.: “domingo de manhã”, “hoje à noite”)
+    m_tempo = re.search(
+        r"(?i)\b(hoje|amanh[ãa]|ontem|segunda|ter[cç]a|quarta|quinta|sexta|s[áa]bado|domingo)(?:\s+de\s+(manh[ãa]|tarde|noite))?",
+        t)
+    if m_tempo:
+        p1 = m_tempo.group(1).capitalize()
+        p2 = f" de {m_tempo.group(2)}" if m_tempo.group(2) else ""
+        ctx["tempo"] = f"{p1}{p2}"
+
+    # Lugar curto (rótulo)
+    m_lugar = re.search(
+        r"(?i)\b(em casa|no apartamento|na lanchonete|no shopping|na escola|no est[úu]dio|no quarto|no bar|na praia)\b", t)
+    if m_lugar:
+        ctx["lugar"] = m_lugar.group(1)
+
+    # Figurino básico (ex.: “veste/ usando/ de ...”)
+    m_fig = re.search(r"(?i)\b(veste|usando|de)\s+([a-z0-9\s\-ãáéíóúç]+)", t)
+    if m_fig:
+        ctx["figurino"] = m_fig.group(2).strip()
+
+    # Tópico do turno (se houver “:”, pega o pós-dois-pontos; senão, o texto todo resumido)
+    m_top = re.search(r":\s*(.+)$", t)
+    ctx["topico"] = (m_top.group(1).strip() if m_top else t)[:140]
+
+    #--------------#
+    # Persistência: herda o último valor "ctx_cena" se campo não for atualizado
+    for campo in ["tempo", "lugar", "figurino"]:
+        if not ctx.get(campo):  # Se não houve nova detecção, mantém o anterior
+            ultimo_ctx = st.session_state.get("ctx_cena", {})
+            if ultimo_ctx and ultimo_ctx.get(campo):
+                ctx[campo] = ultimo_ctx.get(campo)
+
+    return ctx
+
+def gerar_linha_abertura(ctx: dict) -> str:
+    """
+    Gera a linha de abertura padronizada para a cena, com base no contexto.
+    Exemplo: "Domingo de manhã. Mary, biquíni preto. Jacaraípe."
+    """
+    if not ctx:
+        return ""
+    tempo = (ctx.get("tempo") or "").strip().rstrip(".")
+    figurino = (ctx.get("figurino") or "").strip().rstrip(".")
+    lugar = (ctx.get("lugar") or "").strip().rstrip(".")
+
+    pedacos = []
+    if tempo:
+        pedacos.append(tempo.capitalize())
+    mary_part = "Mary"
+    if figurino:
+        mary_part += f", {figurino}"
+    pedacos.append(mary_part)
+    if lugar:
+        pedacos.append(lugar)
+
+    if not any(pedacos):
+        return ""
+    return ". ".join(pedacos) + "."
+
+
+
 
 # ---------------------------------------------
 # VIRGINDADE — leitura memoria_jm + fallback (interacoes_jm) e inferência temporal
 # ---------------------------------------------
-from typing import Optional, Tuple, List, Dict
+from typing import Optional, Tuple, List
 import re
 from datetime import datetime
 
@@ -210,7 +382,7 @@ PADROES_VIRGEM = [
 ]
 
 def _to_dt(ts: str) -> Optional[datetime]:
-    """Converte timestamp em datetime."""
+    """Converte timestamp em datetime. Aceita formatos comuns; retorna None se falhar."""
     ts = (ts or "").strip()
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
         try:
@@ -221,8 +393,8 @@ def _to_dt(ts: str) -> Optional[datetime]:
 
 def _ultimo_evento_virgindade_memoria(ate: Optional[datetime] = None) -> Optional[Tuple[bool, datetime, str]]:
     """
-    Busca evidência em memoria_jm (tags [mary] e [all]), priorizando perda de virgindade.
-    Retorna (estado_bool, timestamp, 'memoria_jm')
+    Varre a aba memoria_jm (via carregar_memorias_brutas) nos tipos [mary] e [all].
+    Retorna (estado_bool, ts, "memoria_jm") com o evento mais recente <= ate.
     """
     try:
         buckets = carregar_memorias_brutas()  # {'[tag]': [{'conteudo','timestamp'}, ...]}
@@ -230,6 +402,7 @@ def _ultimo_evento_virgindade_memoria(ate: Optional[datetime] = None) -> Optiona
         buckets = {}
     candidatos: List[Tuple[bool, datetime]] = []
     ate = ate or datetime.now()
+
     for tag in ("[mary]", "[all]"):
         for item in buckets.get(tag, []) or []:
             txt = (item.get("conteudo") or "").strip()
@@ -237,26 +410,30 @@ def _ultimo_evento_virgindade_memoria(ate: Optional[datetime] = None) -> Optiona
             if ts and ts > ate:
                 continue
             low = txt.lower()
+            # não virgem tem prioridade
             if any(re.search(p, low, re.IGNORECASE) for p in PADROES_NAO_VIRGEM):
                 candidatos.append((False, ts or datetime.min))
             elif any(re.search(p, low, re.IGNORECASE) for p in PADROES_VIRGEM):
                 candidatos.append((True, ts or datetime.min))
+
     if not candidatos:
         return None
-    # Mais recente, False (não virgem) vence empate
+
+    # mais recente; em empate, False (não virgem) vence
     candidatos.sort(key=lambda x: (x[1], 0 if x[0] is False else 1))
     estado, ts = candidatos[-1]
     return (estado, ts, "memoria_jm")
 
 def _ultimo_evento_virgindade_interacoes(ate: Optional[datetime] = None) -> Optional[Tuple[bool, datetime, str]]:
     """
-    Fallback: busca padrão nas últimas interações (interacoes_jm).
-    Retorna (estado_bool, timestamp, 'interacoes_jm')
+    Fallback: varre interacoes_jm (via carregar_interacoes) e tenta inferir.
+    Retorna (estado_bool, ts, "interacoes_jm").
     """
     ate = ate or datetime.now()
-    inter = carregar_interacoes(n=20)
+    inter = carregar_interacoes(n=20)  # pega um histórico grande
     if not inter:
         return None
+
     candidatos: List[Tuple[bool, datetime]] = []
     for r in inter:
         ts = _to_dt(r.get("timestamp"))
@@ -267,24 +444,146 @@ def _ultimo_evento_virgindade_interacoes(ate: Optional[datetime] = None) -> Opti
             candidatos.append((False, ts or datetime.min))
         elif any(re.search(p, low, re.IGNORECASE) for p in PADROES_VIRGEM):
             candidatos.append((True, ts or datetime.min))
+
     if not candidatos:
         return None
+
     candidatos.sort(key=lambda x: (x[1], 0 if x[0] is False else 1))
     estado, ts = candidatos[-1]
     return (estado, ts, "interacoes_jm")
 
 def estado_virgindade_ate(ate: Optional[datetime] = None) -> Optional[bool]:
     """
-    Determina status canônico de virgindade para uso no prompt.
-    True  -> virgem
-    False -> não virgem
-    None  -> desconhecido (sem evidências)
+    Público p/ o prompt builder:
+      True  -> virgem
+      False -> não virgem
+      None  -> desconhecido (sem evidências)
     """
     ate = ate or datetime.now()
     res = _ultimo_evento_virgindade_memoria(ate)
     if res is None:
         res = _ultimo_evento_virgindade_interacoes(ate)
     return None if res is None else res[0]
+
+
+def _normalize_tag(raw: str) -> str:
+    t = (raw or "").strip().lower()
+    if not t:
+        return ""
+    return t if t.startswith("[") else f"[{t}]"
+
+def _parse_ts(s: str) -> str:
+    s = (s or "").strip()
+    try:
+        datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+        return s
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def carregar_memorias_brutas() -> Dict[str, List[dict]]:
+    """Lê a aba TAB_MEMORIAS e devolve um dicionário {'[tag]': [{'conteudo':..., 'timestamp':...}, ...]}."""
+    try:
+        regs = _sheet_all_records_cached(TAB_MEMORIAS)
+        buckets: Dict[str, List[dict]] = {}
+        for r in regs:
+            tag = _normalize_tag(r.get("tipo"))
+            txt = (r.get("conteudo") or "").strip()
+            ts  = (r.get("timestamp") or "").strip()
+            if tag and txt:
+                buckets.setdefault(tag, []).append({"conteudo": txt, "timestamp": ts})
+        return buckets
+    except Exception as e:
+        st.warning(f"Erro ao carregar memórias: {e}")
+        return {}
+
+def persona_block_temporal(nome: str, buckets: dict, ate_ts: str, max_linhas: int = 8) -> str:
+    """
+    Monta um bloco textual (linhas) da persona 'nome' até o timestamp ate_ts (YYYY-MM-DD HH:MM:SS).
+    Busca no buckets['[nome]'] e filtra por timestamp <= ate_ts.
+    """
+    tag = f"[{nome}]"
+    linhas = []
+    for d in buckets.get(tag, []) or []:
+        if not isinstance(d, dict):
+            continue
+        c = (d.get("conteudo") or "").strip()
+        ts = (d.get("timestamp") or "").strip()
+        if not c:
+            continue
+        if ts and ate_ts and ts > ate_ts:
+            continue
+        linhas.append((ts, c))
+    linhas.sort(key=lambda x: x[0])
+    ult = [c for _, c in linhas][-max_linhas:]
+    if not ult:
+        return ""
+    titulo = "Jânio" if nome in ("janio", "jânio") else "Mary" if nome == "mary" else nome.capitalize()
+    return f"{titulo}:\n- " + "\n- ".join(ult)
+
+def carregar_resumo_salvo() -> str:
+    """Lê a última linha com coluna 'resumo' não vazia em TAB_PERFIL."""
+    try:
+        registros = _sheet_all_records_cached(TAB_PERFIL)
+        for r in reversed(registros):
+            txt = (r.get("resumo") or "").strip()
+            if txt:
+                return txt
+        return ""
+    except Exception as e:
+        st.warning(f"Erro ao carregar resumo salvo: {e}")
+        return ""
+
+def salvar_resumo(resumo: str):
+    """Salva uma nova linha [timestamp, resumo] na aba TAB_PERFIL."""
+    try:
+        aba = _ws(TAB_PERFIL)
+        if not aba:
+            return
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _retry_429(aba.append_row, [timestamp, resumo], value_input_option="RAW")
+        _invalidate_sheet_caches()
+    except Exception as e:
+        st.error(f"Erro ao salvar resumo: {e}")
+
+def carregar_interacoes(n: int = 20):
+    """
+    Carrega as interações da aba TAB_INTERACOES com cache em sessão.
+    Retorna as últimas n interações normalizadas: [{timestamp, role, content}, ...]
+    """
+    cache = st.session_state.get("_cache_interacoes", None)
+    if cache is None:
+        regs = _sheet_all_records_cached(TAB_INTERACOES)
+        # normaliza
+        norm = []
+        for r in regs:
+            norm.append({
+                "timestamp": (r.get("timestamp") or "").strip(),
+                "role": (r.get("role") or "user").strip(),
+                "content": (r.get("content") or "").strip(),
+            })
+        st.session_state["_cache_interacoes"] = norm
+        cache = norm
+    return cache[-n:] if len(cache) > n else cache
+
+def salvar_interacao(role: str, content: str):
+    """Acrescenta uma linha em TAB_INTERACOES e atualiza o cache em sessão."""
+    if not planilha:
+        return
+    try:
+        aba = _ws(TAB_INTERACOES)
+        if not aba:
+            return
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        row = [timestamp, f"{role or ''}".strip(), f"{content or ''}".strip()]
+        _retry_429(aba.append_row, row, value_input_option="RAW")
+        lst = st.session_state.get("_cache_interacoes")
+        if isinstance(lst, list):
+            lst.append({"timestamp": timestamp, "role": row[1], "content": row[2]})
+        else:
+            st.session_state["_cache_interacoes"] = [{"timestamp": timestamp, "role": row[1], "content": row[2]}]
+        _invalidate_sheet_caches()
+    except Exception as e:
+        st.error(f"Erro ao salvar interação: {e}")
 
 # =========================
 # MEMÓRIA LONGA (opcional simples)
@@ -362,7 +661,6 @@ def memoria_longa_reforcar(textos_usados: list):
     except Exception:
         pass
 
-
 # =========================
 # REGRAS DE FASE (APENAS FASE)
 # =========================
@@ -390,7 +688,7 @@ FASES_ROMANCE: Dict[int, Dict[str, str]] = {
 FLAG_FASE_TXT_PREFIX = "FLAG: mj_fase="
 
 def _fase_label(n: int) -> str:
-    d = FASES_ROMANCE.get(int(n), FASES_ROMANCE)
+    d = FASES_ROMANCE.get(int(n), FASES_ROMANCE[0])
     return f"{int(n)} — {d['nome']}"
 
 def mj_set_fase(n: int, persist: bool=False):
@@ -418,12 +716,12 @@ def mj_carregar_fase_inicial() -> int:
     st.session_state.mj_fase = 0
     return 0
 
-
 # =========================
 # FALAS DA MARY (BRANDAS) + PLANILHA
 # =========================
 
 FALAS_EXPLICITAS_MARY = [
+    # Brandas por padrão — troque depois se quiser
     "Vem mais perto, sem pressa.",
     "Assim está bom… continua desse jeito.",
     "Eu quero sentir você devagar.",
@@ -445,12 +743,9 @@ def carregar_falas_mary() -> List[str]:
     except Exception:
         return []
 
-
 # =========================
 # AJUSTES DE TOM / SINTONIA
 # =========================
-import re, random
-
 import re, random
 
 def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True, sintonia: bool = True) -> str:
@@ -484,7 +779,7 @@ def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True, sinto
     else:
         pool = list(base_leve) + list(base_marcado) + list(base_ousado)
 
-    # Filtro extra contra clima/paisagem
+    # Filtro extra de segurança contra “paisagem/clima”
     termos_banidos = re.compile(
         r"\b(c[ée]u|mar|onda?s?|vento|brisa|chuva|nublado|luar|horizonte|pier|paisage?m|cen[áa]rio|amanhecer|entardecer|p[ôo]r do sol)\b",
         re.IGNORECASE,
@@ -512,7 +807,6 @@ def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True, sinto
                 frases = frases[:n_eff]
     return " ".join(frases)
 
-
 def _last_user_text(hist):
     if not hist:
         return ""
@@ -535,7 +829,6 @@ def _deduzir_ancora(texto: str) -> dict:
         return {"local": "Biblioteca", "hora": "tarde"}
     return {}
 
-
 def inserir_regras_mary_e_janio(prompt_base: str) -> str:
     calor = int(st.session_state.get("nsfw_max_level", 0))
     regras = f"""
@@ -548,7 +841,6 @@ def inserir_regras_mary_e_janio(prompt_base: str) -> str:
 - Sem “fade to black”: a progressão é mostrada, mas sem pornografia explícita.
 """.strip()
     return prompt_base + "\n" + regras
-
 
 # =========================
 # VIRGINDADE (opcional)
@@ -618,15 +910,35 @@ OBRIGATÓRIO — FORMATO ESTRUTURADO DE ROLEPLAY
 """.strip()
 
     BLOCO_RESTRICAO_SENSORY = """
-Conduza como romance contemporâneo: descreva ações, sensações, diálogos de forma rica, emotiva e natural, incluindo cenários, introspecções leves e clima emocional.
-Diálogos podem aparecer intercalados com narração, integrados em parágrafos maiores quando pertinente.
-Jamais use início seco tipo 'Parque da cidade.' nem fechos como 'um silêncio elétrico preenche o quarto'.
-"""
-
+NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
+NÃO inicie textos com lugar ou "Pier de Camburi — Noite —", nem descreva onde estão ou o horário.
+PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
+Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
+Respostas devem ser curtas e diretas.
 
 ...
+Respostas devem OBRIGATORIAMENTE começar assim, sem metáforas:
+"Domingo de manhã. Mary, biquíni preto. Jacaraípe."
+- SEMPRE inicie com uma linha nesse formato: tempo. Mary[, figurino]. local.
+- Após essa linha, use somente frases de ação, sensação física ou diálogo direto, um por parágrafo.
+- Não agrupe frases em prosa. Parágrafos sempre curtos e diretos, quebra de linha explícita entre falas/ações.
+
+Exemplo:
+
+Domingo de manhã. Mary, biquíni preto. Jacaraípe.
+Ela bloqueia as mensagens de Ricardo. Respiração cadenciada. Mãos firmes na mochila.
+— Posso ajudar? — a atendente se aproxima.
+— Água mineral. Sem gelo.
+— Com gás ou sem?
+— Sem. E rápida.
+A tampinha estala. Mary bebe, fecha a garrafa e segue em frente, leve e decidida.
 """.strip()
 
+    # EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
+    # Se houver diretiva do usuário, você PODE começar com UMA linha objetiva:
+    # "Tempo. Mary[, figurino]. [Lugar]."
+    # (Sem metáforas, sem descrever cenário/clima. Após essa linha, volte ao estilo seco acima.)
+    
     ctx = st.session_state.get("ctx_cena", {})
     try:
         voz_bloco = instrucao_llm(st.session_state.get("finalizacao_modo", "ponto de gancho"), ctx)
@@ -785,8 +1097,7 @@ Jamais use início seco tipo 'Parque da cidade.' nem fechos como 'um silêncio e
             "- **Sem fade-to-black** em qualquer circunstância.\n"
         )
 
-
-   prompt = f"""
+    prompt = f"""
 {BLOCO_RESTRICAO_SENSORY}
 {voz_bloco}
 {cena_bloco}
@@ -846,13 +1157,11 @@ Jamais use início seco tipo 'Parque da cidade.' nem fechos como 'um silêncio e
 {regra_saida}
 """.strip()
 
-prompt = inserir_regras_mary_e_janio(prompt)
-return prompt
-
+    prompt = inserir_regras_mary_e_janio(prompt)
+    return prompt
 
 import re
-
-# --- Remoção de termos de paisagem/clima ---
+# --- Remoção de "paisagem/clima" (sem mexer em sentido da cena) ---
 SCENERY_TERMS = [
     r"c[ée]u", r"nuvens?", r"horizonte", r"luar",
     r"mar", r"onda?s?", r"pier",
@@ -871,7 +1180,7 @@ def sanitize_scenery(text: str) -> str:
     return SCENERY_WORD.sub("", text)
 
 def sanitize_scenery_preserve_opening(t: str) -> str:
-    """Remove natureza/clima, mas preserva a primeira linha intacta."""
+    """Apaga termos de natureza/clima e normaliza espaços, mas PRESERVA a primeira linha (abertura)."""
     if not t:
         return ""
     linhas = t.strip().split('\n')
@@ -882,20 +1191,21 @@ def sanitize_scenery_preserve_opening(t: str) -> str:
     if resto:
         resto_filtrado = sanitize_scenery(resto)
         return primeira_linha + ('\n' + resto_filtrado if resto_filtrado else '')
-    return primeira_linha
+    else:
+        return primeira_linha
 
 def _render_visible(t: str) -> str:
-    t = sanitize_scenery_preserve_opening(t)  # Preserva linha de abertura limpa
-    t = roleplay_paragraphizer(t)             # Organiza parágrafos e falas
+    t = sanitize_scenery_preserve_opening(t)  # preserva linha de abertura
+    t = roleplay_paragraphizer(t)             # força parágrafos e falas em linhas
     if st.session_state.get("app_bloqueio_intimo", True):
         t = sanitize_explicit(t, int(st.session_state.get("nsfw_max_level", 0)), action="soften")
     return t
 
+
+
 def force_linebreak_on_falas(txt):
-    """Força quebra em toda fala iniciada por travessão em texto corrido."""
     return re.sub(r"([^\n])\s*(—)", r"\1\n\n\2", txt)
 
-# --- Filtro de termos explícitos de sexo ---
 EXPL_PAT = re.compile(
     r"\b(mamilos?|genit[aá]lia|ere[cç][aã]o|penetra[cç][aã]o|boquete|gozada|gozo|sexo oral|chupar|enfiar)\b",
     flags=re.IGNORECASE
@@ -911,12 +1221,10 @@ def classify_nsfw_level(t: str) -> int:
     return 0
 
 def sanitize_explicit(t: str, max_level: int, action: str) -> str:
-    """Corta ou suaviza respostas que excedem o nível permitido de NSFW."""
     lvl = classify_nsfw_level(t)
     if lvl <= max_level:
         return t
-    # Adapte este bloco se quiser cortar ou substituir além do recomendado
-    return t  # Não aplica corte automático por padrão
+    return t  # não corta por padrão
 
 def redact_for_logs(t: str) -> str:
     if not t:
@@ -925,14 +1233,13 @@ def redact_for_logs(t: str) -> str:
     return re.sub(r'\n{3,}', '\n\n', t).strip()
 
 def resposta_valida(t: str) -> bool:
-    """Verifica se há conteúdo suficiente para ser considerado uma resposta válida."""
     if not t or t.strip() == "[Sem conteúdo]":
         return False
     if len(t.strip()) < 5:
         return False
     return True
 
-# Exemplo de uso após gerar resposta:
+# Use APÓS as funções acima:
 # visible_txt = force_linebreak_on_falas(_render_visible(resposta_txt).strip())
 
 # =========================
@@ -963,33 +1270,25 @@ for k, v in {
     "etapa_template": 0,
     "ctx_cena": dict(CTX_INICIAL),
     "finalizacao_modo": "ponto de gancho",
+
+
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
 # =========================
 # SIDEBAR — Reorganizado (apenas FASE)
 # =========================
 
 with st.sidebar:
     st.title("🧭 Painel do Roteirista")
-    
+
     # Provedor / modelos
-    provedor = st.radio(
-        "🌐 Provedor",
-        ["OpenRouter", "Together", "Hugging Face"],
-        index=["OpenRouter", "Together", "Hugging Face"].index(st.session_state.get("provedor_ia", "OpenRouter")),
-        key="provedor_ia"
-    )
+    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
     if not api_key:
         st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
-
-    modelo_nome = st.selectbox(
-        "🤖 Modelo de IA",
-        list(modelos_map.keys()),
-        index=list(modelos_map.keys()).index(next((k for k, v in modelos_map.items() if v == st.session_state.get("modelo_escolhido_id")), list(modelos_map.keys())[0])),
-        key="modelo_nome_ui"
-    )
+    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
 
     st.markdown("---")
@@ -999,45 +1298,50 @@ with st.sidebar:
     modo_op = st.selectbox(
         "Modo de resposta",
         ["Narrador padrão", "Mary (1ª pessoa)"],
-        index=["Narrador padrão", "Mary (1ª pessoa)"].index(st.session_state.get("modo_resposta", "Narrador padrão")),
-        key="modo_resposta"
+        index=0,
+        key="modo_resposta",
     )
+    # Compat: flag booleana para o bloco de streaming
     st.session_state.interpretar_apenas_mary = (modo_op == "Mary (1ª pessoa)")
 
     st.selectbox(
         "Estilo de escrita",
         ["AÇÃO", "ROMANCE LENTO", "NOIR"],
         index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
-        key="estilo_escrita"
+        key="estilo_escrita",
     )
 
-    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 0)), key="nsfw_max_level")
+    # Defaults no mínimo
+    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=0, key="nsfw_max_level")
 
     st.checkbox(
         "Sintonia com o parceiro (modo harmônico)",
         key="modo_sintonia",
-        value=st.session_state.get("modo_sintonia", True)
+        value=st.session_state.get("modo_sintonia", True),
     )
 
     st.select_slider(
         "Ritmo da cena",
         options=[0, 1, 2, 3],
-        value=int(st.session_state.get("ritmo_cena", 0)),
+        value=0,
         format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
-        key="ritmo_cena"
+        key="ritmo_cena",
     )
 
     st.selectbox(
-        "Finalização",
-        ["ponto de gancho", "fecho suave", "deixar no suspense"],
-        index=["ponto de gancho", "fecho suave", "deixar no suspense"].index(st.session_state.get("finalizacao_modo", "ponto de gancho")),
-        key="finalizacao_modo"
+    "Finalização",
+    ["ponto de gancho", "fecho suave", "deixar no suspense"],
+    index=["ponto de gancho","fecho suave","deixar no suspense"].index(
+        st.session_state.get("finalizacao_modo", "ponto de gancho")
+    ),
+    key="finalizacao_modo",
     )
+
 
     st.checkbox(
         "Usar falas da Mary da planilha (usar literalmente)",
         value=st.session_state.get("usar_falas_mary", False),
-        key="usar_falas_mary"
+        key="usar_falas_mary",
     )
 
     st.markdown("---")
@@ -1051,7 +1355,7 @@ with st.sidebar:
         options=options_fase,
         value=fase_ui_val,
         format_func=_fase_label,
-        key="ui_mj_fase"
+        key="ui_mj_fase",
     )
     if fase_escolhida != st.session_state.get("mj_fase", fase_default):
         mj_set_fase(fase_escolhida, persist=True)
@@ -1068,24 +1372,24 @@ with st.sidebar:
     st.checkbox(
         "Evitar coincidências forçadas (montagem paralela A/B)",
         value=st.session_state.get("no_coincidencias", True),
-        key="no_coincidencias"
+        key="no_coincidencias",
     )
     st.checkbox(
         "Bloquear avanços íntimos sem ordem",
         value=st.session_state.get("app_bloqueio_intimo", True),
-        key="app_bloqueio_intimo"
+        key="app_bloqueio_intimo",
     )
     st.selectbox(
         "🎭 Emoção oculta",
         ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
         index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.get("app_emocao_oculta", "nenhuma")),
-        key="ui_app_emocao_oculta"
+        key="ui_app_emocao_oculta",
     )
     st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
 
     st.markdown("---")
     st.markdown("### ⏱️ Comprimento/timeout")
-    st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp",1200)), step=32, key="max_tokens_rsp")
+    st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp", 1200)), step=32, key="max_tokens_rsp")
     st.slider("Timeout (segundos)", 60, 600, value=int(st.session_state.get("timeout_s", 300)), step=10, key="timeout_s")
 
     st.markdown("---")
@@ -1100,7 +1404,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📝 Utilitários")
 
-    # Gerar resumo do capítulo (pega as últimas interações do Sheets)
+        # Gerar resumo do capítulo (pega as últimas interações do Sheets)
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             inter = carregar_interacoes(n=6)
@@ -1109,18 +1413,21 @@ with st.sidebar:
                 "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
                 + texto + "\n\nResumo:"
             )
-            provedor_local = st.session_state.get("provedor_ia", provedor)
+    
+            # Usa o provedor/modelo selecionados no topo do sidebar
+            provedor = st.session_state.get("provedor_ia", "OpenRouter")
             api_url_local = api_url
             api_key_local = api_key
             model_id_call = (
                 model_id_for_together(st.session_state.modelo_escolhido_id)
-                if provedor_local == "Together"
+                if provedor == "Together"
                 else st.session_state.modelo_escolhido_id
             )
+    
             if not api_key_local:
                 st.error("⚠️ API key ausente para o provedor selecionado (defina em st.secrets).")
             else:
-                if provedor_local == "Hugging Face":
+                if provedor == "Hugging Face":
                     # --- HF sem requests: usa InferenceClient ---
                     try:
                         hf_client = InferenceClient(
@@ -1163,6 +1470,26 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
 
+
+# =========================
+# EXIBIR HISTÓRICO
+# =========================
+
+with st.container():
+    interacoes = carregar_interacoes(n=20)
+    for r in interacoes:
+        role = r.get("role", "user")
+        content = r.get("content", "")
+        if role == "user":
+            with st.chat_message("user"):
+                st.markdown(content)
+        else:
+            with st.chat_message("assistant"):
+                st.markdown(content)
+    if st.session_state.get("resumo_capitulo"):
+        with st.expander("🧠 Resumo do capítulo (mais recente)"):
+            st.markdown(st.session_state.resumo_capitulo)
+
 # =========================
 # ENVIO DO USUÁRIO + STREAMING
 # =========================
@@ -1170,49 +1497,76 @@ with st.sidebar:
 entrada = st.chat_input("Digite sua direção de cena...")
 
 if entrada:
+    # SOMENTE FASE: não alteramos “momento”
     salvar_interacao("user", str(entrada))
     st.session_state.session_msgs.append({"role": "user", "content": str(entrada)})
-    st.session_state["ctx_cena"] = extrair_diretriz_contexto(entrada, st.session_state.get("ctx_cena", CTX_INICIAL))
+    # Atualiza o contexto fixo de cena com a diretiva do usuário
+    st.session_state["ctx_cena"] = extrair_diretriz_contexto(
+        entrada,
+        st.session_state.get("ctx_cena", CTX_INICIAL)
+    )
     ctx = st.session_state["ctx_cena"]
 
+    # Gera linha de abertura padronizada
     linha_abertura = gerar_linha_abertura(ctx)
 
+    # Defina se o modo Mary está ativo ANTES do for!
     mary_mode_active = bool(
         st.session_state.get("interpretar_apenas_mary")
         or st.session_state.get("modo_resposta") == "Mary (1ª pessoa)"
     )
 
+    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
     historico = []
     for ix, m in enumerate(st.session_state.session_msgs):
         role = m.get("role", "user")
         content = m.get("content", "")
-        # Só a ÚLTIMA mensagem do usuário recebe o contexto de abertura (mas prefixa só depois do JÂNIO:)
+        # Só para a ÚLTIMA mensagem do usuário, aplica o formato padronizado!
         if ix == len(st.session_state.session_msgs) - 1 and role.lower() == "user":
             content = linha_abertura
         if mary_mode_active and role.lower() == "user":
             content = f"JÂNIO: {content}"
         historico.append({"role": role, "content": content})
 
+
+    # --- MODO MARY (1ª pessoa) ---
+    mary_mode_active = bool(
+        st.session_state.get("interpretar_apenas_mary")
+        or st.session_state.get("modo_resposta") == "Mary (1ª pessoa)"
+    )
+
+    # Construção do prompt (já deve incluir, se você seguiu, o {voz_bloco} no construir_prompt_com_narrador)
     prompt = construir_prompt_com_narrador()
 
+    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
+    historico = []
+    for m in st.session_state.session_msgs:
+        role = m.get("role", "user")
+        content = m.get("content", "")
+        if mary_mode_active and role.lower() == "user":
+            content = f"JÂNIO: {content}"
+        historico.append({"role": role, "content": content})
+
+        # Provedor / modelo
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
         auth = st.secrets.get("TOGETHER_API_KEY", "")
         model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
     elif prov == "Hugging Face":
-        endpoint = "HF_CLIENT"
+        endpoint = "HF_CLIENT"  # marcador: não usa requests
         auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
         model_to_call = st.session_state.modelo_escolhido_id
     else:
         endpoint = "https://openrouter.ai/api/v1/chat/completions"
         auth = st.secrets.get("OPENROUTER_API_KEY", "")
         model_to_call = st.session_state.modelo_escolhido_id
-
+    
     if not auth:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
 
+    # System prompts
     system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
     system_mary = {
         "role": "system",
@@ -1240,7 +1594,11 @@ if entrada:
     }
     headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
-    # ============ BLOQUEIO DE CLÍMAX ============
+        # =========================================================
+    # BLOQUEIO DE CLÍMAX — Helpers (sempre ativo por padrão)
+    # =========================================================
+
+    # Gatilho explícito do usuário para liberar o clímax
     CLIMAX_USER_TRIGGER = re.compile(
         r"(?:\b("
         r"finaliza(?:r)?|"
@@ -1255,16 +1613,30 @@ if entrada:
         flags=re.IGNORECASE
     )
 
+    # Léxico de termos de clímax
     ORGASM_TERMS = r"(?:cl[ií]max|orgasmo|orgásm(?:ic)o|gozou|gozando|gozaram|ejacul(?:a|ou|ar)|cheg(?:a|ou)\s+lá|explod(?:e|iu))"
+
+    # Remove frases inteiras que contenham termos de clímax
     ORGASM_SENT = re.compile(rf"([^.!\n]*\b{ORGASM_TERMS}\b[^.!?\n]*[.!?])", flags=re.IGNORECASE)
+
+    # (Modo Mary) — filtra falas atribuídas a Jânio quando ativo
+    DIALOGO_NAO_MARY = re.compile(r"(^|\n)\s*—\s*(J[âa]nio|ele|donisete)\b.*", re.IGNORECASE)
+
     def _user_allows_climax(msgs: list) -> bool:
+        """
+        True se a ÚLTIMA fala do usuário libera explicitamente o clímax.
+        """
         last_user = ""
         for r in reversed(msgs or []):
-            if str(r.get("role", "")).lower() == "user":
-                last_user = r.get("content", "") or ""
+            if str(r.get("role","")).lower() == "user":
+                last_user = r.get("content","") or ""
                 break
         return bool(CLIMAX_USER_TRIGGER.search(last_user))
+
     def _strip_or_soften_climax(texto: str) -> str:
+        """
+        Remove qualquer menção de clímax/ejaculação e encerra em pausa sensorial (sem fade-to-black).
+        """
         if not texto:
             return texto
         texto = ORGASM_SENT.sub("", texto)
@@ -1280,91 +1652,23 @@ if entrada:
             texto += random.choice(finais)
         return texto
 
+    
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
+        # FINALIZA TEXTO VISÍVEL
+        visible_txt = _render_visible(resposta_txt).strip()
+
         last_update = time.time()
 
-        # STREAMING: HF ou requests
-        if prov == "Hugging Face":
-            from huggingface_hub import InferenceClient
-            hf_client = InferenceClient(token=auth, timeout=int(st.session_state.get("timeout_s", 300)))
-            for chunk in hf_client.chat.completions.create(
-                model=model_to_call,
-                messages=messages,
-                temperature=0.9,
-                max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
-                stream=True,
-            ):
-                delta = getattr(chunk.choices.delta, "content", None)
-                if not delta:
-                    continue
-                resposta_txt += delta
-                if time.time() - last_update > 0.10:
-                    parcial = _render_visible(resposta_txt) + "▌"
-                    if st.session_state.get("app_bloqueio_intimo", True):
-                        if not _user_allows_climax(st.session_state.session_msgs):
-                            parcial = _strip_or_soften_climax(parcial)
-                    placeholder.markdown(parcial)
-                    last_update = time.time()
-        else:
-            with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=int(st.session_state.get("timeout_s", 300))) as r:
-                if r.status_code == 200:
-                    for raw in r.iter_lines(decode_unicode=False):
-                        if not raw:
-                            continue
-                        line = raw.decode("utf-8", errors="ignore").strip()
-                        if not line.startswith("data:"):
-                            continue
-                        data = line[5:].strip()
-                        if data == "[DONE]":
-                            break
-                        try:
-                            j = json.loads(data)
-                            delta = j["choices"]["delta"].get("content", "")
-                            if not delta:
-                                continue
-                            resposta_txt += delta
-                            if time.time() - last_update > 0.10:
-                                parcial = _render_visible(resposta_txt) + "▌"
-                                if st.session_state.get("app_bloqueio_intimo", True):
-                                    if not _user_allows_climax(st.session_state.session_msgs):
-                                        parcial = _strip_or_soften_climax(parcial)
-                                placeholder.markdown(parcial)
-                                last_update = time.time()
-                        except Exception:
-                            continue
-                else:
-                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
-
-        # FINALIZA TEXTO VISÍVEL completo
-        visible_txt = _render_visible(resposta_txt).strip()
-        if st.session_state.get("app_bloqueio_intimo", True):
-            if not _user_allows_climax(st.session_state.session_msgs):
-                visible_txt = _strip_or_soften_climax(visible_txt)
-
-        # Renderização final
-        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
-
-        # Persistência sempre no histórico
-        if visible_txt and visible_txt != "[Sem conteúdo]":
-            salvar_interacao("assistant", visible_txt)
-            st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
-        else:
-            salvar_interacao("assistant", "[Sem conteúdo]")
-            st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
-
-        # Reforço de memória longa
+        # Reforço memórias usadas no prompt
         try:
-            usados = []
-            topk_usadas = memoria_longa_buscar_topk(
-                query_text=visible_txt,
-                k=int(st.session_state.get("k_memoria_longa", 3)),
-                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
-            )
-            for t, *_ in topk_usadas:
-                usados.append(t)
-            memoria_longa_reforcar(usados)
+            usados_prompt = []
+            usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
+            usados_prompt.extend(st.session_state.get("_ml_recorrentes", []))
+            usados_prompt = [t for t in usados_prompt if t]
+            if usados_prompt:
+                memoria_longa_reforcar(usados_prompt)
         except Exception:
             pass
 
@@ -1562,9 +1866,6 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
-
-
-
 
 
 
