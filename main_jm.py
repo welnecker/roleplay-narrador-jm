@@ -618,11 +618,11 @@ OBRIGATÓRIO — FORMATO ESTRUTURADO DE ROLEPLAY
 """.strip()
 
     BLOCO_RESTRICAO_SENSORY = """
-NUNCA escreva frases sobre ambiente, clima, natureza, luz, pier, mar, vento, céu, luar, som das ondas, paisagem, cenário ou metáforas.
-NÃO inicie textos com lugar ou "Pier de Camburi — Noite —", nem descreva onde estão ou o horário.
-PROIBIDO absolutamente qualquer menção a natureza, cenário, paisagem, efeitos de clima ou metáforas.
-Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, excitação, palavras, gemidos, ações do corpo, reação, ritmo físico.
-Respostas devem ser curtas e diretas.
+Conduza como romance contemporâneo: descreva ações, sensações, diálogos de forma rica, emotiva e natural, incluindo cenários, introspecções leves e clima emocional.
+Diálogos podem aparecer intercalados com narração, integrados em parágrafos maiores quando pertinente.
+Jamais use início seco tipo 'Parque da cidade.' nem fechos como 'um silêncio elétrico preenche o quarto'.
+"""
+
 
 ...
 """.strip()
@@ -1562,6 +1562,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
