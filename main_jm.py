@@ -335,7 +335,7 @@ def extrair_diretriz_contexto(texto_usuario: str, ctx: dict | None = None) -> di
 def gerar_linha_abertura(ctx: dict) -> str:
     """
     Gera a linha de abertura padronizada para a cena, com base no contexto.
-    Exemplo: "Domingo de manhã. Mary, biquíni preto. Jacaraípe."
+    Exemplo: "Domingo de manhã. Mary, biquíni ajustado em suas curvas sensuais. Jacaraípe."
     """
     if not ctx:
         return ""
@@ -545,7 +545,7 @@ def salvar_resumo(resumo: str):
     except Exception as e:
         st.error(f"Erro ao salvar resumo: {e}")
 
-def carregar_interacoes(n: int = 20):
+def carregar_interacoes(n: int = 25):
     """
     Carrega as interações da aba TAB_INTERACOES com cache em sessão.
     Retorna as últimas n interações normalizadas: [{timestamp, role, content}, ...]
@@ -722,10 +722,10 @@ def mj_carregar_fase_inicial() -> int:
 
 FALAS_EXPLICITAS_MARY = [
     # Brandas por padrão — troque depois se quiser
-    "Vem mais perto, sem pressa.",
-    "Assim está bom… continua desse jeito.",
-    "Eu quero sentir você devagar.",
-    "Fica comigo, só mais um pouco.",
+    "Vem mais perto...sem pressa.",
+    "Assim está bom… continua...assim... desse jeito.",
+    "Eu quero sentir você...devagar.",
+    "Fica comigo....só mais um pouco.",
 ]
 
 def carregar_falas_mary() -> List[str]:
@@ -767,9 +767,9 @@ def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True, sinto
     ]
     base_ousado = [
         "O ritmo do corpo de Mary é deliberado; chama sem exigir.",
-        "O perfume na clavícula convida a aproximação.",
+        "O perfume dela exala convidando a aproximação.",
         "Os lábios entreabertos, esperando o momento certo.",
-        "O olhar pousa e permanece, pedindo gentileza.",
+        "O olhar pousa e permanece, sugerindo contato.",
     ]
 
     if level == 1:
@@ -918,20 +918,21 @@ Respostas devem ser curtas e diretas.
 
 ...
 Respostas devem OBRIGATORIAMENTE começar assim, sem metáforas:
-"Domingo de manhã. Mary, biquíni preto. Jacaraípe."
+"Domingo de manhã. Mary, biquíni ajustado em seu corpo sensual. Jacaraípe."
 - SEMPRE inicie com uma linha nesse formato: tempo. Mary[, figurino]. local.
 - Após essa linha, use somente frases de ação, sensação física ou diálogo direto, um por parágrafo.
 - Não agrupe frases em prosa. Parágrafos sempre curtos e diretos, quebra de linha explícita entre falas/ações.
 
 Exemplo:
 
-Domingo de manhã. Mary, biquíni preto. Jacaraípe.
-Ela bloqueia as mensagens de Ricardo. Respiração cadenciada. Mãos firmes na mochila.
-— Posso ajudar? — a atendente se aproxima.
-— Água mineral. Sem gelo.
-— Com gás ou sem?
-— Sem. E rápida.
-A tampinha estala. Mary bebe, fecha a garrafa e segue em frente, leve e decidida.
+Domingo de manhã. Mary, biquíni ajustado em seu corpo sensual. Jacaraípe.
+Mary sente seu coração acelerar com as palavras dele. Ela aperta suavemente a mão dele, seus olhos brilhando com uma mistura de desejo e determinação.
+— Eu sei que ainda estou namorando, mas... não por muito tempo — ela confessa, sua voz baixa e intensa..
+— eu não posso mais fingir que estou feliz nesse relacionamento. O que sinto por você, mesmo em tão pouco tempo, é mais forte do que qualquer coisa que já senti.
+— Eu quero terminar com ele. Quero ser livre para explorar o que temos, sem culpa, sem segredos.
+— Eu sei que ainda estou namorando, mas... não por muito tempo
+Seus olhos verdes estão fixos nos dele, cheios de expectativa e desejo mal contido. A tensão entre eles é palpável, como se o ar ao redor estivesse carregado de eletricidade.
+
 """.strip()
 
     # EXCEÇÃO ÚNICA PERMITIDA PARA A ABERTURA:
@@ -1866,6 +1867,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
