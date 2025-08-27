@@ -616,3 +616,141 @@ if user_text:
 
 st.markdown("---")
 st.markdown("**Dica:** Se nenhum modelo aparecer na lista, abra o LM Studio → Developer → Start Server e carregue um modelo. Se estiver em túnel, cole a URL pública com */v1*.\n**Memória:** mensagens são gravadas em *interacoes_jm*. As outras abas são criadas conforme necessidade.")
+
+
+# ============================
+# Diretrizes (UI) + Memórias (UI) — adicionados ao final para evitar chaves duplicadas
+# ============================
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### 📜 Diretrizes de Interação")
+    # Carrega uma vez das planilhas, se ainda não houver no estado
+    if "diretrizes_text" not in st.session_state:
+        try:
+            st.session_state.diretrizes_text = sheet_templates_get("diretrizes")
+        except Exception:
+            st.session_state.diretrizes_text = ""
+    st.session_state.diretrizes_text = st.text_area(
+        "Diretrizes (aplicadas como system message)",
+        value=st.session_state.get("diretrizes_text", ""),
+        key="diretrizes_text_ui",
+        height=160,
+        help="Estas regras serão injetadas como system message em cada geração."
+    )
+    cgd1, cgd2 = st.columns([1,1])
+    with cgd1:
+        if st.button("⤵️ Recarregar do Sheets", key="btn_load_diretrizes"):
+            st.session_state.diretrizes_text = sheet_templates_get("diretrizes")
+            st.experimental_rerun()
+    with cgd2:
+        if st.button("💾 Salvar no Sheets", key="btn_save_diretrizes"):
+            sheet_templates_set("diretrizes", st.session_state.get("diretrizes_text", st.session_state.get("diretrizes_text_ui","")))
+            st.success("Diretrizes salvas em templates_jm.")
+
+    st.markdown("---")
+    st.markdown("### 🧠 Memória (resumo e fatos)")
+    st.slider("Interações para sintetizar", 2, 30, value=int(st.session_state.get("mem_summarize_n", 8)), key="mem_summarize_n")
+    st.checkbox("Indexar memórias na aba memoria_longa_jm (requer modelo de embedding)", key="do_index_long", value=bool(st.session_state.get("do_index_long", False)))
+    st.text_input("Modelo de embedding (LM Studio)", key="emb_model_override", value=st.session_state.get("emb_model_override", ""), help="Se vazio, tento detectar automaticamente um modelo com 'embedding' pelo /v1/models.")
+    cm1, cm2 = st.columns([1,1])
+    with cm1:
+        if st.button("📄 Gerar RESUMO (perfil_jm)", key="btn_make_resumo"):
+            hist = gs_load_last_turns(int(st.session_state.get("mem_summarize_n", 8)))
+            if not hist:
+                st.error("Sem histórico suficiente em interacoes_jm.")
+            else:
+                txt = gerar_resumo_perfil(st.session_state.get("lms_base_url","http://127.0.0.1:1234/v1"), st.session_state.get("modelo_escolhido","llama-3-8b-lexi-uncensored"), hist)
+                if txt:
+                    sheet_perfil_append(txt)
+                    st.success("Resumo salvo em perfil_jm.")
+    with cm2:
+        if st.button("🧩 Extrair MEMÓRIAS (memoria_jm)", key="btn_make_memorias"):
+            hist = gs_load_last_turns(int(st.session_state.get("mem_summarize_n", 8)))
+            if not hist:
+                st.error("Sem histórico suficiente em interacoes_jm.")
+            else:
+                itens = extrair_memorias(st.session_state.get("lms_base_url","http://127.0.0.1:1234/v1"), st.session_state.get("modelo_escolhido","llama-3-8b-lexi-uncensored"), hist)
+                if itens:
+                    sheet_memorias_append_many(itens)
+                    st.success(f"{len(itens)} memórias salvas em memoria_jm.")
+
+# ============================
+# Override: build_messages para injetar diretrizes como system message
+# ============================
+
+def build_messages(ctx: Dict[str, Any], user_text: str, history_msgs: Optional[List[Dict[str, str]]] = None) -> List[Dict[str, str]]:
+    msgs: List[Dict[str, str]] = []
+    msgs.append({"role": "system", "content": build_system_prompt(ctx)})
+    if history_msgs:
+        n = int(st.session_state.get("history_to_prompt", 6))
+        msgs.extend(history_msgs[-n:] if n > 0 else [])
+    # Diretrizes de interação vindas do sidebar/Sheets
+    dtx = st.session_state.get("diretrizes_text") or sheet_templates_get("diretrizes")
+    if dtx:
+        msgs.append({"role": "system", "content": "DIRETRIZES DE INTERAÇÃO (siga estritamente):
+" + dtx})
+    abertura = build_opening_line(ctx)
+    if abertura:
+        msgs.append({"role": "system", "content": f"ABERTURA_SUGERIDA: {abertura}"})
+    msgs.append({"role": "user", "content": user_text})
+    return msgs
+
+# ============================
+# (Opcional) Embeddings — indexar memoria_longa_jm
+# ============================
+
+def _auto_embedding_model() -> str:
+    if st.session_state.get("emb_model_override"):
+        return st.session_state["emb_model_override"].strip()
+    try:
+        models = lms_list_models(st.session_state.get("lms_base_url","http://127.0.0.1:1234/v1"))
+        for m in models:
+            if "embed" in m.lower() or "embedding" in m.lower():
+                return m
+    except Exception:
+        pass
+    return ""
+
+
+def lms_embed(base_url: str, model: str, texts: List[str]) -> List[List[float]]:
+    if not texts:
+        return []
+    payload = {"model": model, "input": texts}
+    url = base_url.rstrip("/") + "/embeddings"
+    headers = {"Content-Type": "application/json"}
+    if st.session_state.get("cf_client_id") and st.session_state.get("cf_client_secret"):
+        headers["CF-Access-Client-Id"] = st.session_state["cf_client_id"]
+        headers["CF-Access-Client-Secret"] = st.session_state["cf_client_secret"]
+    auth = None
+    if st.session_state.get("basic_user") and st.session_state.get("basic_pass"):
+        auth = HTTPBasicAuth(st.session_state["basic_user"], st.session_state["basic_pass"])
+    r = requests.post(url, json=payload, headers=headers, timeout=30, auth=auth)
+    r.raise_for_status()
+    j = r.json()
+    datas = j.get("data", [])
+    return [d.get("embedding", []) for d in datas]
+
+# Quando salvar memórias curtas, opcionalmente indexa
+if st.session_state.get("do_index_long") and planilha:
+    try:
+        ws_mem = _ws(TAB_MEMORIAS, create_if_missing=False)
+        ws_long = _ws(TAB_ML, create_if_missing=True)
+        if ws_mem and ws_long:
+            vals = ws_mem.get_all_values()
+            if vals and len(vals) > 1:
+                header, rows = vals[0], vals[1:]
+                try:
+                    i_conteudo = header.index("conteudo")
+                except ValueError:
+                    i_conteudo = 1
+                textos = [r[i_conteudo] for r in rows if len(r) > i_conteudo][:32]
+                if textos:
+                    emb_model = _auto_embedding_model()
+                    if emb_model:
+                        embs = lms_embed(st.session_state.get("lms_base_url","http://127.0.0.1:1234/v1"), emb_model, textos)
+                        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        for txt, vec in zip(textos, embs):
+                            ws_long.append_row([txt, json.dumps(vec), "auto", ts, 1.0])
+                        st.toast(f"Indexadas {len(embs)} memórias na memoria_longa_jm.")
+    except Exception as e:
+        st.info(f"Indexação opcional de memória longa não concluída: {e}")
