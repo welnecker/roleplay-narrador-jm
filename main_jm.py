@@ -1856,8 +1856,8 @@ if entrada:
     # FINALIZA TEXTO VISÍVEL
     visible_txt = _render_visible(resposta_txt).strip()
 
-        # =========================
-        # Fallback sem stream (robusto por provedor) — PATCH 2 (ajustado)
+              # =========================
+        # Fallback sem stream (robusto por provedor)
         # =========================
         def _resolver_endpoint_e_headers(prov: str, endpoint: str, auth: str) -> tuple[str, dict]:
             if prov == "LM Studio (local)":
@@ -1866,7 +1866,7 @@ if entrada:
                 hdrs = {"Content-Type": "application/json", "Authorization": "Bearer lm-studio"}
                 return ep, hdrs
             elif prov == "Hugging Face":
-                # Neste ramo usamos InferenceClient; mantemos headers apenas por segurança.
+                # Neste ramo usamos InferenceClient; mantemos headers por segurança.
                 return endpoint, {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
             else:
                 # OpenRouter, Together, etc.
@@ -1963,53 +1963,55 @@ if entrada:
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # Render final (exibe se veio de fallback)
+        # Render parcial: se veio de fallback
         if visible_txt:
             placeholder.markdown(visible_txt)
 
-
-    # BLOQUEIO DE CLÍMAX FINAL (sempre que a opção estiver ativa, só libera com comando do usuário)
-    if st.session_state.get("app_bloqueio_intimo", True):
-        if not _user_allows_climax(st.session_state.session_msgs):
-            visible_txt = _strip_or_soften_climax(visible_txt)
+        # =========================
+        # BLOQUEIO DE CLÍMAX FINAL + ENFORCER MARY
+        # =========================
+        if st.session_state.get("app_bloqueio_intimo", True):
+            if not _user_allows_climax(st.session_state.session_msgs):
+                visible_txt = _strip_or_soften_climax(visible_txt)
 
         # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
-    if st.session_state.get("usar_falas_mary", False):
-        falas = st.session_state.get("_falas_mary_list", []) or []
-        if falas and visible_txt:
-            tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
-            if not tem_fala:
-                escolha = random.choice(falas)
-                if st.session_state.get("interpretar_apenas_mary", False):
-                    inj = f"— {escolha}\n\n"
-                else:
-                    inj = f"— {escolha} — diz Mary.\n\n"
-                visible_txt = inj + visible_txt
-    
-    # ===== Render final (sempre) =====
-    placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
-    
-    # ===== Persistência (sempre) =====
-    if visible_txt and visible_txt != "[Sem conteúdo]":
-        salvar_interacao("assistant", visible_txt)
-        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
-    else:
-        salvar_interacao("assistant", "[Sem conteúdo]")
-        st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
-    
-    # ===== Reforço pós-resposta (sempre) =====
-    try:
-        usados = []
-        topk_usadas = memoria_longa_buscar_topk(
-            query_text=visible_txt,
-            k=int(st.session_state.get("k_memoria_longa", 3)),
-            limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
-        )
-        for t, _sc, _sim, _rr in topk_usadas:
-            usados.append(t)
-        memoria_longa_reforcar(usados)
-    except Exception:
-        pass
+        if st.session_state.get("usar_falas_mary", False):
+            falas = st.session_state.get("_falas_mary_list", []) or []
+            if falas and visible_txt:
+                tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
+                if not tem_fala:
+                    escolha = random.choice(falas)
+                    if st.session_state.get("interpretar_apenas_mary", False):
+                        inj = f"— {escolha}\n\n"
+                    else:
+                        inj = f"— {escolha} — diz Mary.\n\n"
+                    visible_txt = inj + visible_txt
+
+        # ===== Render final (sempre) =====
+        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
+
+        # ===== Persistência (sempre) =====
+        if visible_txt and visible_txt != "[Sem conteúdo]":
+            salvar_interacao("assistant", visible_txt)
+            st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
+        else:
+            salvar_interacao("assistant", "[Sem conteúdo]")
+            st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
+
+        # ===== Reforço pós-resposta (sempre) =====
+        try:
+            usados = []
+            topk_usadas = memoria_longa_buscar_topk(
+                query_text=visible_txt,
+                k=int(st.session_state.get("k_memoria_longa", 3)),
+                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
+            )
+            for t, _sc, _sim, _rr in topk_usadas:
+                usados.append(t)
+            memoria_longa_reforcar(usados)
+        except Exception:
+            pass
+
 
 
 
