@@ -1435,83 +1435,90 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📝 Utilitários")
 
-        # Gerar resumo do capítulo (pega as últimas interações do Sheets)
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            inter = carregar_interacoes(n=6)
-            texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
-            prompt_resumo = (
-                "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
-                + texto + "\n\nResumo:"
-            )
-    
-            # Usa o provedor/modelo selecionados no topo do sidebar
-            provedor = st.session_state.get("provedor_ia", "OpenRouter")
-            api_url_local = api_url
-            api_key_local = api_key
-            model_id_call = (
-                model_id_for_together(st.session_state.modelo_escolhido_id)
-                if provedor == "Together"
-                else st.session_state.modelo_escolhido_id
-            )
-    
-            if not api_key_local:
-                st.error("⚠️ API key ausente para o provedor selecionado (defina em st.secrets).")
-            else:
-                if provedor == "Hugging Face":
-                    # --- HF sem requests: usa InferenceClient ---
-                    try:
-                        hf_client = InferenceClient(
-                            token=api_key_local,
-                            timeout=int(st.session_state.get("timeout_s", 300))
-                        )
-                        out = hf_client.chat.completions.create(
-                            model=model_id_call,
-                            messages=[{"role": "user", "content": prompt_resumo}],
-                            max_tokens=800,
-                            temperature=0.85,
-                            stream=False,
-                        )
-                        resumo = out.choices[0].message.content.strip()
-                        st.session_state.resumo_capitulo = resumo
-                        salvar_resumo(resumo)
-                        st.success("Resumo gerado e salvo com sucesso!")
-                    except Exception as e:
-                        st.error(f"Erro ao resumir (HF): {e}")
-                else:
-                    # OpenRouter / Together / LM Studio (requests)
-                    headers = {"Content-Type": "application/json"}
-                    if api_key_local:  # só envia Authorization se houver API key
-                        headers["Authorization"] = f"Bearer {api_key_local}"
-                    
-                    payload = {
-                        "model": model_id_call,
-                        "messages": [{"role": "user", "content": prompt_resumo}],
-                        "max_tokens": 800,
-                        "temperature": 0.85,
-                    }
-                    
-                    r = requests.post(
-                        api_url_local,
-                        headers=headers,
-                        json=payload,
-                        timeout=60,  # opcional, ajuste se quiser
-                    )
-                    r.raise_for_status()
-                    data = r.json()
+      # Gerar resumo do capítulo (pega as últimas interações do Sheets)
+if st.button("📝 Gerar resumo do capítulo"):
+    try:
+        inter = carregar_interacoes(n=6)
+        texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
+        prompt_resumo = (
+            "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
+            + texto + "\n\nResumo:"
+        )
 
-                        timeout=int(st.session_state.get("timeout_s", 300)),
-                    )
-                    if r.status_code == 200:
-                        resumo = r.json()["choices"][0]["message"]["content"].strip()
-                        st.session_state.resumo_capitulo = resumo
-                        salvar_resumo(resumo)
-                        st.success("Resumo gerado e salvo com sucesso!")
-                    else:
-                        st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
-        except Exception as e:
-            st.error(f"Erro ao gerar resumo: {e}")
+        # Usa o provedor/modelo selecionados no topo do sidebar
+        provedor = st.session_state.get("provedor_ia", "OpenRouter")
+        api_url_local, api_key_local, _catalogo = api_config_for_provider(provedor)
 
+        model_id_call = (
+            model_id_for_together(st.session_state.modelo_escolhido_id)
+            if provedor == "Together"
+            else st.session_state.modelo_escolhido_id
+        )
+
+        if provedor == "Hugging Face":
+            # --- HF sem requests: usa InferenceClient ---
+            try:
+                hf_client = InferenceClient(
+                    token=api_key_local,
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
+                out = hf_client.chat.completions.create(
+                    model=model_id_call,
+                    messages=[{"role": "user", "content": prompt_resumo}],
+                    max_tokens=800,
+                    temperature=0.85,
+                    stream=False,
+                )
+                resumo = out.choices[0].message.content.strip()
+                st.session_state.resumo_capitulo = resumo
+                salvar_resumo(resumo)
+                st.success("Resumo gerado e salvo com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao resumir (HF): {e}")
+
+        else:
+            # OpenRouter / Together / LM Studio (requests)
+            # LM Studio NÃO precisa de Authorization; os demais sim.
+            headers = {"Content-Type": "application/json"}
+            if api_key_local:
+                headers["Authorization"] = f"Bearer {api_key_local}"
+
+            payload = {
+                "model": model_id_call,
+                "messages": [{"role": "user", "content": prompt_resumo}],
+                "max_tokens": 800,
+                "temperature": 0.85,
+            }
+
+            r = requests.post(
+                api_url_local,
+                headers=headers,
+                json=payload,
+                timeout=int(st.session_state.get("timeout_s", 300)),
+            )
+            r.raise_for_status()
+            data = r.json()
+
+            # Extrai conteúdo de forma robusta (OpenAI/OR/Together/LM Studio)
+            resumo = None
+            if isinstance(data, dict):
+                ch = data.get("choices") or []
+                if ch and isinstance(ch[0], dict):
+                    resumo = (
+                        ch[0].get("message", {}).get("content")
+                        or ch[0].get("text")
+                        or ch[0].get("delta", {}).get("content")
+                    )
+            if not resumo:
+                resumo = json.dumps(data)
+
+            resumo = (resumo or "").strip()
+            st.session_state.resumo_capitulo = resumo
+            salvar_resumo(resumo)
+            st.success("Resumo gerado e salvo com sucesso!")
+
+    except Exception as e:
+        st.error(f"Erro ao gerar resumo: {e}")
 
 # =========================
 # EXIBIR HISTÓRICO
@@ -1908,6 +1915,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
