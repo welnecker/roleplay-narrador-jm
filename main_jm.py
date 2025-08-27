@@ -1307,213 +1307,212 @@ for k, v in {
 # =========================
 
 with st.sidebar:
-    st.title("🧭 Painel do Roteirista")
+        st.title("🧭 Painel do Roteirista")
 
-    # Provedor / modelos
-    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face", "LM Studio (local)"], index=0, key="provedor_ia")
+        # Provedor / modelos
+        provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face", "LM Studio (local)"], index=0, key="provedor_ia")
     
-api_url, api_key, modelos_map = api_config_for_provider(provedor)
-if not api_key:
-    st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
-if provedor == "LM Studio (local)":
-    # Config base URL input
-    base_url_lms = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"), key="lms_base_url")
-    modelos_lms = lms_list_models(base_url_lms)
-    if not modelos_lms:
-        st.warning("⚠️ Servidor do LM Studio não encontrado ou sem modelos. Abra o LM Studio → Developer → Start Server.")
-    modelo_nome = st.selectbox("🤖 Modelo de IA (LM Studio)", modelos_lms or ["<digite manualmente>"], index=0, key="modelo_nome_ui")
-    if modelo_nome == "<digite manualmente>":
-        modelo_nome = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido_id","llama-3-8b-lexi-uncensored"))
-    st.session_state.modelo_escolhido_id = modelo_nome
-else:
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
-    st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
+    api_url, api_key, modelos_map = api_config_for_provider(provedor)
+    if not api_key:
+        st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
+    if provedor == "LM Studio (local)":
+        # Config base URL input
+        base_url_lms = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"), key="lms_base_url")
+        modelos_lms = lms_list_models(base_url_lms)
+        if not modelos_lms:
+            st.warning("⚠️ Servidor do LM Studio não encontrado ou sem modelos. Abra o LM Studio → Developer → Start Server.")
+        modelo_nome = st.selectbox("🤖 Modelo de IA (LM Studio)", modelos_lms or ["<digite manualmente>"], index=0, key="modelo_nome_ui")
+        if modelo_nome == "<digite manualmente>":
+            modelo_nome = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido_id","llama-3-8b-lexi-uncensored"))
+        st.session_state.modelo_escolhido_id = modelo_nome
+    else:
+        modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
+        st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
 
 
-    st.markdown("---")
-    st.markdown("### ✍️ Estilo & Progresso Dramático")
+        st.markdown("---")
+        st.markdown("### ✍️ Estilo & Progresso Dramático")
 
-    # Modo de resposta (NARRADOR ou MARY 1ª pessoa)
-    modo_op = st.selectbox(
-        "Modo de resposta",
-        ["Narrador padrão", "Mary (1ª pessoa)"],
-        index=0,
-        key="modo_resposta",
-    )
-    # Compat: flag booleana para o bloco de streaming
-    st.session_state.interpretar_apenas_mary = (modo_op == "Mary (1ª pessoa)")
+        # Modo de resposta (NARRADOR ou MARY 1ª pessoa)
+        modo_op = st.selectbox(
+            "Modo de resposta",
+            ["Narrador padrão", "Mary (1ª pessoa)"],
+            index=0,
+            key="modo_resposta",
+        )
+        # Compat: flag booleana para o bloco de streaming
+        st.session_state.interpretar_apenas_mary = (modo_op == "Mary (1ª pessoa)")
 
-    st.selectbox(
-        "Estilo de escrita",
-        ["AÇÃO", "ROMANCE LENTO", "NOIR"],
-        index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
-        key="estilo_escrita",
-    )
+        st.selectbox(
+            "Estilo de escrita",
+            ["AÇÃO", "ROMANCE LENTO", "NOIR"],
+            index=["AÇÃO", "ROMANCE LENTO", "NOIR"].index(st.session_state.get("estilo_escrita", "AÇÃO")),
+            key="estilo_escrita",
+        )
 
-    # Defaults no mínimo
-    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=0, key="nsfw_max_level")
+        # Defaults no mínimo
+        st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=0, key="nsfw_max_level")
 
-    st.checkbox(
-        "Sintonia com o parceiro (modo harmônico)",
-        key="modo_sintonia",
-        value=st.session_state.get("modo_sintonia", True),
-    )
+        st.checkbox(
+            "Sintonia com o parceiro (modo harmônico)",
+            key="modo_sintonia",
+            value=st.session_state.get("modo_sintonia", True),
+        )
 
-    st.select_slider(
-        "Ritmo da cena",
-        options=[0, 1, 2, 3],
-        value=0,
-        format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
-        key="ritmo_cena",
-    )
+        st.select_slider(
+            "Ritmo da cena",
+            options=[0, 1, 2, 3],
+            value=0,
+            format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
+            key="ritmo_cena",
+        )
 
-    st.selectbox(
-    "Finalização",
-    ["ponto de gancho", "fecho suave", "deixar no suspense"],
-    index=["ponto de gancho","fecho suave","deixar no suspense"].index(
-        st.session_state.get("finalizacao_modo", "ponto de gancho")
-    ),
-    key="finalizacao_modo",
-    )
+        st.selectbox(
+        "Finalização",
+        ["ponto de gancho", "fecho suave", "deixar no suspense"],
+        index=["ponto de gancho","fecho suave","deixar no suspense"].index(
+            st.session_state.get("finalizacao_modo", "ponto de gancho")
+        ),
+        key="finalizacao_modo",
+        )
 
 
-    st.checkbox(
-        "Usar falas da Mary da planilha (usar literalmente)",
-        value=st.session_state.get("usar_falas_mary", False),
-        key="usar_falas_mary",
-    )
+        st.checkbox(
+            "Usar falas da Mary da planilha (usar literalmente)",
+            value=st.session_state.get("usar_falas_mary", False),
+            key="usar_falas_mary",
+        )
 
-    st.markdown("---")
-    st.markdown("### 💞 Romance Mary & Jânio (apenas Fase)")
-    fase_default = mj_carregar_fase_inicial()
-    options_fase = sorted(FASES_ROMANCE.keys())
-    fase_ui_val = int(st.session_state.get("mj_fase", fase_default))
-    fase_ui_val = max(min(fase_ui_val, max(options_fase)), min(options_fase))
-    fase_escolhida = st.select_slider(
-        "Fase do romance",
-        options=options_fase,
-        value=fase_ui_val,
-        format_func=_fase_label,
-        key="ui_mj_fase",
-    )
-    if fase_escolhida != st.session_state.get("mj_fase", fase_default):
-        mj_set_fase(fase_escolhida, persist=True)
+        st.markdown("---")
+        st.markdown("### 💞 Romance Mary & Jânio (apenas Fase)")
+        fase_default = mj_carregar_fase_inicial()
+        options_fase = sorted(FASES_ROMANCE.keys())
+        fase_ui_val = int(st.session_state.get("mj_fase", fase_default))
+        fase_ui_val = max(min(fase_ui_val, max(options_fase)), min(options_fase))
+        fase_escolhida = st.select_slider(
+            "Fase do romance",
+            options=options_fase,
+            value=fase_ui_val,
+            format_func=_fase_label,
+            key="ui_mj_fase",
+        )
+        if fase_escolhida != st.session_state.get("mj_fase", fase_default):
+            mj_set_fase(fase_escolhida, persist=True)
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button("➕ Avançar 1 fase"):
-            mj_set_fase(min(st.session_state.get("mj_fase", 0) + 1, max(options_fase)), persist=True)
-    with col_b:
-        if st.button("↺ Reiniciar (0)"):
-            mj_set_fase(0, persist=True)
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("➕ Avançar 1 fase"):
+                mj_set_fase(min(st.session_state.get("mj_fase", 0) + 1, max(options_fase)), persist=True)
+        with col_b:
+            if st.button("↺ Reiniciar (0)"):
+                mj_set_fase(0, persist=True)
 
-    st.markdown("---")
-    st.checkbox(
-        "Evitar coincidências forçadas (montagem paralela A/B)",
-        value=st.session_state.get("no_coincidencias", True),
-        key="no_coincidencias",
-    )
-    st.checkbox(
-        "Bloquear avanços íntimos sem ordem",
-        value=st.session_state.get("app_bloqueio_intimo", True),
-        key="app_bloqueio_intimo",
-    )
-    st.selectbox(
-        "🎭 Emoção oculta",
-        ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
-        index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.get("app_emocao_oculta", "nenhuma")),
-        key="ui_app_emocao_oculta",
-    )
-    st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
+        st.markdown("---")
+        st.checkbox(
+            "Evitar coincidências forçadas (montagem paralela A/B)",
+            value=st.session_state.get("no_coincidencias", True),
+            key="no_coincidencias",
+        )
+        st.checkbox(
+            "Bloquear avanços íntimos sem ordem",
+            value=st.session_state.get("app_bloqueio_intimo", True),
+            key="app_bloqueio_intimo",
+        )
+        st.selectbox(
+            "🎭 Emoção oculta",
+            ["nenhuma", "tristeza", "felicidade", "tensão", "raiva"],
+            index=["nenhuma", "tristeza", "felicidade", "tensão", "raiva"].index(st.session_state.get("app_emocao_oculta", "nenhuma")),
+            key="ui_app_emocao_oculta",
+        )
+        st.session_state.app_emocao_oculta = st.session_state.get("ui_app_emocao_oculta", "nenhuma")
 
-    st.markdown("---")
-    st.markdown("### ⏱️ Comprimento/timeout")
-    st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp", 1200)), step=32, key="max_tokens_rsp")
-    st.slider("Timeout (segundos)", 60, 600, value=int(st.session_state.get("timeout_s", 300)), step=10, key="timeout_s")
+        st.markdown("---")
+        st.markdown("### ⏱️ Comprimento/timeout")
+        st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp", 1200)), step=32, key="max_tokens_rsp")
+        st.slider("Timeout (segundos)", 60, 600, value=int(st.session_state.get("timeout_s", 300)), step=10, key="timeout_s")
 
-    st.markdown("---")
-    st.markdown("### 🗃️ Memória Longa")
-    st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
-    st.slider("Top-K memórias", 1, 5, int(st.session_state.get("k_memoria_longa", 3)), 1, key="k_memoria_longa")
-    st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
+        st.markdown("---")
+        st.markdown("### 🗃️ Memória Longa")
+        st.checkbox("Usar memória longa no prompt", value=st.session_state.get("use_memoria_longa", True), key="use_memoria_longa")
+        st.slider("Top-K memórias", 1, 5, int(st.session_state.get("k_memoria_longa", 3)), 1, key="k_memoria_longa")
+        st.slider("Limiar de similaridade", 0.50, 0.95, float(st.session_state.get("limiar_memoria_longa", 0.78)), 0.01, key="limiar_memoria_longa")
 
-    st.markdown("### 🧩 Histórico no prompt")
-    st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
+        st.markdown("### 🧩 Histórico no prompt")
+        st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
 
-    st.markdown("---")
-    st.markdown("### 📝 Utilitários")
+        st.markdown("---")
+        st.markdown("### 📝 Utilitários")
 
-        # Gerar resumo do capítulo (pega as últimas interações do Sheets)
-    if st.button("📝 Gerar resumo do capítulo"):
-        try:
-            inter = carregar_interacoes(n=6)
-            texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
-            prompt_resumo = (
-                "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
-                + texto + "\n\nResumo:"
-            )
+            # Gerar resumo do capítulo (pega as últimas interações do Sheets)
+        if st.button("📝 Gerar resumo do capítulo"):
+            try:
+                inter = carregar_interacoes(n=6)
+                texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
+                prompt_resumo = (
+                    "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
+                    + texto + "\n\nResumo:"
+                )
     
-            # Usa o provedor/modelo selecionados no topo do sidebar
-            provedor = st.session_state.get("provedor_ia", "OpenRouter")
-            api_url_local = api_url
-            api_key_local = api_key
-            model_id_call = (
-                model_id_for_together(st.session_state.modelo_escolhido_id)
-                if provedor == "Together"
-                else st.session_state.modelo_escolhido_id
-            )
+                # Usa o provedor/modelo selecionados no topo do sidebar
+                provedor = st.session_state.get("provedor_ia", "OpenRouter")
+                api_url_local = api_url
+                api_key_local = api_key
+                model_id_call = (
+                    model_id_for_together(st.session_state.modelo_escolhido_id)
+                    if provedor == "Together"
+                    else st.session_state.modelo_escolhido_id
+                )
     
-            if not api_key_local:
-                st.error("⚠️ API key ausente para o provedor selecionado (defina em st.secrets).")
-            else:
-                if provedor == "Hugging Face":
-                    # --- HF sem requests: usa InferenceClient ---
-                    try:
-                        hf_client = InferenceClient(
-                            token=api_key_local,
-                            timeout=int(st.session_state.get("timeout_s", 300))
-                        )
-                        out = hf_client.chat.completions.create(
-                            model=model_id_call,
-                            messages=[{"role": "user", "content": prompt_resumo}],
-                            max_tokens=800,
-                            temperature=0.85,
-                            stream=False,
-                        )
-                        resumo = out.choices[0].message.content.strip()
-                        st.session_state.resumo_capitulo = resumo
-                        salvar_resumo(resumo)
-                        st.success("Resumo gerado e salvo com sucesso!")
-                    except Exception as e:
-                        st.error(f"Erro ao resumir (HF): {e}")
+                if not api_key_local:
+                    st.error("⚠️ API key ausente para o provedor selecionado (defina em st.secrets).")
                 else:
-                    # OpenRouter / Together (requests)
-                    r = requests.post(
-                        api_url_local,
-                        headers={"Authorization": f"Bearer {api_key_local}", "Content-Type": "application/json"},
-                        json={
-                            "model": model_id_call,
-                            "messages": [{"role": "user", "content": prompt_resumo}],
-                            "max_tokens": 800,
-                            "temperature": 0.85
-                        },
-                        timeout=int(st.session_state.get("timeout_s", 300)),
-                    )
-                    if r.status_code == 200:
-                        resumo = r.json()["choices"][0]["message"]["content"].strip()
-                        st.session_state.resumo_capitulo = resumo
-                        salvar_resumo(resumo)
-                        st.success("Resumo gerado e salvo com sucesso!")
+                    if provedor == "Hugging Face":
+                        # --- HF sem requests: usa InferenceClient ---
+                        try:
+                            hf_client = InferenceClient(
+                                token=api_key_local,
+                                timeout=int(st.session_state.get("timeout_s", 300))
+                            )
+                            out = hf_client.chat.completions.create(
+                                model=model_id_call,
+                                messages=[{"role": "user", "content": prompt_resumo}],
+                                max_tokens=800,
+                                temperature=0.85,
+                                stream=False,
+                            )
+                            resumo = out.choices[0].message.content.strip()
+                            st.session_state.resumo_capitulo = resumo
+                            salvar_resumo(resumo)
+                            st.success("Resumo gerado e salvo com sucesso!")
+                        except Exception as e:
+                            st.error(f"Erro ao resumir (HF): {e}")
                     else:
-                        st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
-        except Exception as e:
-            st.error(f"Erro ao gerar resumo: {e}")
+                        # OpenRouter / Together (requests)
+                        r = requests.post(
+                            api_url_local,
+                            headers={"Authorization": f"Bearer {api_key_local}", "Content-Type": "application/json"},
+                            json={
+                                "model": model_id_call,
+                                "messages": [{"role": "user", "content": prompt_resumo}],
+                                "max_tokens": 800,
+                                "temperature": 0.85
+                            },
+                            timeout=int(st.session_state.get("timeout_s", 300)),
+                        )
+                        if r.status_code == 200:
+                            resumo = r.json()["choices"][0]["message"]["content"].strip()
+                            st.session_state.resumo_capitulo = resumo
+                            salvar_resumo(resumo)
+                            st.success("Resumo gerado e salvo com sucesso!")
+                        else:
+                            st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
+            except Exception as e:
+                st.error(f"Erro ao gerar resumo: {e}")
 
 
-# =========================
-# EXIBIR HISTÓRICO
-# =========================
-
+    # =========================
+    # EXIBIR HISTÓRICO
+    # =========================
 with st.container():
     interacoes = carregar_interacoes(n=20)
     for r in interacoes:
