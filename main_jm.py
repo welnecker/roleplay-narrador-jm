@@ -687,8 +687,10 @@ def build_messages(ctx: Dict[str, Any], user_text: str, history_msgs: Optional[L
     # Diretrizes de interação vindas do sidebar/Sheets
     dtx = st.session_state.get("diretrizes_text") or sheet_templates_get("diretrizes")
     if dtx:
-        msgs.append({"role": "system", "content": "DIRETRIZES DE INTERAÇÃO (siga estritamente):
-" + dtx})
+        msgs.append({
+            "role": "system",
+            "content": f"DIRETRIZES DE INTERAÇÃO (siga estritamente):\n{dtx}"
+        })
     abertura = build_opening_line(ctx)
     if abertura:
         msgs.append({"role": "system", "content": f"ABERTURA_SUGERIDA: {abertura}"})
@@ -754,3 +756,4 @@ if st.session_state.get("do_index_long") and planilha:
                         st.toast(f"Indexadas {len(embs)} memórias na memoria_longa_jm.")
     except Exception as e:
         st.info(f"Indexação opcional de memória longa não concluída: {e}")
+
