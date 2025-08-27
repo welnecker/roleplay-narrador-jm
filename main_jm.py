@@ -262,11 +262,12 @@ def strip_outer_quotes(t: str) -> str:
         return t[1:-1].strip()
     return t
 
-def count_paragraphs(visible_text: str) -> int:
-    blocks = [b.strip() for b in visible_text.split("
+import re
 
-") if b.strip()]
+def count_paragraphs(visible_text: str) -> int:
+    blocks = [b.strip() for b in re.split(r"\n\s*\n", visible_text) if b.strip()]
     return len(blocks)
+
 
 def build_continue_messages(ctx, last_assistant: str) -> List[Dict[str,str]]:
     return [
@@ -812,3 +813,4 @@ if st.session_state.get("do_index_long") and planilha:
                         st.toast(f"Indexadas {len(embs)} memórias na memoria_longa_jm.")
     except Exception as e:
         st.info(f"Indexação opcional de memória longa não concluída: {e}")
+
