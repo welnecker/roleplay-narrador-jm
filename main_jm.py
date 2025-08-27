@@ -254,7 +254,8 @@ def complete_hf(*, api_key: str, model: str, messages: List[Dict[str, str]],
                 temperature: float = 0.7, top_p: float = 1.0,
                 max_tokens: int = 1200, timeout: int = 60) -> str:
     """Hugging Face Inference API — simples (sem streaming)."""
-    sys = "
+    sys = "\n".join([m["content"] for m in messages if m["role"] == "system"]) or "Você é um assistente útil."
+
 ".join([m["content"] for m in messages if m["role"] == "system"]) or "Você é um assistente útil."
     conv = []
     for m in messages:
@@ -815,3 +816,4 @@ if run_btn:
 
 st.markdown("---")
 st.markdown("**Dica:** Se nenhum modelo aparecer na lista, abra o LM Studio → ‘Developer’ → ‘Start Server’ e garanta que há pelo menos um modelo carregado. Coloque o mesmo *Model Identifier* mostrado no LM Studio (ex.: `llama-3-8b-lexi-uncensored`).")
+
