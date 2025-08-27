@@ -166,19 +166,20 @@ def api_config_for_provider(provider: str):
             st.secrets.get("OPENROUTER_API_KEY", ""),
             MODELOS_OPENROUTER,
         )
-    elif provider == "Hugging Face":
+    elif provider == "Hugging Face":  # <= NOVO RAMO
         return (
             "HF_CLIENT",                                 # marcador especial (não usa requests)
             st.secrets.get("HUGGINGFACE_API_KEY", ""),   # token do HF
             MODELOS_HF,
         )
-    elif provider == "LM Studio (local)":
-        base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
-        return (
-            f"{base_url}/chat/completions",
-            "lm-studio",  # dummy key
-            {},           # modelos serão obtidos em tempo real via /v1/models
-        )
+elif provider == "LM Studio (local)":
+    base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
+    return (
+        f"{base_url}/chat/completions",
+        "lm-studio",  # dummy key
+        {},           # modelos serão obtidos em tempo real via /v1/models
+    )
+
     else:
         return (
             "https://api.together.xyz/v1/chat/completions",
