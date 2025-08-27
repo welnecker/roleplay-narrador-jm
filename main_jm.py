@@ -16,6 +16,8 @@ import numpy as np
 from gspread.exceptions import APIError
 from oauth2client.service_account import ServiceAccountCredentials
 from huggingface_hub import InferenceClient  # <= ADICIONE ESTA LINHA
+from gspread.exceptions import APIError, GSpreadException
+
 
 # =========================
 # CONFIG BÁSICA DO APP
@@ -217,13 +219,18 @@ def _retry_429(callable_fn, *args, _retries=5, _base=0.6, **kwargs):
     for i in range(_retries):
         try:
             return callable_fn(*args, **kwargs)
-        except APIError as e:
-            msg = str(e)
-            if "429" in msg or "quota" in msg.lower():
+        except (APIError, GSpreadException) as e:
+            msg = (str(e) or "").lower()
+            # trata como transitório: 429, quota/rate, timeout, backendError, deadline
+            transient = any(k in msg for k in ["429", "quota", "rate", "timed out", "timeout", "backenderror", "deadline"])
+            if transient:
                 time.sleep((_base * (2 ** i)) + random.uniform(0, 0.25))
                 continue
+            # se não parece transitório, re-lança
             raise
+    # última tentativa
     return callable_fn(*args, **kwargs)
+
 
 @st.cache_data(ttl=45, show_spinner=False)
 def _sheet_all_records_cached(sheet_name: str):
@@ -232,12 +239,131 @@ def _sheet_all_records_cached(sheet_name: str):
         return []
     return _retry_429(ws.get_all_records)
 
+# ========= helpers do Google Sheets =========
+
+def _rows_to_records(vals):
+    if not vals:
+        return []
+    header = vals[0] if vals else []
+    body = vals[1:] if len(vals) > 1 else []
+    # cabeçalho sintético se vazio
+    if not header or all(not (c or "").strip() for c in header):
+        maxlen = max((len(r) for r in body), default=0)
+        header = [f"col_{i+1}" for i in range(maxlen)]
+    else:
+        # dedup nomes vazios/duplicados
+        seen, new = set(), []
+        for i, h in enumerate(header):
+            name = (h or f"col_{i+1}").strip() or f"col_{i+1}"
+            base, j = name, 2
+            while name in seen:
+                name = f"{base}_{j}"
+                j += 1
+            seen.add(name)
+            new.append(name)
+        header = new
+    out = []
+    for r in body:
+        row = list(r) + [""] * max(0, len(header) - len(r))
+        row = row[:len(header)]
+        out.append({header[i]: row[i] for i in range(len(header))})
+    return out
+
+
+@st.cache_data(ttl=45, show_spinner=False)
+def _sheet_all_records_cached(sheet_name: str):
+    ws = _ws(sheet_name, create_if_missing=False)
+    if not ws:
+        return []
+    try:
+        # caminho “feliz” (como já era)
+        return _retry_429(ws.get_all_records)
+    except GSpreadException:
+        # fallback robusto sem derrubar o app
+        vals = _retry_429(ws.get_all_values)
+        return _rows_to_records(vals)
+    except Exception as e:
+        st.warning(f"Falha ao ler '{sheet_name}': {e}")
+        return []
+
+
 @st.cache_data(ttl=45, show_spinner=False)
 def _sheet_all_values_cached(sheet_name: str):
     ws = _ws(sheet_name, create_if_missing=False)
     if not ws:
         return []
-    return _retry_429(ws.get_all_values)
+    try:
+        return _retry_429(ws.get_all_values)
+    except Exception as e:
+        st.warning(f"Falha ao ler valores de '{sheet_name}': {e}")
+        return []
+
+
+def _invalidate_sheet_caches():
+    try:
+        _sheet_all_records_cached.clear()
+        _sheet_all_values_cached.clear()
+    except Exception:
+        pass
+# ========= helpers do Google Sheets =========
+
+def _rows_to_records(vals):
+    if not vals:
+        return []
+    header = vals[0] if vals else []
+    body = vals[1:] if len(vals) > 1 else []
+    # cabeçalho sintético se vazio
+    if not header or all(not (c or "").strip() for c in header):
+        maxlen = max((len(r) for r in body), default=0)
+        header = [f"col_{i+1}" for i in range(maxlen)]
+    else:
+        # dedup nomes vazios/duplicados
+        seen, new = set(), []
+        for i, h in enumerate(header):
+            name = (h or f"col_{i+1}").strip() or f"col_{i+1}"
+            base, j = name, 2
+            while name in seen:
+                name = f"{base}_{j}"
+                j += 1
+            seen.add(name)
+            new.append(name)
+        header = new
+    out = []
+    for r in body:
+        row = list(r) + [""] * max(0, len(header) - len(r))
+        row = row[:len(header)]
+        out.append({header[i]: row[i] for i in range(len(header))})
+    return out
+
+
+@st.cache_data(ttl=45, show_spinner=False)
+def _sheet_all_records_cached(sheet_name: str):
+    ws = _ws(sheet_name, create_if_missing=False)
+    if not ws:
+        return []
+    try:
+        # caminho “feliz” (como já era)
+        return _retry_429(ws.get_all_records)
+    except GSpreadException:
+        # fallback robusto sem derrubar o app
+        vals = _retry_429(ws.get_all_values)
+        return _rows_to_records(vals)
+    except Exception as e:
+        st.warning(f"Falha ao ler '{sheet_name}': {e}")
+        return []
+
+
+@st.cache_data(ttl=45, show_spinner=False)
+def _sheet_all_values_cached(sheet_name: str):
+    ws = _ws(sheet_name, create_if_missing=False)
+    if not ws:
+        return []
+    try:
+        return _retry_429(ws.get_all_values)
+    except Exception as e:
+        st.warning(f"Falha ao ler valores de '{sheet_name}': {e}")
+        return []
+
 
 def _invalidate_sheet_caches():
     try:
@@ -1915,6 +2041,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
