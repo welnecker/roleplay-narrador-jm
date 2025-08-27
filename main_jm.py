@@ -1306,7 +1306,7 @@ for k, v in {
 # SIDEBAR — Reorganizado (apenas FASE)
 # =========================
 
-with st.sidebar:
+    with st.sidebar:
         st.title("🧭 Painel do Roteirista")
 
         # Provedor / modelos
@@ -1904,6 +1904,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
