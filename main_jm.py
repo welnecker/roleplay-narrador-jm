@@ -172,12 +172,38 @@ def api_config_for_provider(provider: str):
             st.secrets.get("HUGGINGFACE_API_KEY", ""),   # token do HF
             MODELOS_HF,
         )
+elif provider == "LM Studio (local)":
+    base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
+    return (
+        f"{base_url}/chat/completions",
+        "lm-studio",  # dummy key
+        {},           # modelos serão obtidos em tempo real via /v1/models
+    )
+
     else:
         return (
             "https://api.together.xyz/v1/chat/completions",
             st.secrets.get("TOGETHER_API_KEY", ""),
             MODELOS_TOGETHER_UI,
         )
+
+
+
+# =========================
+# LM Studio helpers
+# =========================
+@st.cache_data(ttl=15, show_spinner=False)
+def lms_list_models(base_url: str) -> list[str]:
+    import requests
+    try:
+        url = base_url.rstrip("/") + "/models"
+        r = requests.get(url, timeout=5)
+        r.raise_for_status()
+        j = r.json()
+        ids = [m.get("id") for m in j.get("data", []) if m.get("id")]
+        return ids or []
+    except Exception:
+        return []
 
 # =========================
 # BACKOFF + CACHES
@@ -1285,12 +1311,25 @@ with st.sidebar:
     st.title("🧭 Painel do Roteirista")
 
     # Provedor / modelos
-    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face"], index=0, key="provedor_ia")
-    api_url, api_key, modelos_map = api_config_for_provider(provedor)
-    if not api_key:
-        st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
+    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face", "LM Studio (local)"], index=0, key="provedor_ia")
+    
+api_url, api_key, modelos_map = api_config_for_provider(provedor)
+if not api_key:
+    st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
+if provedor == "LM Studio (local)":
+    # Config base URL input
+    base_url_lms = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"), key="lms_base_url")
+    modelos_lms = lms_list_models(base_url_lms)
+    if not modelos_lms:
+        st.warning("⚠️ Servidor do LM Studio não encontrado ou sem modelos. Abra o LM Studio → Developer → Start Server.")
+    modelo_nome = st.selectbox("🤖 Modelo de IA (LM Studio)", modelos_lms or ["<digite manualmente>"], index=0, key="modelo_nome_ui")
+    if modelo_nome == "<digite manualmente>":
+        modelo_nome = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido_id","llama-3-8b-lexi-uncensored"))
+    st.session_state.modelo_escolhido_id = modelo_nome
+else:
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
+
 
     st.markdown("---")
     st.markdown("### ✍️ Estilo & Progresso Dramático")
@@ -1867,6 +1906,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
