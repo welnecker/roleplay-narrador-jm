@@ -222,17 +222,6 @@ def lms_list_models(base_url: str) -> list[str]:
     except Exception:
         return []
 
-models_lms = lms_list_models(base_url)
-if models_lms:
-    if model_to_call not in models_lms:
-        st.warning(
-            f"Modelo '{model_to_call}' não existe no LM Studio. "
-            f"Alternando para '{models_lms[0]}'."
-        )
-        model_to_call = models_lms[0]
-        st.session_state["modelo_escolhido_id"] = model_to_call
-else:
-    st.warning("Servidor LM Studio respondeu sem modelos. Verifique se um modelo de chat está carregado.")
 
 
 # =========================
@@ -1652,66 +1641,46 @@ if entrada:
         historico.append({"role": role, "content": content})
     
     # Provedor / modelo  (⚠️ fora do loop acima)
-    prov = st.session_state.get("provedor_ia", "OpenRouter")
-    if prov == "Together":
-        endpoint = "https://api.together.xyz/v1/chat/completions"
-        auth = st.secrets.get("TOGETHER_API_KEY", "")
-        model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
     
-    elif prov == "Hugging Face":
-        endpoint = "HF_CLIENT"  # marcador: não usa requests
-        auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
-        model_to_call = st.session_state.modelo_escolhido_id
-    
-    elif prov == "LM Studio (local)":
+# Provedor / modelo
+prov = st.session_state.get("provedor_ia", "OpenRouter")
+if prov == "Together":
+    endpoint = "https://api.together.xyz/v1/chat/completions"
+    auth = st.secrets.get("TOGETHER_API_KEY", "")
+    model_to_call = model_id_for_together(st.session_state.get("modelo_escolhido_id",""))
+elif prov == "Hugging Face":
+    endpoint = "HF_CLIENT"
+    auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
+    model_to_call = (st.session_state.get("modelo_escolhido_id","") or "").strip()
+elif prov == "LM Studio (local)":
     base_url = lms_sanitize_base(st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"))
-    endpoint = f"{base_url}/chat/completions"
+    endpoint  = f"{base_url}/chat/completions"
     auth = ""  # LM Studio local não precisa
-    model_to_call = st.session_state.get("modelo_escolhido_id") or "llama-3-8b-lexi-uncensored"
-
-    # pré-check correto: GET <base>/models
+    model_to_call = (st.session_state.get("modelo_escolhido_id","") or "llama-3-8b-lexi-uncensored").strip()
+    # pré-check
     try:
         ok = requests.get(base_url + "/models", timeout=4).status_code == 200
     except Exception:
         ok = False
     if not ok:
-        st.error(f"LM Studio não acessível em {base_url}. Ajuste a Base URL.")
+        st.error(f"LM Studio não acessível em {base_url}. Ajuste a Base URL no sidebar (ex.: http://host.docker.internal:1234/v1).")
         st.stop()
-    
-    else:
-        endpoint = "https://openrouter.ai/api/v1/chat/completions"
-        auth = st.secrets.get("OPENROUTER_API_KEY", "")
-        model_to_call = st.session_state.modelo_escolhido_id
-    
-    if (endpoint != "HF_CLIENT") and (prov != "LM Studio (local)") and not auth:
-        st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
-        st.stop()
+else:
+    endpoint = "https://openrouter.ai/api/v1/chat/completions"
+    auth = st.secrets.get("OPENROUTER_API_KEY", "")
+    model_to_call = (st.session_state.get("modelo_escolhido_id","") or "").strip()
 
+# autenticação exigida apenas para provedores remotos
+if (endpoint != "HF_CLIENT") and (prov != "LM Studio (local)") and not auth:
+    st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
+    st.stop()
 
-
-    # System prompts
-    system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
-    system_mary = {
-        "role": "system",
-        "content": (
-            "MODO MARY (ATIVO):\n"
-            "- Trate a fala do usuário como ações/falas de Jânio.\n"
-            "- Responda SOMENTE como Mary, em primeira pessoa.\n"
-            "- Não invente falas de Jânio; descreva apenas o que Mary diz/sente/faz.\n"
-            "- Se usar diálogo, use travessão (—) apenas para a fala de Mary."
-        )
-    }
-
-    messages = [system_pt]
-    if mary_mode_active:
-        messages.append(system_mary)
-    messages.append({"role": "system", "content": prompt})
-    messages += historico
+headers = _build_headers(prov, endpoint, auth)
 
     payload = {
         "model": model_to_call,
         "messages": messages,
-        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+        "max_tokens": max_tokens_final,
         "temperature": 0.9,
         "stream": True,
     }
@@ -1779,7 +1748,7 @@ if entrada:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
-        # FINALIZA TEXTO VISÍVEL
+# FINALIZA TEXTO VISÍVEL
         visible_txt = _render_visible(resposta_txt).strip()
 
         last_update = time.time()
@@ -1835,7 +1804,7 @@ if entrada:
             payload = {
                 "model": model_to_call,
                 "messages": messages,
-                "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                "max_tokens": max_tokens_final,
                 "temperature": 0.9,
                 "stream": True,
             }
@@ -1930,7 +1899,7 @@ if entrada:
                     json={
                         "model": model_to_call,
                         "messages": [{"role": "system", "content": prompt}] + historico,
-                        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                        "max_tokens": max_tokens_final,
                         "temperature": 0.9,
                         "stream": False,
                     },
@@ -1990,7 +1959,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
-
 
 
 
