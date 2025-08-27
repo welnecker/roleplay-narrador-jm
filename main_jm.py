@@ -1307,7 +1307,7 @@ for k, v in {
 # =========================
 
     with st.sidebar:
-    st.title("🧭 Painel do Roteirista")
+        st.title("🧭 Painel do Roteirista")
 
     # =========================
     # PROVEDOR / MODELOS  (ÚNICO radio com key 'provedor_ia')
@@ -1981,6 +1981,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
