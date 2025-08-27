@@ -1864,6 +1864,17 @@ def _resolver_model_id(prov: str, model_to_call: str | None = None) -> str:
     return mid
 
 # ---------- Fallback 1 (sem stream) ----------
+# --- GUARDA-CHUVA DE DEFAULTS (antes dos fallbacks) ---
+try:
+    visible_txt
+except NameError:
+    visible_txt = ""
+try:
+    resposta_txt
+except NameError:
+    resposta_txt = ""
+
+
 if not visible_txt:
     try:
         model_id = _resolver_model_id(prov, model_to_call)
@@ -1883,9 +1894,12 @@ if not visible_txt:
             # Ajusta endpoint e headers por provedor (LM Studio local, OpenRouter, Together, etc.)
             endpoint_ns, headers_ns = _resolver_endpoint_e_headers(prov, endpoint, auth)
             # Usa o mesmo payload base, garantindo o model correto e stream=False
+            # Monta payload explícito para não depender de 'payload' do streaming
             payload_ns = {
-                **payload,
                 "model": model_id,
+                "messages": messages,
+                "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                "temperature": 0.9,
                 "stream": False,
             }
             r2 = requests.post(
@@ -1907,6 +1921,16 @@ if not visible_txt:
         st.error(f"Fallback (sem stream) erro: {e}")
 
 # ---------- Fallback 2 (prompts limpos) ----------
+# --- GUARDA-CHUVA DE DEFAULTS (antes dos fallbacks) ---
+try:
+    visible_txt
+except NameError:
+    visible_txt = ""
+try:
+    resposta_txt
+except NameError:
+    resposta_txt = ""
+
 if not visible_txt:
     try:
         model_id = _resolver_model_id(prov, model_to_call)
@@ -1989,6 +2013,7 @@ if not visible_txt:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
