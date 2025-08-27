@@ -168,16 +168,16 @@ def api_config_for_provider(provider: str):
         )
     elif provider == "Hugging Face":
         return (
-            "HF_CLIENT",                                 # marcador especial (não usa requests)
-            st.secrets.get("HUGGINGFACE_API_KEY", ""),   # token do HF
+            "HF_CLIENT",
+            st.secrets.get("HUGGINGFACE_API_KEY", ""),
             MODELOS_HF,
         )
     elif provider == "LM Studio (local)":
-        base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
+        base_url = st.session_state.get("lms_base_url", "http://localhost:1234/v1").rstrip("/")
         return (
             f"{base_url}/chat/completions",
-            "lm-studio",  # dummy key
-            {},           # modelos serão obtidos em tempo real via /v1/models
+            "",     # << sem auth
+            {},     # modelos via /v1/models
         )
     else:
         return (
@@ -188,21 +188,52 @@ def api_config_for_provider(provider: str):
 
 
 
+
 # =========================
 # LM Studio helpers
 # =========================
 @st.cache_data(ttl=15, show_spinner=False)
+def _build_headers(prov: str, endpoint: str, auth: str):
+    """Centraliza headers HTTP para cada provedor."""
+    if endpoint == "HF_CLIENT":
+        return None  # Hugging Face usa InferenceClient (sem requests)
+    if prov == "LM Studio (local)":
+        # LM Studio local não precisa (nem sempre aceita) Authorization
+        return {"Content-Type": "application/json"}
+    return {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
+
+def lms_sanitize_base(url: str) -> str:
+    if not url:
+        return "http://127.0.0.1:1234/v1"
+    url = url.replace("\\", "/").strip()
+    url = url.rstrip("/")
+    # se o usuário colocou o endpoint completo, tira o sufixo
+    if url.endswith("/chat/completions"):
+        url = url[: -len("/chat/completions")]
+    return url
+
+
+# busca os modelos disponíveis do servidor
 def lms_list_models(base_url: str) -> list[str]:
-    import requests
     try:
-        url = base_url.rstrip("/") + "/models"
-        r = requests.get(url, timeout=5)
-        r.raise_for_status()
+        r = requests.get(base_url.rstrip("/") + "/models", timeout=4)
         j = r.json()
-        ids = [m.get("id") for m in j.get("data", []) if m.get("id")]
-        return ids or []
+        return [m.get("id","") for m in j.get("data", []) if m.get("id")]
     except Exception:
         return []
+
+models_lms = lms_list_models(base_url)
+if models_lms:
+    if model_to_call not in models_lms:
+        st.warning(
+            f"Modelo '{model_to_call}' não existe no LM Studio. "
+            f"Alternando para '{models_lms[0]}'."
+        )
+        model_to_call = models_lms[0]
+        st.session_state["modelo_escolhido_id"] = model_to_call
+else:
+    st.warning("Servidor LM Studio respondeu sem modelos. Verifique se um modelo de chat está carregado.")
+
 
 # =========================
 # BACKOFF + CACHES
@@ -1306,110 +1337,63 @@ for k, v in {
 # SIDEBAR — Reorganizado (apenas FASE)
 # =========================
 
-    with st.sidebar:
-        st.title("🧭 Painel do Roteirista")
+with st.sidebar:
+    st.title("🧭 Painel do Roteirista")
 
-    # =========================
-    # PROVEDOR / MODELOS  (ÚNICO radio com key 'provedor_ia')
-    # =========================
-    provedor = st.radio(
-        "🌐 Provedor",
-        ["OpenRouter", "Together", "Hugging Face", "LM Studio (local)"],
-        index=0,
-        key="provedor_ia"
-    )
-
-    # --- util: sanitiza base do LM Studio quando necessário ---
-    def lms_sanitize_base(url: str) -> str:
-        if not url:
-            return "http://127.0.0.1:1234/v1"
-        url = url.replace("\\", "/").strip().rstrip("/")
-        if url.endswith("/chat/completions"):
-            url = url[: -len("/chat/completions")]
-        return url
-
-    def lms_list_models(base_url: str) -> list[str]:
-        try:
-            r = requests.get(base_url.rstrip("/") + "/models", timeout=4)
-            j = r.json()
-            return [m.get("id","") for m in j.get("data", []) if m.get("id")]
-        except Exception:
-            return []
-
-    # Cria a key só uma vez, sem atribuições diretas após o widget
-    if "lms_base_url" not in st.session_state:
-        st.session_state["lms_base_url"] = "http://127.0.0.1:1234/v1"
-
-    def _cb_lms_sanitize():
-        st.session_state["lms_base_url"] = lms_sanitize_base(st.session_state.get("lms_base_url",""))
+    # Provedor / modelos
+    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face", "LM Studio (local)"], index=0, key="provedor_ia")
+    
+    # --- INÍCIO: SELETOR DE MODELO COM SUPORTE A LM STUDIO (MANTÉM O RESTO DO SIDEBAR) ---
+    api_url, api_key, modelos_map = api_config_for_provider(provedor)
+    if not api_key and provedor != "LM Studio (local)":
+        st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
 
     if provedor == "LM Studio (local)":
-        st.text_input(
+        # Base URL configurável (não remove seus outros controles)
+        base_url_lms = st.text_input(
             "Base URL (LM Studio)",
+            value=lms_sanitize_base(st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1")),
             key="lms_base_url",
-            help="Abra o LM Studio → Developer → Start Server",
-            on_change=_cb_lms_sanitize,
+            help="Abra o LM Studio → Developer → Start Server"
         )
+        # sempre sanitize antes de usar
+        st.session_state["lms_base_url"] = lms_sanitize_base(st.session_state["lms_base_url"])
 
-        base_url_lms = lms_sanitize_base(st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"))
-        # Check rápido
-        ok_models = []
+
+        # Lista de modelos do servidor local (OpenAI-like)
         try:
-            resp = requests.get(base_url_lms + "/models", timeout=4)
-            if resp.status_code == 200:
-                data = resp.json()
-                ok_models = [m.get("id","") for m in data.get("data", []) if m.get("id")]
+            modelos_lms = lms_list_models(base_url_lms)
         except Exception:
-            ok_models = []
+            modelos_lms = []
 
-        # Mensagens de status
-        st.caption("✅ Servidor acessível: " + base_url_lms)
-        if not ok_models:
-            st.warning("⚠️ Servidor do LM Studio sem modelos. Carregue um modelo e clique em Developer → Start Server.")
-
-        # IMPORTANTE: use **chaves diferentes** para selectbox e text_input,
-        # evitando conflito quando a UI alterna entre eles em reruns.
-        if ok_models:
-            modelo_nome = st.selectbox(
-                "🤖 Modelo de IA (LM Studio)",
-                ok_models,
-                index=0,
-                key="modelo_nome_ui_lms_select"
-            )
-        else:
+        if not modelos_lms:
+            st.warning("Servidor do LM Studio não respondeu ou sem modelos. Você pode digitar o ID manualmente.")
             modelo_nome = st.text_input(
                 "Model identifier (LM Studio)",
-                # valor padrão correto para o seu servidor local
                 value=st.session_state.get("modelo_escolhido_id", "llama-3-8b-lexi-uncensored"),
-                key="modelo_nome_ui_lms_text",
-                help="Dica: use exatamente o ID listado em /v1/models (ex.: llama-3-8b-lexi-uncensored)."
+                key="modelo_nome_ui_lms"
+            )
+        else:
+            modelo_nome = st.selectbox(
+                "🤖 Modelo de IA (LM Studio)",
+                modelos_lms,
+                index=0,
+                key="modelo_nome_ui_lms"
             )
 
-        # Persistimos em um único lugar canônico
-        st.session_state["modelo_escolhido_id"] = (modelo_nome or "").strip()
+        st.session_state.modelo_escolhido_id = modelo_nome
 
     else:
-        # Demais provedores — seletores normais (key ÚNICA aqui)
-        try:
-            # Pegue o map de modelos conforme seu setup:
-            endpoint_tmp, api_key_tmp, modelos_map = api_config_for_provider(provedor)
-        except Exception:
-            modelos_map = {}
-
-        if not modelos_map:
-            st.info("Selecione um provedor válido ou configure suas chaves em st.secrets.")
-            modelos_legiveis = []
-        else:
-            modelos_legiveis = list(modelos_map.keys())
-
+        # Mantém seu fluxo normal para os demais provedores
         modelo_nome_legivel = st.selectbox(
             "🤖 Modelo de IA",
-            modelos_legiveis if modelos_legiveis else ["<nenhum>"],
+            list(modelos_map.keys()),
             index=0,
-            key="modelo_nome_ui"   # key única para provedores remotos
+            key="modelo_nome_ui"
         )
-        if modelos_legiveis:
-            st.session_state["modelo_escolhido_id"] = modelos_map.get(modelo_nome_legivel, "")
+        st.session_state.modelo_escolhido_id = modelos_map[modelo_nome_legivel]
+    # --- FIM: SELETOR DE MODELO COM SUPORTE A LM STUDIO ---
+
 
     st.markdown("---")
     st.markdown("### ✍️ Estilo & Progresso Dramático")
@@ -1421,6 +1405,7 @@ for k, v in {
         index=0,
         key="modo_resposta",
     )
+    # Compat: flag booleana para o bloco de streaming
     st.session_state.interpretar_apenas_mary = (modo_op == "Mary (1ª pessoa)")
 
     st.selectbox(
@@ -1430,7 +1415,8 @@ for k, v in {
         key="estilo_escrita",
     )
 
-    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 0)), key="nsfw_max_level")
+    # Defaults no mínimo
+    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=0, key="nsfw_max_level")
 
     st.checkbox(
         "Sintonia com o parceiro (modo harmônico)",
@@ -1441,19 +1427,20 @@ for k, v in {
     st.select_slider(
         "Ritmo da cena",
         options=[0, 1, 2, 3],
-        value=int(st.session_state.get("ritmo_cena", 0)),
+        value=0,
         format_func=lambda n: ["muito lento", "lento", "médio", "rápido"][n],
         key="ritmo_cena",
     )
 
     st.selectbox(
-        "Finalização",
-        ["ponto de gancho", "fecho suave", "deixar no suspense"],
-        index=["ponto de gancho","fecho suave","deixar no suspense"].index(
-            st.session_state.get("finalizacao_modo", "ponto de gancho")
-        ),
-        key="finalizacao_modo",
+    "Finalização",
+    ["ponto de gancho", "fecho suave", "deixar no suspense"],
+    index=["ponto de gancho","fecho suave","deixar no suspense"].index(
+        st.session_state.get("finalizacao_modo", "ponto de gancho")
+    ),
+    key="finalizacao_modo",
     )
+
 
     st.checkbox(
         "Usar falas da Mary da planilha (usar literalmente)",
@@ -1520,6 +1507,8 @@ for k, v in {
 
     st.markdown("---")
     st.markdown("### 📝 Utilitários")
+
+        # Gerar resumo do capítulo (pega as últimas interações do Sheets)
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             inter = carregar_interacoes(n=6)
@@ -1528,68 +1517,68 @@ for k, v in {
                 "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
                 + texto + "\n\nResumo:"
             )
-
+    
             # Usa o provedor/modelo selecionados no topo do sidebar
-            provedor_local = st.session_state.get("provedor_ia", "OpenRouter")
-            api_url_local, api_key_local, modelos_map_local = api_config_for_provider(provedor_local)
+            provedor = st.session_state.get("provedor_ia", "OpenRouter")
+            api_url_local = api_url
+            api_key_local = api_key
             model_id_call = (
                 model_id_for_together(st.session_state.modelo_escolhido_id)
-                if provedor_local == "Together" else st.session_state.modelo_escolhido_id
+                if provedor == "Together"
+                else st.session_state.modelo_escolhido_id
             )
-
-            if provedor_local == "LM Studio (local)":
-                # LM Studio: sem Authorization, endpoint construído do base_url
-                base_url_lms = lms_sanitize_base(st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"))
-                api_url_local = f"{base_url_lms}/chat/completions"
-                headers_local = {"Content-Type": "application/json"}
-            elif api_url_local == "HF_CLIENT":
-                headers_local = None
+    
+            if not api_key_local:
+                st.error("⚠️ API key ausente para o provedor selecionado (defina em st.secrets).")
             else:
-                headers_local = {"Authorization": f"Bearer {api_key_local}", "Content-Type": "application/json"}
-
-            if api_url_local == "HF_CLIENT":
-                try:
-                    hf_client = InferenceClient(token=api_key_local, timeout=int(st.session_state.get("timeout_s", 300)))
-                    out = hf_client.chat.completions.create(
-                        model=model_id_call,
-                        messages=[{"role": "user", "content": prompt_resumo}],
-                        max_tokens=800,
-                        temperature=0.85,
-                        stream=False,
-                    )
-                    resumo = out.choices[0].message.content.strip()
-                    st.session_state.resumo_capitulo = resumo
-                    salvar_resumo(resumo)
-                    st.success("Resumo gerado e salvo com sucesso!")
-                except Exception as e:
-                    st.error(f"Erro ao resumir (HF): {e}")
-            else:
-                r = requests.post(
-                    api_url_local,
-                    headers=headers_local,
-                    json={
-                        "model": model_id_call,
-                        "messages": [{"role": "user", "content": prompt_resumo}],
-                        "max_tokens": 800,
-                        "temperature": 0.85,
-                        "stream": False
-                    },
-                    timeout=int(st.session_state.get("timeout_s", 300)),
-                )
-                if r.status_code == 200:
-                    resumo = r.json()["choices"][0]["message"]["content"].strip()
-                    st.session_state.resumo_capitulo = resumo
-                    salvar_resumo(resumo)
-                    st.success("Resumo gerado e salvo com sucesso!")
+                if provedor == "Hugging Face":
+                    # --- HF sem requests: usa InferenceClient ---
+                    try:
+                        hf_client = InferenceClient(
+                            token=api_key_local,
+                            timeout=int(st.session_state.get("timeout_s", 300))
+                        )
+                        out = hf_client.chat.completions.create(
+                            model=model_id_call,
+                            messages=[{"role": "user", "content": prompt_resumo}],
+                            max_tokens=800,
+                            temperature=0.85,
+                            stream=False,
+                        )
+                        resumo = out.choices[0].message.content.strip()
+                        st.session_state.resumo_capitulo = resumo
+                        salvar_resumo(resumo)
+                        st.success("Resumo gerado e salvo com sucesso!")
+                    except Exception as e:
+                        st.error(f"Erro ao resumir (HF): {e}")
                 else:
-                    st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
+                    # OpenRouter / Together (requests)
+                    r = requests.post(
+                        api_url_local,
+                        headers={"Authorization": f"Bearer {api_key_local}", "Content-Type": "application/json"},
+                        json={
+                            "model": model_id_call,
+                            "messages": [{"role": "user", "content": prompt_resumo}],
+                            "max_tokens": 800,
+                            "temperature": 0.85
+                        },
+                        timeout=int(st.session_state.get("timeout_s", 300)),
+                    )
+                    if r.status_code == 200:
+                        resumo = r.json()["choices"][0]["message"]["content"].strip()
+                        st.session_state.resumo_capitulo = resumo
+                        salvar_resumo(resumo)
+                        st.success("Resumo gerado e salvo com sucesso!")
+                    else:
+                        st.error(f"Erro ao resumir: {r.status_code} - {r.text}")
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
 
 
-    # =========================
-    # EXIBIR HISTÓRICO
-    # =========================
+# =========================
+# EXIBIR HISTÓRICO
+# =========================
+
 with st.container():
     interacoes = carregar_interacoes(n=20)
     for r in interacoes:
@@ -1653,7 +1642,7 @@ if entrada:
     # Construção do prompt (já deve incluir, se você seguiu, o {voz_bloco} no construir_prompt_com_narrador)
     prompt = construir_prompt_com_narrador()
 
-    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
+        # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
     historico = []
     for m in st.session_state.session_msgs:
         role = m.get("role", "user")
@@ -1661,25 +1650,44 @@ if entrada:
         if mary_mode_active and role.lower() == "user":
             content = f"JÂNIO: {content}"
         historico.append({"role": role, "content": content})
-
-        # Provedor / modelo
+    
+    # Provedor / modelo  (⚠️ fora do loop acima)
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
         auth = st.secrets.get("TOGETHER_API_KEY", "")
         model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
+    
     elif prov == "Hugging Face":
         endpoint = "HF_CLIENT"  # marcador: não usa requests
         auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
         model_to_call = st.session_state.modelo_escolhido_id
+    
+    elif prov == "LM Studio (local)":
+    base_url = lms_sanitize_base(st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"))
+    endpoint = f"{base_url}/chat/completions"
+    auth = ""  # LM Studio local não precisa
+    model_to_call = st.session_state.get("modelo_escolhido_id") or "llama-3-8b-lexi-uncensored"
+
+    # pré-check correto: GET <base>/models
+    try:
+        ok = requests.get(base_url + "/models", timeout=4).status_code == 200
+    except Exception:
+        ok = False
+    if not ok:
+        st.error(f"LM Studio não acessível em {base_url}. Ajuste a Base URL.")
+        st.stop()
+    
     else:
         endpoint = "https://openrouter.ai/api/v1/chat/completions"
         auth = st.secrets.get("OPENROUTER_API_KEY", "")
         model_to_call = st.session_state.modelo_escolhido_id
     
-    if not auth:
+    if (endpoint != "HF_CLIENT") and (prov != "LM Studio (local)") and not auth:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
+
+
 
     # System prompts
     system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
@@ -1707,7 +1715,7 @@ if entrada:
         "temperature": 0.9,
         "stream": True,
     }
-    headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
+    headers = _build_headers(prov, endpoint, auth)
 
         # =========================================================
     # BLOQUEIO DE CLÍMAX — Helpers (sempre ativo por padrão)
@@ -1823,7 +1831,7 @@ if entrada:
     
         else:
             # --- STREAM via SSE (OpenRouter/Together) — mantém seu fluxo atual via requests ---
-            headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
+            headers = _build_headers(prov, endpoint, auth)
             payload = {
                 "model": model_to_call,
                 "messages": messages,
@@ -1888,7 +1896,7 @@ if entrada:
                 visible_txt = _render_visible(resposta_txt).strip()
             else:
                 r2 = requests.post(
-                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
+                    endpoint, headers = _build_headers(prov, endpoint, auth),
                     json={**payload, "stream": False},
                     timeout=int(st.session_state.get("timeout_s", 300))
                 )
@@ -1918,7 +1926,7 @@ if entrada:
                 visible_txt = _render_visible(resposta_txt).strip()
             else:
                 r3 = requests.post(
-                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
+                    endpoint, headers = _build_headers(prov, endpoint, auth),
                     json={
                         "model": model_to_call,
                         "messages": [{"role": "system", "content": prompt}] + historico,
@@ -1939,48 +1947,56 @@ if entrada:
         except Exception as e:
             st.error(f"Fallback (prompts limpos) erro: {e}")
 
-    # BLOQUEIO DE CLÍMAX FINAL (sempre que a opção estiver ativa, só libera com comando do usuário)
-    if st.session_state.get("app_bloqueio_intimo", True):
-        if not _user_allows_climax(st.session_state.session_msgs):
-            visible_txt = _strip_or_soften_climax(visible_txt)
+    # BLOQUEIO DE CLÍMAX FINAL + ENFORCER MARY
+        # =========================
+        if st.session_state.get("app_bloqueio_intimo", True):
+            if not _user_allows_climax(st.session_state.session_msgs):
+                visible_txt = _strip_or_soften_climax(visible_txt)
 
         # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
-    if st.session_state.get("usar_falas_mary", False):
-        falas = st.session_state.get("_falas_mary_list", []) or []
-        if falas and visible_txt:
-            tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
-            if not tem_fala:
-                escolha = random.choice(falas)
-                if st.session_state.get("interpretar_apenas_mary", False):
-                    inj = f"— {escolha}\n\n"
-                else:
-                    inj = f"— {escolha} — diz Mary.\n\n"
-                visible_txt = inj + visible_txt
-    
-    # ===== Render final (sempre) =====
-    placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
-    
-    # ===== Persistência (sempre) =====
-    if visible_txt and visible_txt != "[Sem conteúdo]":
-        salvar_interacao("assistant", visible_txt)
-        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
-    else:
-        salvar_interacao("assistant", "[Sem conteúdo]")
-        st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
-    
-    # ===== Reforço pós-resposta (sempre) =====
-    try:
-        usados = []
-        topk_usadas = memoria_longa_buscar_topk(
-            query_text=visible_txt,
-            k=int(st.session_state.get("k_memoria_longa", 3)),
-            limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
-        )
-        for t, _sc, _sim, _rr in topk_usadas:
-            usados.append(t)
-        memoria_longa_reforcar(usados)
-    except Exception:
-        pass
+        if st.session_state.get("usar_falas_mary", False):
+            falas = st.session_state.get("_falas_mary_list", []) or []
+            if falas and visible_txt:
+                tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
+                if not tem_fala:
+                    escolha = random.choice(falas)
+                    if st.session_state.get("interpretar_apenas_mary", False):
+                        inj = f"— {escolha}\n\n"
+                    else:
+                        inj = f"— {escolha} — diz Mary.\n\n"
+                    visible_txt = inj + visible_txt
+
+        # ===== Render final (sempre) =====
+        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
+
+        # ===== Persistência (sempre) =====
+        if visible_txt and visible_txt != "[Sem conteúdo]":
+            salvar_interacao("assistant", visible_txt)
+            st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
+        else:
+            salvar_interacao("assistant", "[Sem conteúdo]")
+            st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
+
+        # ===== Reforço pós-resposta (sempre) =====
+        try:
+            usados = []
+            topk_usadas = memoria_longa_buscar_topk(
+                query_text=visible_txt,
+                k=int(st.session_state.get("k_memoria_longa", 3)),
+                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
+            )
+            for t, _sc, _sim, _rr in topk_usadas:
+                usados.append(t)
+            memoria_longa_reforcar(usados)
+        except Exception:
+            pass
+
+
+
+
+
+
+
 
 
 
