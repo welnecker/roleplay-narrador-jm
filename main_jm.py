@@ -254,6 +254,27 @@ def _render_visible(t: str) -> str:
     t = sanitize_explicit(t, int(st.session_state.get("nsfw_max_level", 0)))
     return t
 
+# ===== Helpers para continuidade e limpeza =====
+
+def strip_outer_quotes(t: str) -> str:
+    t = t.strip()
+    if (t.startswith('"') and t.endswith('"')) or (t.startswith('“') and t.endswith('”')):
+        return t[1:-1].strip()
+    return t
+
+def count_paragraphs(visible_text: str) -> int:
+    blocks = [b.strip() for b in visible_text.split("
+
+") if b.strip()]
+    return len(blocks)
+
+def build_continue_messages(ctx, last_assistant: str) -> List[Dict[str,str]]:
+    return [
+        {"role": "system", "content": build_system_prompt(ctx)},
+        {"role": "assistant", "content": last_assistant},
+        {"role": "user", "content": "Continue exatamente do ponto onde parou. Não resuma. Prossiga com ação e diálogo até cumprir o volume solicitado."}
+    ]
+
 
 # ============================
 # Prompt Builder
@@ -283,11 +304,16 @@ def build_system_prompt(ctx: Dict[str, Any]) -> str:
         f"Fase atual do romance: {_fase_label(fase)} (respeite limites de avanço).",
         f"Nível de calor permitido: {nsfw} (0 a 3).",
         "Nunca descreva cenário/natureza/clima (proibido céu, mar, vento, ondas, luar etc.).",
-        "Mantenha parágrafos curtos (máx. 2 frases) e falas com travessão em linhas separadas.",
+        "Mantenha parágrafos de 1 a 3 frases e falas com travessão em linhas separadas.",
         "Intercale ação física e diálogo; foque no corpo, reações e toques, sem metáforas ambientais.",
     ]
     if bloquear == "ATIVO":
         linhas.append("Proteção íntima ativa: sem clímax explícito sem liberação direta do usuário.")
+    # alvo de tamanho
+    alvo = int(ctx.get("alvo_paragrafos", 12))
+    linhas.append(f"Escreva cerca de {alvo} parágrafos. Desenvolva ação e diálogo.")
+    linhas.append("Não encerre a cena antes de atingir o volume solicitado, a menos que o usuário peça.")
+
     finalizacao = ctx.get("finalizacao_modo", "ponto de gancho")
     if finalizacao == "ponto de gancho":
         linhas.append("Feche com micro-ação de gancho natural (sem concluir a cena).")
@@ -428,12 +454,13 @@ with st.sidebar:
     st.title("🧭 Painel do Roteirista — LM Studio")
 
     st.markdown("### 🌐 Servidor LM Studio")
-    default_base = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1")
+    default_base = st.session_state.get("lms_base_url", "https://context-frankfurt-environment-virtue.trycloudflare.com/v1")
     base_url_input = st.text_input(
         "Base URL (LM Studio)", value=default_base, key="lms_base_url_input",
-        help="Ex.: https://<seu>.trycloudflare.com/v1 ou http://127.0.0.1:1234/v1"
+        help="Ex.: https://<seu>.trycloudflare.com/v1 (fixo neste app)",
+        disabled=True
     )
-    st.session_state["lms_base_url"] = base_url_input.strip()
+    st.session_state["lms_base_url"] = "https://context-frankfurt-environment-virtue.trycloudflare.com/v1"
 
     colhb1, colhb2 = st.columns([1,1])
     with colhb1:
@@ -445,7 +472,7 @@ with st.sidebar:
             except Exception:
                 pass
     with colhb2:
-        st.caption("Se usar túnel, inclua /v1 no final.")
+        st.caption("Acesso fixo via Cloudflare Tunnel (→ /v1 já incluído).")
 
     modelos = lms_list_models(st.session_state["lms_base_url"]) or []
     modelo_escolhido = st.selectbox("🤖 Modelo (LM Studio)", modelos or ["<digite manualmente>"], key="lm_model_select")
@@ -500,7 +527,8 @@ with st.sidebar:
     st.checkbox("Sintonia com o parceiro (modo harmônico)", key="modo_sintonia", value=st.session_state.get("modo_sintonia", True))
     st.select_slider("Ritmo da cena", options=[0,1,2,3], value=int(st.session_state.get("ritmo_cena", 0)), format_func=lambda n: ["muito lento","lento","médio","rápido"][n], key="ritmo_cena")
     st.selectbox("Finalização", ["ponto de gancho", "fecho suave", "deixar no suspense"], key="finalizacao_modo")
-    st.checkbox("Usar falas da Mary (fixas)", key="usar_falas_mary", value=st.session_state.get("usar_falas_mary", False))
+    st.slider("Alvo de parágrafos", 1, 40, value=int(st.session_state.get("alvo_paragrafos", 12)), key="alvo_paragrafos")
+    st.checkbox("Usar falas da Mary (fixas)", key="usar_falas_mary", value=st.session_state.get("usar_falas_mary", False)))
 
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio (apenas Fase)")
@@ -604,8 +632,38 @@ if user_text:
                 resposta_txt = ""
 
         if resposta_txt:
-            st.markdown(_render_visible(resposta_txt))
-            # Salva no Sheets (se disponível)
+            resposta_txt = strip_outer_quotes(resposta_txt)
+            vis = _render_visible(resposta_txt)
+            st.markdown(vis)
+            # Continuação automática até o alvo (máx 2 iterações)
+            alvo = int(st.session_state.get("alvo_paragrafos", 12))
+            pcount = count_paragraphs(vis)
+            loops = 0
+            while pcount < alvo and loops < 2:
+                cont_msgs = build_continue_messages(ctx, resposta_txt)
+                try:
+                    more = stream_chat_lmstudio(
+                        base_url=st.session_state.get("lms_base_url", "https://context-frankfurt-environment-virtue.trycloudflare.com/v1"),
+                        model=st.session_state.get("modelo_escolhido", "llama-3-8b-lexi-uncensored"),
+                        messages=cont_msgs,
+                        temperature=float(st.session_state.get("temperature", 0.7)),
+                        top_p=float(st.session_state.get("top_p", 1.0)),
+                        max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
+                        timeout=int(st.session_state.get("timeout_s", 300)),
+                    )
+                except Exception:
+                    break
+                if not more.strip():
+                    break
+                resposta_txt += "
+
+" + strip_outer_quotes(more.strip())
+                vis = _render_visible(resposta_txt)
+                st.markdown(vis)
+                pcount = count_paragraphs(vis)
+                loops += 1
+
+            # Salva no Sheets (completo)
             try:
                 gs_save_interaction("user", user_text, st.session_state.get("modelo_escolhido", ""), st.session_state.get("lms_base_url", ""))
                 gs_save_interaction("assistant", resposta_txt, st.session_state.get("modelo_escolhido", ""), st.session_state.get("lms_base_url", ""))
@@ -687,10 +745,8 @@ def build_messages(ctx: Dict[str, Any], user_text: str, history_msgs: Optional[L
     # Diretrizes de interação vindas do sidebar/Sheets
     dtx = st.session_state.get("diretrizes_text") or sheet_templates_get("diretrizes")
     if dtx:
-        msgs.append({
-            "role": "system",
-            "content": f"DIRETRIZES DE INTERAÇÃO (siga estritamente):\n{dtx}"
-        })
+        msgs.append({"role": "system", "content": "DIRETRIZES DE INTERAÇÃO (siga estritamente):
+" + dtx})
     abertura = build_opening_line(ctx)
     if abertura:
         msgs.append({"role": "system", "content": f"ABERTURA_SUGERIDA: {abertura}"})
@@ -756,4 +812,3 @@ if st.session_state.get("do_index_long") and planilha:
                         st.toast(f"Indexadas {len(embs)} memórias na memoria_longa_jm.")
     except Exception as e:
         st.info(f"Indexação opcional de memória longa não concluída: {e}")
-
