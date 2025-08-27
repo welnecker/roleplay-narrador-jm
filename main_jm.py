@@ -555,7 +555,7 @@ with st.sidebar:
         modelos = lms_list_models(base_url)
         if not modelos:
             st.warning("⚠️ LM Studio não encontrado ou sem modelos. Abra o LM Studio → Developer → Start Server.")
-        modelo_escolhido = st.selectbox("🤖 Modelo (LM Studio)", modelos or ["<digite manualmente>"])
+        modelo_escolhido = st.selectbox("🤖 Modelo (LM Studio)", modelos or ["<digite manualmente>"], key="lm_model_select")
         if modelo_escolhido == "<digite manualmente>":
             modelo_escolhido = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido", "llama-3-8b-lexi-uncensored"), key="lm_model_identifier_input")
         st.session_state.modelo_escolhido = modelo_escolhido
@@ -607,10 +607,10 @@ with st.sidebar:
     fase_escolhida = st.select_slider("Fase do romance", options=[0,1,2,3,4,5], value=int(st.session_state.get("fase", 0)), format_func=_fase_label, key="fase")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("➕ Avançar 1 fase"):
+        if st.button("➕ Avançar 1 fase", key="btn_avanca_fase"):
             st.session_state.fase = min(5, int(st.session_state.get("fase", 0)) + 1)
     with col2:
-        if st.button("↺ Reiniciar (0)"):
+        if st.button("↺ Reiniciar (0)", key="btn_reset_fase"):
             st.session_state.fase = 0
     st.checkbox("Evitar coincidências forçadas (montagem paralela)", key="no_coincidencias", value=st.session_state.get("no_coincidencias", True))
     st.checkbox("Bloquear avanços íntimos sem ordem", key="app_bloqueio_intimo", value=st.session_state.get("app_bloqueio_intimo", True))
@@ -627,92 +627,6 @@ with st.sidebar:
     st.text_input("Lugar (ex.: Jacaraípe / em casa)", key="lugar")
     st.text_input("Figurino (ex.: short jeans e regata)", key="figurino")
 
-    st.markdown("### 🌐 Servidor LM Studio")
-    base_url = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"))
-    st.session_state.lms_base_url = base_url.strip()
-
-    colhb1, colhb2 = st.columns([1,1])
-    with colhb1:
-        if st.button("Testar conexão"):
-            ok, msg = lms_health(st.session_state.lms_base_url)
-            (st.success if ok else st.error)(msg)
-            try:
-                lms_list_models.clear()
-            except Exception:
-                pass
-    with colhb2:
-        st.caption("Dica: copie exatamente a URL mostrada no LM Studio › Developer.")
-
-    modelos = lms_list_models(base_url)
-    if not modelos:
-        st.warning("⚠️ Servidor do LM Studio não encontrado ou sem modelos. Abra o LM Studio → Developer → Start Server.")
-    modelo_escolhido = st.selectbox("🤖 Modelo de IA (LM Studio)", modelos or ["<digite manualmente>"])
-    if modelo_escolhido == "<digite manualmente>":
-        modelo_escolhido = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido", "llama-3-8b-lexi-uncensored"))
-    st.session_state.modelo_escolhido = modelo_escolhido
-
-    st.markdown("#### 📋 Mostrar /v1/models")
-    if st.button("Mostrar /v1/models"):
-        try:
-            url = st.session_state.lms_base_url.rstrip("/") + "/models"
-            headers = {"Content-Type": "application/json"}
-            if st.session_state.get("cf_client_id") and st.session_state.get("cf_client_secret"):
-                headers["CF-Access-Client-Id"] = st.session_state["cf_client_id"]
-                headers["CF-Access-Client-Secret"] = st.session_state["cf_client_secret"]
-            auth = None
-            if st.session_state.get("basic_user") and st.session_state.get("basic_pass"):
-                auth = HTTPBasicAuth(st.session_state["basic_user"], st.session_state["basic_pass"])
-            r = requests.get(url, timeout=10, headers=headers, auth=auth)
-            r.raise_for_status()
-            st.code(json.dumps(r.json(), indent=2), language="json")
-        except Exception as e:
-            st.error(f"Falha ao consultar /models: {e}")
-
-    st.markdown("### 🔒 Segurança (opcional)")
-    st.text_input("CF-Access-Client-Id", key="cf_client_id")
-    st.text_input("CF-Access-Client-Secret", type="password", key="cf_client_secret")
-    st.text_input("Basic auth - usuário (ngrok)", key="basic_user")
-    st.text_input("Basic auth - senha (ngrok)", type="password", key="basic_pass")
-
-    st.markdown("---")
-    st.markdown("### ⚙️ Parâmetros do Modelo")
-    st.slider("Temperature", 0.0, 1.5, value=float(st.session_state.get("temperature", 0.7)), step=0.05, key="temperature")
-    st.slider("Top-p", 0.0, 1.0, value=float(st.session_state.get("top_p", 1.0)), step=0.05, key="top_p")
-
-    st.markdown("---")
-    st.markdown("### ✍️ Estilo & Progresso Dramático")
-    st.selectbox("Modo de resposta", ["Narrador padrão", "Mary (1ª pessoa)"], key="modo_resposta")
-    st.selectbox("Estilo de escrita", ["AÇÃO", "ROMANCE LENTO", "NOIR"], key="estilo_escrita")
-    st.slider("Nível de calor (0=leve, 3=explícito)", 0, 3, value=int(st.session_state.get("nsfw_max_level", 0)), key="nsfw_max_level")
-    st.checkbox("Sintonia com o parceiro (modo harmônico)", key="modo_sintonia", value=st.session_state.get("modo_sintonia", True))
-    st.select_slider("Ritmo da cena", options=[0,1,2,3], value=int(st.session_state.get("ritmo_cena", 0)), format_func=lambda n: ["muito lento","lento","médio","rápido"][n], key="ritmo_cena")
-    st.selectbox("Finalização", ["ponto de gancho", "fecho suave", "deixar no suspense"], key="finalizacao_modo")
-    st.checkbox("Usar falas da Mary (fixas)", key="usar_falas_mary", value=st.session_state.get("usar_falas_mary", False))
-
-    st.markdown("---")
-    st.markdown("### 💞 Romance Mary & Jânio (apenas Fase)")
-    fase_escolhida = st.select_slider("Fase do romance", options=[0,1,2,3,4,5], value=int(st.session_state.get("fase", 0)), format_func=_fase_label, key="fase")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("➕ Avançar 1 fase"):
-            st.session_state.fase = min(5, int(st.session_state.get("fase", 0)) + 1)
-    with col2:
-        if st.button("↺ Reiniciar (0)"):
-            st.session_state.fase = 0
-    st.checkbox("Evitar coincidências forçadas (montagem paralela)", key="no_coincidencias", value=st.session_state.get("no_coincidencias", True))
-    st.checkbox("Bloquear avanços íntimos sem ordem", key="app_bloqueio_intimo", value=st.session_state.get("app_bloqueio_intimo", True))
-    st.selectbox("🎭 Emoção oculta", ["nenhuma","tristeza","felicidade","tensão","raiva"], key="app_emocao_oculta")
-
-    st.markdown("---")
-    st.markdown("### ⏱️ Comprimento/timeout")
-    st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp", 1200)), step=32, key="max_tokens_rsp")
-    st.slider("Timeout (segundos)", 60, 600, value=int(st.session_state.get("timeout_s", 300)), step=10, key="timeout_s")
-
-    st.markdown("---")
-    st.markdown("### 🧩 Contexto da Cena (opcional)")
-    st.text_input("Tempo (ex.: Domingo de manhã)", key="tempo")
-    st.text_input("Lugar (ex.: Jacaraípe / em casa)", key="lugar")
-    st.text_input("Figurino (ex.: short jeans e regata)", key="figurino")
 
 
 # ----------------------------
@@ -819,4 +733,5 @@ if run_btn:
 
 st.markdown("---")
 st.markdown("**Dica:** Se nenhum modelo aparecer na lista, abra o LM Studio → ‘Developer’ → ‘Start Server’ e garanta que há pelo menos um modelo carregado. Coloque o mesmo *Model Identifier* mostrado no LM Studio (ex.: `llama-3-8b-lexi-uncensored`).")
+
 
