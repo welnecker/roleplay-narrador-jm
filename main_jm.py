@@ -1339,16 +1339,21 @@ with st.sidebar:
 
     if provedor == "LM Studio (local)":
         # Base URL configurável (não remove seus outros controles)
-        base_url_lms = st.text_input(
-            "Base URL (LM Studio)",
-            value=lms_sanitize_base(st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1")),
+        base_url_lms = if "lms_base_url" not in st.session_state:
+    st.session_state["lms_base_url"] = "http://127.0.0.1:1234/v1"
+
+def _cb_lms_sanitize():
+    st.text_input(
+    "Base URL (LM Studio)",
+    key="lms_base_url",
+    help="Abra o LM Studio → Developer → Start Server",
+    on_change=_cb_lms_sanitize,
+)
+),
             key="lms_base_url",
             help="Abra o LM Studio → Developer → Start Server"
         )
         # sempre sanitize antes de usar
-        st.session_state["lms_base_url"] = lms_sanitize_base(st.session_state["lms_base_url"])
-
-
         # Lista de modelos do servidor local (OpenAI-like)
         try:
             modelos_lms = lms_list_models(base_url_lms)
@@ -1675,7 +1680,7 @@ if (endpoint != "HF_CLIENT") and (prov != "LM Studio (local)") and not auth:
     st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
     st.stop()
 
-    headers = _build_headers(prov, endpoint, auth)
+headers = _build_headers(prov, endpoint, auth)
 
     payload = {
         "model": model_to_call,
@@ -1959,7 +1964,6 @@ if (endpoint != "HF_CLIENT") and (prov != "LM Studio (local)") and not auth:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
-
 
 
 
