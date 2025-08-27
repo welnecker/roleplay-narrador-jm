@@ -1675,7 +1675,7 @@ if (endpoint != "HF_CLIENT") and (prov != "LM Studio (local)") and not auth:
     st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
     st.stop()
 
-headers = _build_headers(prov, endpoint, auth)
+    headers = _build_headers(prov, endpoint, auth)
 
     payload = {
         "model": model_to_call,
@@ -1959,6 +1959,7 @@ headers = _build_headers(prov, endpoint, auth)
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
