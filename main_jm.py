@@ -39,6 +39,23 @@ def lms_list_models(base_url: str) -> list[str]:
         return []
 
 
+def lms_health(base_url: str) -> tuple[bool, str]:
+    """Testa conexão com o servidor e retorna (ok, msg)."""
+    try:
+        url = base_url.rstrip("/") + "/models"
+        r = requests.get(url, timeout=5)
+        r.raise_for_status()
+        _ = r.json()
+        return True, "Servidor acessível e respondendo em /models."
+    except requests.ConnectionError as e:
+        return False, f"Sem conexão com {base_url} — verifique se o servidor está ligado (Start Server) e a porta. {e}"
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response else ""
+        return False, f"HTTP {code} de {base_url}. O servidor respondeu, mas com erro. {e}"
+    except Exception as e:
+        return False, f"Falha inesperada ao acessar {base_url}: {e}"
+
+
 def stream_chat_lmstudio(*, base_url: str, model: str, messages: List[Dict[str, str]],
                          temperature: float = 0.7, top_p: float = 1.0,
                          max_tokens: int = 1200, timeout: int = 300) -> str:
@@ -310,7 +327,19 @@ with st.sidebar:
 
     st.markdown("### 🌐 Servidor LM Studio")
     base_url = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"))
-    st.session_state.lms_base_url = base_url
+    st.session_state.lms_base_url = base_url.strip()
+
+    colhb1, colhb2 = st.columns([1,1])
+    with colhb1:
+        if st.button("Testar conexão"):
+            ok, msg = lms_health(st.session_state.lms_base_url)
+            (st.success if ok else st.error)(msg)
+            try:
+                lms_list_models.clear()
+            except Exception:
+                pass
+    with colhb2:
+        st.caption("Dica: copie exatamente a URL mostrada no LM Studio › Developer.")
 
     modelos = lms_list_models(base_url)
     if not modelos:
