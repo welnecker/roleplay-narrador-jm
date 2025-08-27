@@ -254,36 +254,40 @@ def complete_hf(*, api_key: str, model: str, messages: List[Dict[str, str]],
                 temperature: float = 0.7, top_p: float = 1.0,
                 max_tokens: int = 1200, timeout: int = 60) -> str:
     """Hugging Face Inference API — simples (sem streaming)."""
-    sys = "
-".join([m["content"] for m in messages if m["role"] == "system"]) or "Você é um assistente útil."
+    # Use aspas simples dentro da compreensão para evitar conflito com as aspas externas
+    sys = "\n".join([m['content'] for m in messages if m['role'] == 'system']) or "Você é um assistente útil."
     conv = []
     for m in messages:
-        if m["role"] == "user":
+        if m['role'] == 'user':
             conv.append(f"User: {m['content']}")
-        elif m["role"] == "assistant":
+        elif m['role'] == 'assistant':
             conv.append(f"Assistant: {m['content']}")
-    prompt = sys + "
-
-" + "
-".join(conv) + "
-Assistant:"
+    prompt = sys + "\n\n" + "\n".join(conv) + "\nAssistant:"
 
     endpoint = f"https://api-inference.huggingface.co/models/{model}"
     headers = {"Authorization": f"Bearer {api_key.strip()}", "Content-Type": "application/json"}
     payload = {
         "inputs": prompt,
-        "parameters": {"max_new_tokens": int(max_tokens), "temperature": float(temperature), "top_p": float(top_p)},
+        "parameters": {
+            "max_new_tokens": int(max_tokens),
+            "temperature": float(temperature),
+            "top_p": float(top_p)
+        },
         "options": {"wait_for_model": True}
     }
+
     r = requests.post(endpoint, headers=headers, json=payload, timeout=timeout)
     r.raise_for_status()
     data = r.json()
+
+    # Extrai o texto gerado (os formatos da HF variam)
     if isinstance(data, list) and data and isinstance(data[0], dict) and data[0].get("generated_text"):
         txt = data[0]["generated_text"][len(prompt):]
     elif isinstance(data, dict) and data.get("generated_text"):
         txt = data["generated_text"]
     else:
         txt = json.dumps(data)
+
     st.markdown(_render_visible(txt))
     return txt
 
@@ -815,3 +819,4 @@ if run_btn:
 
 st.markdown("---")
 st.markdown("**Dica:** Se nenhum modelo aparecer na lista, abra o LM Studio → ‘Developer’ → ‘Start Server’ e garanta que há pelo menos um modelo carregado. Coloque o mesmo *Model Identifier* mostrado no LM Studio (ex.: `llama-3-8b-lexi-uncensored`).")
+
