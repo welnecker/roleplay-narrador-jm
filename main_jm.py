@@ -529,7 +529,8 @@ with st.sidebar:
     st.select_slider("Ritmo da cena", options=[0,1,2,3], value=int(st.session_state.get("ritmo_cena", 0)), format_func=lambda n: ["muito lento","lento","médio","rápido"][n], key="ritmo_cena")
     st.selectbox("Finalização", ["ponto de gancho", "fecho suave", "deixar no suspense"], key="finalizacao_modo")
     st.slider("Alvo de parágrafos", 1, 40, value=int(st.session_state.get("alvo_paragrafos", 12)), key="alvo_paragrafos")
-    st.checkbox("Usar falas da Mary (fixas)", key="usar_falas_mary", value=st.session_state.get("usar_falas_mary", False)))
+    st.checkbox("Usar falas da Mary (fixas)", key="usar_falas_mary", value=st.session_state.get("usar_falas_mary", False))
+
 
     st.markdown("---")
     st.markdown("### 💞 Romance Mary & Jânio (apenas Fase)")
@@ -813,4 +814,5 @@ if st.session_state.get("do_index_long") and planilha:
                         st.toast(f"Indexadas {len(embs)} memórias na memoria_longa_jm.")
     except Exception as e:
         st.info(f"Indexação opcional de memória longa não concluída: {e}")
+
 
