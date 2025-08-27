@@ -1745,6 +1745,9 @@ if entrada:
        # ======================
     # STREAM (PATCH C) — com suporte a HF
     # ======================
+    # Inicializa acumuladores
+    resposta_txt = ""
+    visible_txt = ""
     try:
         if prov == "Hugging Face":
             # --- STREAM via InferenceClient (sem SSE) ---
@@ -1986,6 +1989,7 @@ if not visible_txt:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
