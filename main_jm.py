@@ -202,17 +202,38 @@ def _build_headers(prov: str, endpoint: str, auth: str):
         return {"Content-Type": "application/json"}
     return {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
 
+def lms_sanitize_base(url: str) -> str:
+    if not url:
+        return "http://127.0.0.1:1234/v1"
+    url = url.replace("\\", "/").strip()
+    url = url.rstrip("/")
+    # se o usuário colocou o endpoint completo, tira o sufixo
+    if url.endswith("/chat/completions"):
+        url = url[: -len("/chat/completions")]
+    return url
+
+
+# busca os modelos disponíveis do servidor
 def lms_list_models(base_url: str) -> list[str]:
-    import requests
     try:
-        url = base_url.rstrip("/") + "/models"
-        r = requests.get(url, timeout=5)
-        r.raise_for_status()
+        r = requests.get(base_url.rstrip("/") + "/models", timeout=4)
         j = r.json()
-        ids = [m.get("id") for m in j.get("data", []) if m.get("id")]
-        return ids or []
+        return [m.get("id","") for m in j.get("data", []) if m.get("id")]
     except Exception:
         return []
+
+models_lms = lms_list_models(base_url)
+if models_lms:
+    if model_to_call not in models_lms:
+        st.warning(
+            f"Modelo '{model_to_call}' não existe no LM Studio. "
+            f"Alternando para '{models_lms[0]}'."
+        )
+        model_to_call = models_lms[0]
+        st.session_state["modelo_escolhido_id"] = model_to_call
+else:
+    st.warning("Servidor LM Studio respondeu sem modelos. Verifique se um modelo de chat está carregado.")
+
 
 # =========================
 # BACKOFF + CACHES
@@ -1331,10 +1352,13 @@ with st.sidebar:
         # Base URL configurável (não remove seus outros controles)
         base_url_lms = st.text_input(
             "Base URL (LM Studio)",
-            value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"),
+            value=lms_sanitize_base(st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1")),
             key="lms_base_url",
             help="Abra o LM Studio → Developer → Start Server"
         )
+        # sempre sanitize antes de usar
+        st.session_state["lms_base_url"] = lms_sanitize_base(st.session_state["lms_base_url"])
+
 
         # Lista de modelos do servidor local (OpenAI-like)
         try:
@@ -1640,26 +1664,19 @@ if entrada:
         model_to_call = st.session_state.modelo_escolhido_id
     
     elif prov == "LM Studio (local)":
-        base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
-        endpoint = f"{base_url}/chat/completions"
-        auth = "lm-studio"  # dummy
-        model_to_call = st.session_state.modelo_escolhido_id
-    
-        # --- PRÉ-CHEQUE DO SERVIDOR LM STUDIO ---
-        def lms_is_up(url: str) -> bool:
-            try:
-                r = requests.get(url.rstrip("/") + "/models", timeout=3)
-                return r.status_code == 200
-            except Exception:
-                return False
-    
-        if not lms_is_up(base_url):
-            st.error(
-                f"LM Studio não acessível em {base_url}. "
-                f"Ajuste a Base URL no sidebar (ex.: http://host.docker.internal:1234/v1, "
-                f"IP da máquina, ou URL do ngrok/cloudflared)."
-            )
-            st.stop()
+    base_url = lms_sanitize_base(st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"))
+    endpoint = f"{base_url}/chat/completions"
+    auth = ""  # LM Studio local não precisa
+    model_to_call = st.session_state.get("modelo_escolhido_id") or "llama-3-8b-lexi-uncensored"
+
+    # pré-check correto: GET <base>/models
+    try:
+        ok = requests.get(base_url + "/models", timeout=4).status_code == 200
+    except Exception:
+        ok = False
+    if not ok:
+        st.error(f"LM Studio não acessível em {base_url}. Ajuste a Base URL.")
+        st.stop()
     
     else:
         endpoint = "https://openrouter.ai/api/v1/chat/completions"
@@ -1973,6 +1990,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
