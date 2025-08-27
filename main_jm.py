@@ -537,13 +537,20 @@ with st.sidebar:
 
     st.markdown("### 🌐 Servidor / Endpoint")
     if provedor == "LM Studio":
-        base_url = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"), key="lms_base_url_input")
-        st.session_state.lms_base_url = st.session_state.get("lms_base_url_input", "http://127.0.0.1:1234/v1").strip()
+        # Única fonte de verdade: st.session_state["lms_base_url"]
+        default_base = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1")
+        base_url_input = st.text_input(
+            "Base URL (LM Studio)",
+            value=default_base,
+            key="lms_base_url_input",
+            help="Ex.: https://context-frankfurt-environment-virtue.trycloudflare.com/v1",
+        )
+        st.session_state["lms_base_url"] = base_url_input.strip()
 
         colhb1, colhb2 = st.columns([1,1])
         with colhb1:
             if st.button("Testar conexão", key="btn_test_conn"):
-                ok, msg = lms_health(st.session_state.lms_base_url)
+                ok, msg = lms_health(st.session_state["lms_base_url"])
                 (st.success if ok else st.error)(msg)
                 try:
                     lms_list_models.clear()
@@ -552,7 +559,7 @@ with st.sidebar:
         with colhb2:
             st.caption("Dica: se estiver em túnel, use a URL pública com /v1 no final.")
 
-        modelos = lms_list_models(base_url)
+        modelos = lms_list_models(st.session_state["lms_base_url"])
         if not modelos:
             st.warning("⚠️ LM Studio não encontrado ou sem modelos. Abra o LM Studio → Developer → Start Server.")
         modelo_escolhido = st.selectbox("🤖 Modelo (LM Studio)", modelos or ["<digite manualmente>"], key="lm_model_select")
@@ -733,5 +740,6 @@ if run_btn:
 
 st.markdown("---")
 st.markdown("**Dica:** Se nenhum modelo aparecer na lista, abra o LM Studio → ‘Developer’ → ‘Start Server’ e garanta que há pelo menos um modelo carregado. Coloque o mesmo *Model Identifier* mostrado no LM Studio (ex.: `llama-3-8b-lexi-uncensored`).")
+
 
 
