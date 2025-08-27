@@ -1854,7 +1854,7 @@ if entrada:
         st.error(f"Erro no streaming: {e}")
 
     # FINALIZA TEXTO VISÍVEL
-    visible_txt = _render_visible(resposta_txt).strip()
+        visible_txt = _render_visible(resposta_txt).strip()
 
               # =========================
         # Fallback sem stream (robusto por provedor)
@@ -2011,6 +2011,7 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
 
