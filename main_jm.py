@@ -1312,53 +1312,53 @@ with st.sidebar:
     # Provedor / modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face", "LM Studio (local)"], index=0, key="provedor_ia")
     
-# --- INÍCIO: SELETOR DE MODELO COM SUPORTE A LM STUDIO (MANTÉM O RESTO DO SIDEBAR) ---
-api_url, api_key, modelos_map = api_config_for_provider(provedor)
-if not api_key and provedor != "LM Studio (local)":
-    st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
+    # --- INÍCIO: SELETOR DE MODELO COM SUPORTE A LM STUDIO (MANTÉM O RESTO DO SIDEBAR) ---
+    api_url, api_key, modelos_map = api_config_for_provider(provedor)
+    if not api_key and provedor != "LM Studio (local)":
+        st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
 
-if provedor == "LM Studio (local)":
-    # Base URL configurável (não remove seus outros controles)
-    base_url_lms = st.text_input(
-        "Base URL (LM Studio)",
-        value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"),
-        key="lms_base_url",
-        help="Abra o LM Studio → Developer → Start Server"
-    )
-
-    # Lista de modelos do servidor local (OpenAI-like)
-    try:
-        modelos_lms = lms_list_models(base_url_lms)
-    except Exception:
-        modelos_lms = []
-
-    if not modelos_lms:
-        st.warning("Servidor do LM Studio não respondeu ou sem modelos. Você pode digitar o ID manualmente.")
-        modelo_nome = st.text_input(
-            "Model identifier (LM Studio)",
-            value=st.session_state.get("modelo_escolhido_id", "llama-3-8b-lexi-uncensored"),
-            key="modelo_nome_ui_lms"
+    if provedor == "LM Studio (local)":
+        # Base URL configurável (não remove seus outros controles)
+        base_url_lms = st.text_input(
+            "Base URL (LM Studio)",
+            value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"),
+            key="lms_base_url",
+            help="Abra o LM Studio → Developer → Start Server"
         )
+
+        # Lista de modelos do servidor local (OpenAI-like)
+        try:
+            modelos_lms = lms_list_models(base_url_lms)
+        except Exception:
+            modelos_lms = []
+
+        if not modelos_lms:
+            st.warning("Servidor do LM Studio não respondeu ou sem modelos. Você pode digitar o ID manualmente.")
+            modelo_nome = st.text_input(
+                "Model identifier (LM Studio)",
+                value=st.session_state.get("modelo_escolhido_id", "llama-3-8b-lexi-uncensored"),
+                key="modelo_nome_ui_lms"
+            )
+        else:
+            modelo_nome = st.selectbox(
+                "🤖 Modelo de IA (LM Studio)",
+                modelos_lms,
+                index=0,
+                key="modelo_nome_ui_lms"
+            )
+
+        st.session_state.modelo_escolhido_id = modelo_nome
+
     else:
-        modelo_nome = st.selectbox(
-            "🤖 Modelo de IA (LM Studio)",
-            modelos_lms,
+        # Mantém seu fluxo normal para os demais provedores
+        modelo_nome_legivel = st.selectbox(
+            "🤖 Modelo de IA",
+            list(modelos_map.keys()),
             index=0,
-            key="modelo_nome_ui_lms"
+            key="modelo_nome_ui"
         )
-
-    st.session_state.modelo_escolhido_id = modelo_nome
-
-else:
-    # Mantém seu fluxo normal para os demais provedores
-    modelo_nome_legivel = st.selectbox(
-        "🤖 Modelo de IA",
-        list(modelos_map.keys()),
-        index=0,
-        key="modelo_nome_ui"
-    )
-    st.session_state.modelo_escolhido_id = modelos_map[modelo_nome_legivel]
-# --- FIM: SELETOR DE MODELO COM SUPORTE A LM STUDIO ---
+        st.session_state.modelo_escolhido_id = modelos_map[modelo_nome_legivel]
+    # --- FIM: SELETOR DE MODELO COM SUPORTE A LM STUDIO ---
 
 
     st.markdown("---")
@@ -1936,7 +1936,6 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
-
 
 
 
