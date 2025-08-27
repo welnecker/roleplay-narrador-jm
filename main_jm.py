@@ -1608,7 +1608,7 @@ if entrada:
     # Construção do prompt (já deve incluir, se você seguiu, o {voz_bloco} no construir_prompt_com_narrador)
     prompt = construir_prompt_com_narrador()
 
-    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
+        # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
     historico = []
     for m in st.session_state.session_msgs:
         role = m.get("role", "user")
@@ -1616,30 +1616,50 @@ if entrada:
         if mary_mode_active and role.lower() == "user":
             content = f"JÂNIO: {content}"
         historico.append({"role": role, "content": content})
-
-        # Provedor / modelo
-        prov = st.session_state.get("provedor_ia", "OpenRouter")
-        if prov == "Together":
-            endpoint = "https://api.together.xyz/v1/chat/completions"
-            auth = st.secrets.get("TOGETHER_API_KEY", "")
-            model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
-        elif prov == "Hugging Face":
-            endpoint = "HF_CLIENT"  # marcador: não usa requests
-            auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
-            model_to_call = st.session_state.modelo_escolhido_id
-        elif prov == "LM Studio (local)":
-            base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
-            endpoint = f"{base_url}/chat/completions"
-            auth = "lm-studio"  # dummy
-            model_to_call = st.session_state.modelo_escolhido_id
-        else:
-            endpoint = "https://openrouter.ai/api/v1/chat/completions"
-            auth = st.secrets.get("OPENROUTER_API_KEY", "")
-            model_to_call = st.session_state.modelo_escolhido_id
+    
+    # Provedor / modelo  (⚠️ fora do loop acima)
+    prov = st.session_state.get("provedor_ia", "OpenRouter")
+    if prov == "Together":
+        endpoint = "https://api.together.xyz/v1/chat/completions"
+        auth = st.secrets.get("TOGETHER_API_KEY", "")
+        model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
+    
+    elif prov == "Hugging Face":
+        endpoint = "HF_CLIENT"  # marcador: não usa requests
+        auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
+        model_to_call = st.session_state.modelo_escolhido_id
+    
+    elif prov == "LM Studio (local)":
+        base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
+        endpoint = f"{base_url}/chat/completions"
+        auth = "lm-studio"  # dummy
+        model_to_call = st.session_state.modelo_escolhido_id
+    
+        # --- PRÉ-CHEQUE DO SERVIDOR LM STUDIO ---
+        def lms_is_up(url: str) -> bool:
+            try:
+                r = requests.get(url.rstrip("/") + "/models", timeout=3)
+                return r.status_code == 200
+            except Exception:
+                return False
+    
+        if not lms_is_up(base_url):
+            st.error(
+                f"LM Studio não acessível em {base_url}. "
+                f"Ajuste a Base URL no sidebar (ex.: http://host.docker.internal:1234/v1, "
+                f"IP da máquina, ou URL do ngrok/cloudflared)."
+            )
+            st.stop()
+    
+    else:
+        endpoint = "https://openrouter.ai/api/v1/chat/completions"
+        auth = st.secrets.get("OPENROUTER_API_KEY", "")
+        model_to_call = st.session_state.modelo_escolhido_id
     
     if not auth:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
+
 
     # System prompts
     system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
@@ -1837,31 +1857,33 @@ if entrada:
     visible_txt = _render_visible(resposta_txt).strip()
 
         # =========================
-        # Fallback sem stream (robusto por provedor)
+        # Fallback sem stream (robusto por provedor) — PATCH 2 (ajustado)
         # =========================
-    def _resolver_endpoint_e_headers(prov: str, endpoint: str, auth: str) -> tuple[str, dict]:
+        def _resolver_endpoint_e_headers(prov: str, endpoint: str, auth: str) -> tuple[str, dict]:
             if prov == "LM Studio (local)":
                 base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
                 ep = f"{base_url}/chat/completions"
                 hdrs = {"Content-Type": "application/json", "Authorization": "Bearer lm-studio"}
                 return ep, hdrs
             elif prov == "Hugging Face":
+                # Neste ramo usamos InferenceClient; mantemos headers apenas por segurança.
                 return endpoint, {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
             else:
+                # OpenRouter, Together, etc.
                 return endpoint, {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
 
-    def _resolver_model_id(prov: str, model_to_call: str | None = None) -> str:
+        def _resolver_model_id(prov: str, model_to_call: str | None = None) -> str:
             mid = (st.session_state.get("modelo_escolhido_id") or "").strip()
             if not mid:
                 mid = (model_to_call or "").strip()
             return mid
 
-        # Guarda-chuva (garante existência)
-    visible_txt  = visible_txt or ""
-    resposta_txt = resposta_txt or ""
+        # Guarda-chuva (garante existência local)
+        visible_txt  = visible_txt or ""
+        resposta_txt = resposta_txt or ""
 
         # ---------- Fallback 1 (sem stream) ----------
-    if not visible_txt:
+        if not visible_txt:
             try:
                 model_id = _resolver_model_id(prov, model_to_call)
 
@@ -1902,7 +1924,7 @@ if entrada:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
         # ---------- Fallback 2 (prompts limpos) ----------
-    if not visible_txt:
+        if not visible_txt:
             try:
                 model_id = _resolver_model_id(prov, model_to_call)
 
@@ -1942,8 +1964,9 @@ if entrada:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
         # Render final (exibe se veio de fallback)
-    if visible_txt:
+        if visible_txt:
             placeholder.markdown(visible_txt)
+
 
     # BLOQUEIO DE CLÍMAX FINAL (sempre que a opção estiver ativa, só libera com comando do usuário)
     if st.session_state.get("app_bloqueio_intimo", True):
@@ -1987,6 +2010,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
