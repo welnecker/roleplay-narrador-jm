@@ -1828,71 +1828,121 @@ if entrada:
     # FINALIZA TEXTO VISÍVEL
     visible_txt = _render_visible(resposta_txt).strip()
 
-    # Fallback sem stream
-    if not visible_txt:
-        try:
-            if prov == "Hugging Face":
-                out = InferenceClient(token=auth).chat.completions.create(
-                    model=model_to_call,
-                    messages=messages,
-                    temperature=0.9,
-                    max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
-                    stream=False,
-                )
-                resposta_txt = (out.choices[0].message.content or "").strip()
-                visible_txt = _render_visible(resposta_txt).strip()
-            else:
-                r2 = requests.post(
-                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
-                    json={**payload, "stream": False},
-                    timeout=int(st.session_state.get("timeout_s", 300))
-                )
-                if r2.status_code == 200:
-                    try:
-                        resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
-                    except Exception:
-                        resposta_txt = ""
-                    visible_txt = _render_visible(resposta_txt).strip()
-                else:
-                    st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
-        except Exception as e:
-            st.error(f"Fallback (sem stream) erro: {e}")
+    # =========================
+# Fallback sem stream (robusto por provedor)
+# =========================
+def _resolver_endpoint_e_headers(prov: str, endpoint: str, auth: str) -> tuple[str, dict]:
+    """
+    Retorna (endpoint_ajustado, headers) para o fallback sem stream.
+    - LM Studio: usa base local e Authorization dummy
+    - Demais: usa endpoint já definido + Bearer real
+    """
+    if prov == "LM Studio (local)":
+        base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
+        ep = f"{base_url}/chat/completions"
+        hdrs = {"Content-Type": "application/json", "Authorization": "Bearer lm-studio"}
+        return ep, hdrs
+    elif prov == "Hugging Face":
+        # No ramo HF, usamos InferenceClient (já tratado abaixo).
+        # Retornamos headers default caso alguém re-use; não será usado.
+        return endpoint, {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
+    else:
+        # OpenRouter, Together, etc.
+        return endpoint, {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
 
-        # Fallback com prompts limpos
-    if not visible_txt:
-        try:
-            if prov == "Hugging Face":
-                out2 = InferenceClient(token=auth).chat.completions.create(
-                    model=model_to_call,
-                    messages=[{"role": "system", "content": prompt}] + historico,
-                    temperature=0.9,
-                    max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
-                    stream=False,
-                )
-                resposta_txt = (out2.choices[0].message.content or "").strip()
+def _resolver_model_id(prov: str, model_to_call: str | None = None) -> str:
+    """
+    Prioriza o ID salvo na sessão (que deve ser o ID real do provedor).
+    Cai para model_to_call se vier algo válido.
+    """
+    mid = (st.session_state.get("modelo_escolhido_id") or "").strip()
+    if not mid:
+        mid = (model_to_call or "").strip()
+    return mid
+
+# ---------- Fallback 1 (sem stream) ----------
+if not visible_txt:
+    try:
+        model_id = _resolver_model_id(prov, model_to_call)
+
+        if prov == "Hugging Face":
+            # Usa o cliente HF (chat.completions). Aqui o model_id precisa ser o repo-id do HF.
+            out = InferenceClient(token=auth).chat.completions.create(
+                model=model_id,
+                messages=messages,
+                temperature=0.9,
+                max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
+                stream=False,
+            )
+            resposta_txt = (out.choices[0].message.content or "").strip()
+            visible_txt = _render_visible(resposta_txt).strip()
+        else:
+            # Ajusta endpoint e headers por provedor (LM Studio local, OpenRouter, Together, etc.)
+            endpoint_ns, headers_ns = _resolver_endpoint_e_headers(prov, endpoint, auth)
+            # Usa o mesmo payload base, garantindo o model correto e stream=False
+            payload_ns = {
+                **payload,
+                "model": model_id,
+                "stream": False,
+            }
+            r2 = requests.post(
+                endpoint_ns,
+                headers=headers_ns,
+                json=payload_ns,
+                timeout=int(st.session_state.get("timeout_s", 300)),
+            )
+            if r2.status_code == 200:
+                try:
+                    resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    resposta_txt = ""
                 visible_txt = _render_visible(resposta_txt).strip()
             else:
-                r3 = requests.post(
-                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
-                    json={
-                        "model": model_to_call,
-                        "messages": [{"role": "system", "content": prompt}] + historico,
-                        "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
-                        "temperature": 0.9,
-                        "stream": False,
-                    },
-                    timeout=int(st.session_state.get("timeout_s", 300))
-                )
-                if r3.status_code == 200:
-                    try:
-                        resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
-                    except Exception:
-                        resposta_txt = ""
-                    visible_txt = _render_visible(resposta_txt).strip()
-                else:
-                    st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
-        except Exception as e:
-            st.error(f"Fallback (prompts limpos) erro: {e}")
+                st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
+
+    except Exception as e:
+        st.error(f"Fallback (sem stream) erro: {e}")
+
+# ---------- Fallback 2 (prompts limpos) ----------
+if not visible_txt:
+    try:
+        model_id = _resolver_model_id(prov, model_to_call)
+
+        if prov == "Hugging Face":
+            out2 = InferenceClient(token=auth).chat.completions.create(
+                model=model_id,
+                messages=[{"role": "system", "content": prompt}] + historico,
+                temperature=0.9,
+                max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
+                stream=False,
+            )
+            resposta_txt = (out2.choices[0].message.content or "").strip()
+            visible_txt = _render_visible(resposta_txt).strip()
+        else:
+            endpoint_ns, headers_ns = _resolver_endpoint_e_headers(prov, endpoint, auth)
+            r3 = requests.post(
+                endpoint_ns,
+                headers=headers_ns,
+                json={
+                    "model": model_id,
+                    "messages": [{"role": "system", "content": prompt}] + historico,
+                    "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
+                    "temperature": 0.9,
+                    "stream": False,
+                },
+                timeout=int(st.session_state.get("timeout_s", 300)),
+            )
+            if r3.status_code == 200:
+                try:
+                    resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    resposta_txt = ""
+                visible_txt = _render_visible(resposta_txt).strip()
+            else:
+                st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
+
+    except Exception as e:
+        st.error(f"Fallback (prompts limpos) erro: {e}")
 
     # BLOQUEIO DE CLÍMAX FINAL (sempre que a opção estiver ativa, só libera com comando do usuário)
     if st.session_state.get("app_bloqueio_intimo", True):
@@ -1936,6 +1986,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
