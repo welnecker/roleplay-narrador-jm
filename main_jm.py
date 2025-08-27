@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 import requests
+from requests.auth import HTTPBasicAuth
 import streamlit as st
 
 # ----------------------------
@@ -30,7 +31,15 @@ def lms_list_models(base_url: str) -> list[str]:
     """Lista modelos expostos pelo servidor do LM Studio (OpenAI-compatible)."""
     try:
         url = base_url.rstrip("/") + "/models"
-        r = requests.get(url, timeout=5)
+        # Segurança opcional (CF Access / Basic Auth)
+        headers = {"Content-Type": "application/json"}
+        if st.session_state.get("cf_client_id") and st.session_state.get("cf_client_secret"):
+            headers["CF-Access-Client-Id"] = st.session_state["cf_client_id"]
+            headers["CF-Access-Client-Secret"] = st.session_state["cf_client_secret"]
+        auth = None
+        if st.session_state.get("basic_user") and st.session_state.get("basic_pass"):
+            auth = HTTPBasicAuth(st.session_state["basic_user"], st.session_state["basic_pass"])
+        r = requests.get(url, timeout=5, headers=headers, auth=auth)
         r.raise_for_status()
         j = r.json()
         # LM Studio usa {object:"list", data:[{id:"…"}, …]}
@@ -43,7 +52,15 @@ def lms_health(base_url: str) -> tuple[bool, str]:
     """Testa conexão com o servidor e retorna (ok, msg)."""
     try:
         url = base_url.rstrip("/") + "/models"
-        r = requests.get(url, timeout=5)
+        # Segurança opcional (CF Access / Basic Auth)
+        headers = {"Content-Type": "application/json"}
+        if st.session_state.get("cf_client_id") and st.session_state.get("cf_client_secret"):
+            headers["CF-Access-Client-Id"] = st.session_state["cf_client_id"]
+            headers["CF-Access-Client-Secret"] = st.session_state["cf_client_secret"]
+        auth = None
+        if st.session_state.get("basic_user") and st.session_state.get("basic_pass"):
+            auth = HTTPBasicAuth(st.session_state["basic_user"], st.session_state["basic_pass"])
+        r = requests.get(url, timeout=5, headers=headers, auth=auth)
         r.raise_for_status()
         _ = r.json()
         return True, "Servidor acessível e respondendo em /models."
@@ -70,9 +87,17 @@ def stream_chat_lmstudio(*, base_url: str, model: str, messages: List[Dict[str, 
         "stream": True,
     }
     headers = {"Content-Type": "application/json"}
+    # Cloudflare Access (Zero Trust) opcional
+    if st.session_state.get("cf_client_id") and st.session_state.get("cf_client_secret"):
+        headers["CF-Access-Client-Id"] = st.session_state["cf_client_id"]
+        headers["CF-Access-Client-Secret"] = st.session_state["cf_client_secret"]
+    # ngrok Basic Auth opcional
+    auth = None
+    if st.session_state.get("basic_user") and st.session_state.get("basic_pass"):
+        auth = HTTPBasicAuth(st.session_state["basic_user"], st.session_state["basic_pass"])
 
     resposta_txt = ""
-    with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=timeout) as r:
+    with requests.post(endpoint, headers=headers, json=payload, stream=True, timeout=timeout, auth=auth) as r:
         r.raise_for_status()
         last_update = 0.0
         placeholder = st.empty()
@@ -348,6 +373,29 @@ with st.sidebar:
     if modelo_escolhido == "<digite manualmente>":
         modelo_escolhido = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido", "llama-3-8b-lexi-uncensored"))
     st.session_state.modelo_escolhido = modelo_escolhido
+
+    st.markdown("#### 📋 Mostrar /v1/models")
+    if st.button("Mostrar /v1/models"):
+        try:
+            url = st.session_state.lms_base_url.rstrip("/") + "/models"
+            headers = {"Content-Type": "application/json"}
+            if st.session_state.get("cf_client_id") and st.session_state.get("cf_client_secret"):
+                headers["CF-Access-Client-Id"] = st.session_state["cf_client_id"]
+                headers["CF-Access-Client-Secret"] = st.session_state["cf_client_secret"]
+            auth = None
+            if st.session_state.get("basic_user") and st.session_state.get("basic_pass"):
+                auth = HTTPBasicAuth(st.session_state["basic_user"], st.session_state["basic_pass"])
+            r = requests.get(url, timeout=10, headers=headers, auth=auth)
+            r.raise_for_status()
+            st.code(json.dumps(r.json(), indent=2), language="json")
+        except Exception as e:
+            st.error(f"Falha ao consultar /models: {e}")
+
+    st.markdown("### 🔒 Segurança (opcional)")
+    st.text_input("CF-Access-Client-Id", key="cf_client_id")
+    st.text_input("CF-Access-Client-Secret", type="password", key="cf_client_secret")
+    st.text_input("Basic auth - usuário (ngrok)", key="basic_user")
+    st.text_input("Basic auth - senha (ngrok)", type="password", key="basic_pass")
 
     st.markdown("---")
     st.markdown("### ⚙️ Parâmetros do Modelo")
