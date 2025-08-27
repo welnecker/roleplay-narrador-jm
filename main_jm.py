@@ -1618,7 +1618,7 @@ if entrada:
         historico.append({"role": role, "content": content})
 
         # Provedor / modelo
-            prov = st.session_state.get("provedor_ia", "OpenRouter")
+        prov = st.session_state.get("provedor_ia", "OpenRouter")
         if prov == "Together":
             endpoint = "https://api.together.xyz/v1/chat/completions"
             auth = st.secrets.get("TOGETHER_API_KEY", "")
@@ -1839,7 +1839,7 @@ if entrada:
         # =========================
         # Fallback sem stream (robusto por provedor)
         # =========================
-        def _resolver_endpoint_e_headers(prov: str, endpoint: str, auth: str) -> tuple[str, dict]:
+    def _resolver_endpoint_e_headers(prov: str, endpoint: str, auth: str) -> tuple[str, dict]:
             if prov == "LM Studio (local)":
                 base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
                 ep = f"{base_url}/chat/completions"
@@ -1850,18 +1850,18 @@ if entrada:
             else:
                 return endpoint, {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
 
-        def _resolver_model_id(prov: str, model_to_call: str | None = None) -> str:
+    def _resolver_model_id(prov: str, model_to_call: str | None = None) -> str:
             mid = (st.session_state.get("modelo_escolhido_id") or "").strip()
             if not mid:
                 mid = (model_to_call or "").strip()
             return mid
 
         # Guarda-chuva (garante existência)
-        visible_txt  = visible_txt or ""
-        resposta_txt = resposta_txt or ""
+    visible_txt  = visible_txt or ""
+    resposta_txt = resposta_txt or ""
 
         # ---------- Fallback 1 (sem stream) ----------
-        if not visible_txt:
+    if not visible_txt:
             try:
                 model_id = _resolver_model_id(prov, model_to_call)
 
@@ -1902,7 +1902,7 @@ if entrada:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
         # ---------- Fallback 2 (prompts limpos) ----------
-        if not visible_txt:
+    if not visible_txt:
             try:
                 model_id = _resolver_model_id(prov, model_to_call)
 
@@ -1942,7 +1942,7 @@ if entrada:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
         # Render final (exibe se veio de fallback)
-        if visible_txt:
+    if visible_txt:
             placeholder.markdown(visible_txt)
 
     # BLOQUEIO DE CLÍMAX FINAL (sempre que a opção estiver ativa, só libera com comando do usuário)
@@ -1987,6 +1987,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
