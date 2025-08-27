@@ -254,30 +254,30 @@ def complete_hf(*, api_key: str, model: str, messages: List[Dict[str, str]],
                 temperature: float = 0.7, top_p: float = 1.0,
                 max_tokens: int = 1200, timeout: int = 60) -> str:
     """Hugging Face Inference API — simples (sem streaming)."""
-    sys = "\n".join([m['content'] for m in messages if m['role'] == 'system']) or "Você é um assistente útil."
+    sys = "
+".join([m["content"] for m in messages if m["role"] == "system"]) or "Você é um assistente útil."
     conv = []
     for m in messages:
-        if m['role'] == 'user':
+        if m["role"] == "user":
             conv.append(f"User: {m['content']}")
-        elif m['role'] == 'assistant':
+        elif m["role"] == "assistant":
             conv.append(f"Assistant: {m['content']}")
-    prompt = sys + "\n\n" + "\n".join(conv) + "\nAssistant:"
+    prompt = sys + "
+
+" + "
+".join(conv) + "
+Assistant:"
 
     endpoint = f"https://api-inference.huggingface.co/models/{model}"
     headers = {"Authorization": f"Bearer {api_key.strip()}", "Content-Type": "application/json"}
     payload = {
         "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": int(max_tokens),
-            "temperature": float(temperature),
-            "top_p": float(top_p)
-        },
+        "parameters": {"max_new_tokens": int(max_tokens), "temperature": float(temperature), "top_p": float(top_p)},
         "options": {"wait_for_model": True}
     }
     r = requests.post(endpoint, headers=headers, json=payload, timeout=timeout)
     r.raise_for_status()
     data = r.json()
-
     if isinstance(data, list) and data and isinstance(data[0], dict) and data[0].get("generated_text"):
         txt = data[0]["generated_text"][len(prompt):]
     elif isinstance(data, dict) and data.get("generated_text"):
@@ -533,12 +533,12 @@ with st.sidebar:
 
     st.markdown("### 🌐 Servidor / Endpoint")
     if provedor == "LM Studio":
-        base_url = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"))
-        st.session_state.lms_base_url = base_url.strip()
+        base_url = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"), key="lms_base_url_input")
+        st.session_state.lms_base_url = st.session_state.get("lms_base_url_input", "http://127.0.0.1:1234/v1").strip()
 
         colhb1, colhb2 = st.columns([1,1])
         with colhb1:
-            if st.button("Testar conexão"):
+            if st.button("Testar conexão", key="btn_test_conn"):
                 ok, msg = lms_health(st.session_state.lms_base_url)
                 (st.success if ok else st.error)(msg)
                 try:
@@ -553,11 +553,11 @@ with st.sidebar:
             st.warning("⚠️ LM Studio não encontrado ou sem modelos. Abra o LM Studio → Developer → Start Server.")
         modelo_escolhido = st.selectbox("🤖 Modelo (LM Studio)", modelos or ["<digite manualmente>"])
         if modelo_escolhido == "<digite manualmente>":
-            modelo_escolhido = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido", "llama-3-8b-lexi-uncensored"))
+            modelo_escolhido = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido", "llama-3-8b-lexi-uncensored"), key="lm_model_identifier_input")
         st.session_state.modelo_escolhido = modelo_escolhido
 
         st.markdown("#### 📋 Mostrar /v1/models")
-        if st.button("Mostrar /v1/models"):
+        if st.button("Mostrar /v1/models", key="btn_show_models"):
             try:
                 url = st.session_state.lms_base_url.rstrip("/") + "/models"
                 headers = {"Content-Type": "application/json"}
@@ -815,5 +815,3 @@ if run_btn:
 
 st.markdown("---")
 st.markdown("**Dica:** Se nenhum modelo aparecer na lista, abra o LM Studio → ‘Developer’ → ‘Start Server’ e garanta que há pelo menos um modelo carregado. Coloque o mesmo *Model Identifier* mostrado no LM Studio (ex.: `llama-3-8b-lexi-uncensored`).")
-
-
