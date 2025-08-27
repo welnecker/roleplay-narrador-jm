@@ -1312,53 +1312,22 @@ with st.sidebar:
     # Provedor / modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face", "LM Studio (local)"], index=0, key="provedor_ia")
     
-    # --- INÍCIO: SELETOR DE MODELO COM SUPORTE A LM STUDIO (MANTÉM O RESTO DO SIDEBAR) ---
-    api_url, api_key, modelos_map = api_config_for_provider(provedor)
-    if not api_key and provedor != "LM Studio (local)":
-        st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
-
-    if provedor == "LM Studio (local)":
-        # Base URL configurável (não remove seus outros controles)
-        base_url_lms = st.text_input(
-            "Base URL (LM Studio)",
-            value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"),
-            key="lms_base_url",
-            help="Abra o LM Studio → Developer → Start Server"
-        )
-
-        # Lista de modelos do servidor local (OpenAI-like)
-        try:
-            modelos_lms = lms_list_models(base_url_lms)
-        except Exception:
-            modelos_lms = []
-
-        if not modelos_lms:
-            st.warning("Servidor do LM Studio não respondeu ou sem modelos. Você pode digitar o ID manualmente.")
-            modelo_nome = st.text_input(
-                "Model identifier (LM Studio)",
-                value=st.session_state.get("modelo_escolhido_id", "llama-3-8b-lexi-uncensored"),
-                key="modelo_nome_ui_lms"
-            )
-        else:
-            modelo_nome = st.selectbox(
-                "🤖 Modelo de IA (LM Studio)",
-                modelos_lms,
-                index=0,
-                key="modelo_nome_ui_lms"
-            )
-
-        st.session_state.modelo_escolhido_id = modelo_nome
-
-    else:
-        # Mantém seu fluxo normal para os demais provedores
-        modelo_nome_legivel = st.selectbox(
-            "🤖 Modelo de IA",
-            list(modelos_map.keys()),
-            index=0,
-            key="modelo_nome_ui"
-        )
-        st.session_state.modelo_escolhido_id = modelos_map[modelo_nome_legivel]
-    # --- FIM: SELETOR DE MODELO COM SUPORTE A LM STUDIO ---
+api_url, api_key, modelos_map = api_config_for_provider(provedor)
+if not api_key:
+    st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
+if provedor == "LM Studio (local)":
+    # Config base URL input
+    base_url_lms = st.text_input("Base URL (LM Studio)", value=st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1"), key="lms_base_url")
+    modelos_lms = lms_list_models(base_url_lms)
+    if not modelos_lms:
+        st.warning("⚠️ Servidor do LM Studio não encontrado ou sem modelos. Abra o LM Studio → Developer → Start Server.")
+    modelo_nome = st.selectbox("🤖 Modelo de IA (LM Studio)", modelos_lms or ["<digite manualmente>"], index=0, key="modelo_nome_ui")
+    if modelo_nome == "<digite manualmente>":
+        modelo_nome = st.text_input("Model identifier (LM Studio)", value=st.session_state.get("modelo_escolhido_id","llama-3-8b-lexi-uncensored"))
+    st.session_state.modelo_escolhido_id = modelo_nome
+else:
+    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
+    st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
 
 
     st.markdown("---")
@@ -1608,7 +1577,7 @@ if entrada:
     # Construção do prompt (já deve incluir, se você seguiu, o {voz_bloco} no construir_prompt_com_narrador)
     prompt = construir_prompt_com_narrador()
 
-        # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
+    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
     historico = []
     for m in st.session_state.session_msgs:
         role = m.get("role", "user")
@@ -1616,41 +1585,17 @@ if entrada:
         if mary_mode_active and role.lower() == "user":
             content = f"JÂNIO: {content}"
         historico.append({"role": role, "content": content})
-    
-    # Provedor / modelo  (⚠️ fora do loop acima)
+
+        # Provedor / modelo
     prov = st.session_state.get("provedor_ia", "OpenRouter")
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
         auth = st.secrets.get("TOGETHER_API_KEY", "")
         model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
-    
     elif prov == "Hugging Face":
         endpoint = "HF_CLIENT"  # marcador: não usa requests
         auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
         model_to_call = st.session_state.modelo_escolhido_id
-    
-    elif prov == "LM Studio (local)":
-        base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
-        endpoint = f"{base_url}/chat/completions"
-        auth = "lm-studio"  # dummy
-        model_to_call = st.session_state.modelo_escolhido_id
-    
-        # --- PRÉ-CHEQUE DO SERVIDOR LM STUDIO ---
-        def lms_is_up(url: str) -> bool:
-            try:
-                r = requests.get(url.rstrip("/") + "/models", timeout=3)
-                return r.status_code == 200
-            except Exception:
-                return False
-    
-        if not lms_is_up(base_url):
-            st.error(
-                f"LM Studio não acessível em {base_url}. "
-                f"Ajuste a Base URL no sidebar (ex.: http://host.docker.internal:1234/v1, "
-                f"IP da máquina, ou URL do ngrok/cloudflared)."
-            )
-            st.stop()
-    
     else:
         endpoint = "https://openrouter.ai/api/v1/chat/completions"
         auth = st.secrets.get("OPENROUTER_API_KEY", "")
@@ -1659,7 +1604,6 @@ if entrada:
     if not auth:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
-
 
     # System prompts
     system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
@@ -1770,9 +1714,6 @@ if entrada:
        # ======================
     # STREAM (PATCH C) — com suporte a HF
     # ======================
-    # Inicializa acumuladores
-    resposta_txt = ""
-    visible_txt = ""
     try:
         if prov == "Hugging Face":
             # --- STREAM via InferenceClient (sem SSE) ---
@@ -1854,172 +1795,116 @@ if entrada:
         st.error(f"Erro no streaming: {e}")
 
     # FINALIZA TEXTO VISÍVEL
-        visible_txt = _render_visible(resposta_txt).strip()
+    visible_txt = _render_visible(resposta_txt).strip()
 
-              # =========================
-        # Fallback sem stream (robusto por provedor)
-        # =========================
-        def _resolver_endpoint_e_headers(prov: str, endpoint: str, auth: str) -> tuple[str, dict]:
-            if prov == "LM Studio (local)":
-                base_url = st.session_state.get("lms_base_url", "http://127.0.0.1:1234/v1").rstrip("/")
-                ep = f"{base_url}/chat/completions"
-                hdrs = {"Content-Type": "application/json", "Authorization": "Bearer lm-studio"}
-                return ep, hdrs
-            elif prov == "Hugging Face":
-                # Neste ramo usamos InferenceClient; mantemos headers por segurança.
-                return endpoint, {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
+    # Fallback sem stream
+    if not visible_txt:
+        try:
+            if prov == "Hugging Face":
+                out = InferenceClient(token=auth).chat.completions.create(
+                    model=model_to_call,
+                    messages=messages,
+                    temperature=0.9,
+                    max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
+                    stream=False,
+                )
+                resposta_txt = (out.choices[0].message.content or "").strip()
+                visible_txt = _render_visible(resposta_txt).strip()
             else:
-                # OpenRouter, Together, etc.
-                return endpoint, {"Content-Type": "application/json", "Authorization": f"Bearer {auth}"}
-
-        def _resolver_model_id(prov: str, model_to_call: str | None = None) -> str:
-            mid = (st.session_state.get("modelo_escolhido_id") or "").strip()
-            if not mid:
-                mid = (model_to_call or "").strip()
-            return mid
-
-        # Guarda-chuva (garante existência local)
-        visible_txt  = visible_txt or ""
-        resposta_txt = resposta_txt or ""
-
-        # ---------- Fallback 1 (sem stream) ----------
-        if not visible_txt:
-            try:
-                model_id = _resolver_model_id(prov, model_to_call)
-
-                if prov == "Hugging Face":
-                    out = InferenceClient(token=auth).chat.completions.create(
-                        model=model_id,
-                        messages=messages,
-                        temperature=0.9,
-                        max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
-                        stream=False,
-                    )
-                    resposta_txt = (out.choices[0].message.content or "").strip()
+                r2 = requests.post(
+                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
+                    json={**payload, "stream": False},
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
+                if r2.status_code == 200:
+                    try:
+                        resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
                     visible_txt = _render_visible(resposta_txt).strip()
                 else:
-                    endpoint_ns, headers_ns = _resolver_endpoint_e_headers(prov, endpoint, auth)
-                    payload_ns = {
-                        "model": model_id,
-                        "messages": messages,
+                    st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
+        except Exception as e:
+            st.error(f"Fallback (sem stream) erro: {e}")
+
+        # Fallback com prompts limpos
+    if not visible_txt:
+        try:
+            if prov == "Hugging Face":
+                out2 = InferenceClient(token=auth).chat.completions.create(
+                    model=model_to_call,
+                    messages=[{"role": "system", "content": prompt}] + historico,
+                    temperature=0.9,
+                    max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
+                    stream=False,
+                )
+                resposta_txt = (out2.choices[0].message.content or "").strip()
+                visible_txt = _render_visible(resposta_txt).strip()
+            else:
+                r3 = requests.post(
+                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
+                    json={
+                        "model": model_to_call,
+                        "messages": [{"role": "system", "content": prompt}] + historico,
                         "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
                         "temperature": 0.9,
                         "stream": False,
-                    }
-                    r2 = requests.post(
-                        endpoint_ns,
-                        headers=headers_ns,
-                        json=payload_ns,
-                        timeout=int(st.session_state.get("timeout_s", 300)),
-                    )
-                    if r2.status_code == 200:
-                        try:
-                            resposta_txt = r2.json()["choices"][0]["message"]["content"].strip()
-                        except Exception:
-                            resposta_txt = ""
-                        visible_txt = _render_visible(resposta_txt).strip()
-                    else:
-                        st.error(f"Fallback (sem stream) falhou: {r2.status_code} - {r2.text}")
-            except Exception as e:
-                st.error(f"Fallback (sem stream) erro: {e}")
-
-        # ---------- Fallback 2 (prompts limpos) ----------
-        if not visible_txt:
-            try:
-                model_id = _resolver_model_id(prov, model_to_call)
-
-                if prov == "Hugging Face":
-                    out2 = InferenceClient(token=auth).chat.completions.create(
-                        model=model_id,
-                        messages=[{"role": "system", "content": prompt}] + historico,
-                        temperature=0.9,
-                        max_tokens=int(st.session_state.get("max_tokens_rsp", 1200)),
-                        stream=False,
-                    )
-                    resposta_txt = (out2.choices[0].message.content or "").strip()
+                    },
+                    timeout=int(st.session_state.get("timeout_s", 300))
+                )
+                if r3.status_code == 200:
+                    try:
+                        resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
+                    except Exception:
+                        resposta_txt = ""
                     visible_txt = _render_visible(resposta_txt).strip()
                 else:
-                    endpoint_ns, headers_ns = _resolver_endpoint_e_headers(prov, endpoint, auth)
-                    r3 = requests.post(
-                        endpoint_ns,
-                        headers=headers_ns,
-                        json={
-                            "model": model_id,
-                            "messages": [{"role": "system", "content": prompt}] + historico,
-                            "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
-                            "temperature": 0.9,
-                            "stream": False,
-                        },
-                        timeout=int(st.session_state.get("timeout_s", 300)),
-                    )
-                    if r3.status_code == 200:
-                        try:
-                            resposta_txt = r3.json()["choices"][0]["message"]["content"].strip()
-                        except Exception:
-                            resposta_txt = ""
-                        visible_txt = _render_visible(resposta_txt).strip()
-                    else:
-                        st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
-            except Exception as e:
-                st.error(f"Fallback (prompts limpos) erro: {e}")
+                    st.error(f"Fallback (prompts limpos) falhou: {r3.status_code} - {r3.text}")
+        except Exception as e:
+            st.error(f"Fallback (prompts limpos) erro: {e}")
 
-        # Render parcial: se veio de fallback
-        if visible_txt:
-            placeholder.markdown(visible_txt)
-
-        # =========================
-        # BLOQUEIO DE CLÍMAX FINAL + ENFORCER MARY
-        # =========================
-        if st.session_state.get("app_bloqueio_intimo", True):
-            if not _user_allows_climax(st.session_state.session_msgs):
-                visible_txt = _strip_or_soften_climax(visible_txt)
+    # BLOQUEIO DE CLÍMAX FINAL (sempre que a opção estiver ativa, só libera com comando do usuário)
+    if st.session_state.get("app_bloqueio_intimo", True):
+        if not _user_allows_climax(st.session_state.session_msgs):
+            visible_txt = _strip_or_soften_climax(visible_txt)
 
         # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
-        if st.session_state.get("usar_falas_mary", False):
-            falas = st.session_state.get("_falas_mary_list", []) or []
-            if falas and visible_txt:
-                tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
-                if not tem_fala:
-                    escolha = random.choice(falas)
-                    if st.session_state.get("interpretar_apenas_mary", False):
-                        inj = f"— {escolha}\n\n"
-                    else:
-                        inj = f"— {escolha} — diz Mary.\n\n"
-                    visible_txt = inj + visible_txt
-
-        # ===== Render final (sempre) =====
-        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
-
-        # ===== Persistência (sempre) =====
-        if visible_txt and visible_txt != "[Sem conteúdo]":
-            salvar_interacao("assistant", visible_txt)
-            st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
-        else:
-            salvar_interacao("assistant", "[Sem conteúdo]")
-            st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
-
-        # ===== Reforço pós-resposta (sempre) =====
-        try:
-            usados = []
-            topk_usadas = memoria_longa_buscar_topk(
-                query_text=visible_txt,
-                k=int(st.session_state.get("k_memoria_longa", 3)),
-                limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
-            )
-            for t, _sc, _sim, _rr in topk_usadas:
-                usados.append(t)
-            memoria_longa_reforcar(usados)
-        except Exception:
-            pass
-
-
-
-
-
-
-
-
-
+    if st.session_state.get("usar_falas_mary", False):
+        falas = st.session_state.get("_falas_mary_list", []) or []
+        if falas and visible_txt:
+            tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
+            if not tem_fala:
+                escolha = random.choice(falas)
+                if st.session_state.get("interpretar_apenas_mary", False):
+                    inj = f"— {escolha}\n\n"
+                else:
+                    inj = f"— {escolha} — diz Mary.\n\n"
+                visible_txt = inj + visible_txt
+    
+    # ===== Render final (sempre) =====
+    placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
+    
+    # ===== Persistência (sempre) =====
+    if visible_txt and visible_txt != "[Sem conteúdo]":
+        salvar_interacao("assistant", visible_txt)
+        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
+    else:
+        salvar_interacao("assistant", "[Sem conteúdo]")
+        st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
+    
+    # ===== Reforço pós-resposta (sempre) =====
+    try:
+        usados = []
+        topk_usadas = memoria_longa_buscar_topk(
+            query_text=visible_txt,
+            k=int(st.session_state.get("k_memoria_longa", 3)),
+            limiar=float(st.session_state.get("limiar_memoria_longa", 0.78)),
+        )
+        for t, _sc, _sim, _rr in topk_usadas:
+            usados.append(t)
+        memoria_longa_reforcar(usados)
+    except Exception:
+        pass
 
 
 
