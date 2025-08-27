@@ -639,8 +639,10 @@ if user_text:
             st.markdown(vis)
             # Continuação automática até o alvo (máx 2 iterações)
             alvo = int(st.session_state.get("alvo_paragrafos", 12))
+            vis = _render_visible(resposta_txt)
             pcount = count_paragraphs(vis)
             loops = 0
+            
             while pcount < alvo and loops < 2:
                 cont_msgs = build_continue_messages(ctx, resposta_txt)
                 try:
@@ -655,11 +657,17 @@ if user_text:
                     )
                 except Exception:
                     break
-                if not more.strip():
+            
+                more = strip_outer_quotes((more or "").strip())
+                if not more:
                     break
-                resposta_txt += "
-
-" + strip_outer_quotes(more.strip())
+            
+                # ✅ Concatenar de forma segura (NÃO quebre a string em outra linha)
+                resposta_txt += "\n\n" + more
+                # (alternativas equivalentes, se preferir)
+                # resposta_txt = f"{resposta_txt}\n\n{more}"
+                # resposta_txt = "\n\n".join([resposta_txt, more])
+            
                 vis = _render_visible(resposta_txt)
                 st.markdown(vis)
                 pcount = count_paragraphs(vis)
@@ -814,5 +822,6 @@ if st.session_state.get("do_index_long") and planilha:
                         st.toast(f"Indexadas {len(embs)} memórias na memoria_longa_jm.")
     except Exception as e:
         st.info(f"Indexação opcional de memória longa não concluída: {e}")
+
 
 
