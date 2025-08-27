@@ -752,11 +752,21 @@ def build_messages(ctx: Dict[str, Any], user_text: str, history_msgs: Optional[L
     if history_msgs:
         n = int(st.session_state.get("history_to_prompt", 6))
         msgs.extend(history_msgs[-n:] if n > 0 else [])
-    # Diretrizes de interação vindas do sidebar/Sheets
+  
+        # Diretrizes de interação vindas do sidebar/Sheets
     dtx = st.session_state.get("diretrizes_text") or sheet_templates_get("diretrizes")
     if dtx:
-        msgs.append({"role": "system", "content": "DIRETRIZES DE INTERAÇÃO (siga estritamente):
-" + dtx})
+        dtx = dtx.strip()
+        msgs.append({
+            "role": "system",
+            # forma segura: você pode quebrar a LINHA do CÓDIGO usando parênteses,
+            # mas a STRING fica corretamente fechada com "\n"
+            "content": (
+                "DIRETRIZES DE INTERAÇÃO (siga estritamente):\n"
+                + dtx
+            )
+        })
+
     abertura = build_opening_line(ctx)
     if abertura:
         msgs.append({"role": "system", "content": f"ABERTURA_SUGERIDA: {abertura}"})
@@ -822,6 +832,7 @@ if st.session_state.get("do_index_long") and planilha:
                         st.toast(f"Indexadas {len(embs)} memórias na memoria_longa_jm.")
     except Exception as e:
         st.info(f"Indexação opcional de memória longa não concluída: {e}")
+
 
 
 
