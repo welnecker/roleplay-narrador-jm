@@ -80,19 +80,19 @@ MODELOS_HF = {
 @st.cache_data(ttl=15, show_spinner=False)
 def _lms_models_dict() -> dict[str, str]:
     """
-    Lê /v1/models do LM Studio e devolve um dict para o seletor:
-    {"<rótulo (LM Studio)>": "<id-do-modelo>"}
+    Lê /v1/models do LM Studio e devolve um dict {"<rótulo (LM Studio)>": "<id>"}
     """
     try:
         import requests
-        url = LMS_BASE_URL.rstrip("/") + "/models"
+        base = (st.session_state.get("lms_base_url") or LMS_BASE_URL or "").rstrip("/")
+        url = base + "/models"
         r = requests.get(url, timeout=10)
         r.raise_for_status()
         data = r.json()
         return {f"{m['id']} (LM Studio)": m["id"] for m in data.get("data", []) if m.get("id")}
     except Exception:
-        # Fallback para o seletor, caso o /models ainda não esteja disponível
-        return {"<digite manualmente> (LM Studio)": "llama-3-8b-lexi-uncensored"}
+        # Fallback: ainda mostra uma opção manual
+        return {"<digite manualmente> (LM Studio)": "llama-3.1-8b-instruct"}
 
 # === Roleplay: força parágrafos e falas em linhas separadas ===
 
@@ -1396,6 +1396,13 @@ def resposta_valida(t: str) -> bool:
         return False
     return True
 
+def is_mary_mode_active() -> bool:
+    return bool(
+        st.session_state.get("interpretar_apenas_mary", False)
+        or st.session_state.get("modo_resposta") == "Mary (1ª pessoa)"
+    )
+
+
 # Use APÓS as funções acima:
 # visible_txt = force_linebreak_on_falas(_render_visible(resposta_txt).strip())
 
@@ -1445,21 +1452,42 @@ with st.sidebar:
         "🌐 Provedor",
         ["OpenRouter", "Together", "Hugging Face", "LM Studio"],
         index=0,
-        key="provedor_ia",
+        key="provedor_ia"
     )
+
+    # Se quiser permitir trocar a base do LM Studio no UI:
+    if provedor == "LM Studio":
+        LMS_BASE_URL = st.text_input(
+            "Base URL (LM Studio)",
+            value=st.session_state.get("lms_base_url", LMS_BASE_URL),
+            key="lms_base_url",
+            help="Ex.: http://127.0.0.1:1234/v1 ou a URL pública do túnel com /v1 no final"
+        )
+
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
 
-    # Só avisa quando for um provedor que exige chave
+    # Aviso de chave só para provedores que realmente exigem
     if provedor in ("OpenRouter", "Together", "Hugging Face") and not api_key:
         st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
 
-    modelo_nome = st.selectbox(
-        "🤖 Modelo de IA",
-        list(modelos_map.keys()),
-        index=0,
-        key="modelo_nome_ui",
-    )
-    st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
+    # Seleção de modelo
+    if provedor == "LM Studio":
+        modelos_lms = list(modelos_map.keys())
+        if not modelos_lms:
+            st.info("Não consegui listar modelos do LM Studio. Digite o ID manualmente.")
+            modelo_nome = st.text_input("🤖 Modelo (LM Studio)", value="<digite manualmente> (LM Studio)", key="modelo_nome_ui")
+            st.session_state.modelo_escolhido_id = st.text_input(
+                "ID do modelo (LM Studio)",
+                value="llama-3.1-8b-instruct",
+                key="modelo_id_lmstudio"
+            )
+        else:
+            modelo_nome = st.selectbox("🤖 Modelo de IA", modelos_lms, index=0, key="modelo_nome_ui")
+            st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
+    else:
+        modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
+        st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
+
 
     st.markdown("---")
     st.markdown("### ✍️ Estilo & Progresso Dramático")
@@ -1706,25 +1734,25 @@ if entrada:
     )
 
     # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
-    historico = []
-    for ix, m in enumerate(st.session_state.session_msgs):
-        role = m.get("role", "user")
-        content = m.get("content", "")
-        # Só para a ÚLTIMA mensagem do usuário, aplica o formato padronizado!
-        if ix == len(st.session_state.session_msgs) - 1 and role.lower() == "user":
-            content = linha_abertura
-        if mary_mode_active and role.lower() == "user":
-            content = f"JÂNIO: {content}"
-        historico.append({"role": role, "content": content})
+        historico = []
+        last_idx = len(st.session_state.session_msgs) - 1
+        
+        for ix, m in enumerate(st.session_state.session_msgs):
+            role = m.get("role", "user")
+            content = m.get("content", "") or ""
+        
+            # Para a ÚLTIMA mensagem do usuário, ANEXE a linha de abertura em cima (não substitua)
+            if ix == last_idx and role.lower() == "user":
+                content = (linha_abertura.strip() + ("\n" + content if content else "")).strip()
+        
+            # Se modo Mary, prefixe as falas do usuário como "JÂNIO: ..."
+            if mary_mode_active and role.lower() == "user":
+                content = f"JÂNIO: {content}"
+        
+            historico.append({"role": role, "content": content})
 
 
-    # --- MODO MARY (1ª pessoa) ---
-    mary_mode_active = bool(
-        st.session_state.get("interpretar_apenas_mary")
-        or st.session_state.get("modo_resposta") == "Mary (1ª pessoa)"
-    )
-
-    # Construção do prompt (já deve incluir, se você seguiu, o {voz_bloco} no construir_prompt_com_narrador)
+       # Construção do prompt (já deve incluir, se você seguiu, o {voz_bloco} no construir_prompt_com_narrador)
     prompt = construir_prompt_com_narrador()
 
     # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
@@ -2071,6 +2099,7 @@ if need_auth:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
