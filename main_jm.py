@@ -1600,93 +1600,91 @@ with st.sidebar:
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
 
-    st.markdown("---")
+        st.markdown("---")
     st.markdown("### 📝 Utilitários")
 
-      # Gerar resumo do capítulo (pega as últimas interações do Sheets)
-if st.button("📝 Gerar resumo do capítulo"):
-    try:
-        inter = carregar_interacoes(n=6)
-        texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
-        prompt_resumo = (
-            "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
-            + texto + "\n\nResumo:"
-        )
+    # Gerar resumo do capítulo (pega as últimas interações do Sheets)
+    if st.button("📝 Gerar resumo do capítulo"):
+        try:
+            inter = carregar_interacoes(n=6)
+            texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
+            prompt_resumo = (
+                "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
+                + texto + "\n\nResumo:"
+            )
 
-        # Usa o provedor/modelo selecionados no topo do sidebar
-        provedor = st.session_state.get("provedor_ia", "OpenRouter")
-        api_url_local, api_key_local, _catalogo = api_config_for_provider(provedor)
+            # Usa o provedor/modelo selecionados no topo do sidebar
+            provedor = st.session_state.get("provedor_ia", "OpenRouter")
+            api_url_local, api_key_local, _catalogo = api_config_for_provider(provedor)
 
-        model_id_call = (
-            model_id_for_together(st.session_state.modelo_escolhido_id)
-            if provedor == "Together"
-            else st.session_state.modelo_escolhido_id
-        )
+            model_id_call = (
+                model_id_for_together(st.session_state.modelo_escolhido_id)
+                if provedor == "Together"
+                else st.session_state.modelo_escolhido_id
+            )
 
-        if provedor == "Hugging Face":
-            # --- HF sem requests: usa InferenceClient ---
-            try:
-                hf_client = InferenceClient(
-                    token=api_key_local,
-                    timeout=int(st.session_state.get("timeout_s", 300))
+            if provedor == "Hugging Face":
+                # --- HF sem requests: usa InferenceClient ---
+                try:
+                    hf_client = InferenceClient(
+                        token=api_key_local,
+                        timeout=int(st.session_state.get("timeout_s", 300))
+                    )
+                    out = hf_client.chat.completions.create(
+                        model=model_id_call,
+                        messages=[{"role": "user", "content": prompt_resumo}],
+                        max_tokens=800,
+                        temperature=0.85,
+                        stream=False,
+                    )
+                    resumo = (out.choices[0].message.content or "").strip()
+                    st.session_state.resumo_capitulo = resumo
+                    salvar_resumo(resumo)
+                    st.success("Resumo gerado e salvo com sucesso!")
+                except Exception as e:
+                    st.error(f"Erro ao resumir (HF): {e}")
+
+            else:
+                # OpenRouter / Together / LM Studio (requests)
+                headers = {"Content-Type": "application/json"}
+                if api_key_local:  # LM Studio não precisa Authorization
+                    headers["Authorization"] = f"Bearer {api_key_local}"
+
+                payload = {
+                    "model": model_id_call,
+                    "messages": [{"role": "user", "content": prompt_resumo}],
+                    "max_tokens": 800,
+                    "temperature": 0.85,
+                }
+
+                r = requests.post(
+                    api_url_local,
+                    headers=headers,
+                    json=payload,
+                    timeout=int(st.session_state.get("timeout_s", 300)),
                 )
-                out = hf_client.chat.completions.create(
-                    model=model_id_call,
-                    messages=[{"role": "user", "content": prompt_resumo}],
-                    max_tokens=800,
-                    temperature=0.85,
-                    stream=False,
-                )
-                resumo = out.choices[0].message.content.strip()
+                r.raise_for_status()
+                data = r.json()
+
+                resumo = None
+                if isinstance(data, dict):
+                    ch = data.get("choices") or []
+                    if ch and isinstance(ch[0], dict):
+                        resumo = (
+                            ch[0].get("message", {}).get("content")
+                            or ch[0].get("text")
+                            or ch[0].get("delta", {}).get("content")
+                        )
+                if not resumo:
+                    resumo = json.dumps(data)
+
+                resumo = (resumo or "").strip()
                 st.session_state.resumo_capitulo = resumo
                 salvar_resumo(resumo)
                 st.success("Resumo gerado e salvo com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao resumir (HF): {e}")
 
-        else:
-            # OpenRouter / Together / LM Studio (requests)
-            # LM Studio NÃO precisa de Authorization; os demais sim.
-            headers = {"Content-Type": "application/json"}
-            if api_key_local:
-                headers["Authorization"] = f"Bearer {api_key_local}"
-
-            payload = {
-                "model": model_id_call,
-                "messages": [{"role": "user", "content": prompt_resumo}],
-                "max_tokens": 800,
-                "temperature": 0.85,
-            }
-
-            r = requests.post(
-                api_url_local,
-                headers=headers,  # << usa o mesmo headers
-                json=payload,
-                timeout=int(st.session_state.get("timeout_s", 300)),
-            )
-            r.raise_for_status()
-            data = r.json()
-            
-            # extrai conteúdo de forma robusta
-            resumo = None
-            if isinstance(data, dict):
-                ch = data.get("choices") or []
-                if ch and isinstance(ch[0], dict):
-                    resumo = (
-                        ch[0].get("message", {}).get("content")
-                        or ch[0].get("text")
-                        or ch[0].get("delta", {}).get("content")
-                    )
-            if not resumo:
-                resumo = json.dumps(data)
-            
-            resumo = (resumo or "").strip()
-            st.session_state.resumo_capitulo = resumo
-            salvar_resumo(resumo)
-            st.success("Resumo gerado e salvo com sucesso!")
-
-    except Exception as e:
-        st.error(f"Erro ao gerar resumo: {e}")
+        except Exception as e:
+            st.error(f"Erro ao gerar resumo: {e}")
 
 # =========================
 # EXIBIR HISTÓRICO
@@ -1710,94 +1708,40 @@ with st.container():
 # =========================
 # ENVIO DO USUÁRIO + STREAMING
 # =========================
-
 entrada = st.chat_input("Digite sua direção de cena...")
 
 if entrada:
-    # SOMENTE FASE: não alteramos “momento”
+    # Persistência do user
     salvar_interacao("user", str(entrada))
     st.session_state.session_msgs.append({"role": "user", "content": str(entrada)})
-    # Atualiza o contexto fixo de cena com a diretiva do usuário
+
+    # Atualiza contexto fixo de cena
     st.session_state["ctx_cena"] = extrair_diretriz_contexto(
         entrada,
         st.session_state.get("ctx_cena", CTX_INICIAL)
     )
     ctx = st.session_state["ctx_cena"]
 
-    # Gera linha de abertura padronizada
+    # Linha de abertura padronizada
     linha_abertura = gerar_linha_abertura(ctx)
 
-    # Defina se o modo Mary está ativo ANTES do for!
-    mary_mode_active = bool(
-        st.session_state.get("interpretar_apenas_mary")
-        or st.session_state.get("modo_resposta") == "Mary (1ª pessoa)"
-    )
+    # Modo Mary ativo?
+    mary_mode_active = is_mary_mode_active()
 
-    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
+    # Histórico (apenas UMA vez), com abertura anexada NA ÚLTIMA fala do user
     historico = []
     last_idx = len(st.session_state.session_msgs) - 1
-        
     for ix, m in enumerate(st.session_state.session_msgs):
-            role = m.get("role", "user")
-            content = m.get("content", "") or ""
-        
-            # Para a ÚLTIMA mensagem do usuário, ANEXE a linha de abertura em cima (não substitua)
-            if ix == last_idx and role.lower() == "user":
-                content = (linha_abertura.strip() + ("\n" + content if content else "")).strip()
-        
-            # Se modo Mary, prefixe as falas do usuário como "JÂNIO: ..."
-            if mary_mode_active and role.lower() == "user":
-                content = f"JÂNIO: {content}"
-        
-            historico.append({"role": role, "content": content})
-
-
-       # Construção do prompt (já deve incluir, se você seguiu, o {voz_bloco} no construir_prompt_com_narrador)
-    prompt = construir_prompt_com_narrador()
-
-    # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
-    historico = []
-    for m in st.session_state.session_msgs:
         role = m.get("role", "user")
-        content = m.get("content", "")
+        content = (m.get("content", "") or "").strip()
+        if ix == last_idx and role.lower() == "user" and linha_abertura:
+            content = linha_abertura.strip() + ("\n" + content if content else "")
         if mary_mode_active and role.lower() == "user":
             content = f"JÂNIO: {content}"
         historico.append({"role": role, "content": content})
 
-        # Provedor / modelo
-    # Provedor / modelo (inclui LM Studio corretamente)
-    # Provedor / modelo
-prov = st.session_state.get("provedor_ia", "OpenRouter")
-if prov == "Together":
-    endpoint = "https://api.together.xyz/v1/chat/completions"
-    auth = st.secrets.get("TOGETHER_API_KEY", "")
-    model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
-    need_auth = True
-elif prov == "Hugging Face":
-    endpoint = "HF_CLIENT"  # marcador: não usa requests
-    auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
-    model_to_call = st.session_state.modelo_escolhido_id
-    need_auth = True
-elif prov == "LM Studio":
-    endpoint = LMS_BASE_URL.rstrip("/") + "/chat/completions"
-    auth = ""  # não precisa
-    model_to_call = st.session_state.modelo_escolhido_id
-    need_auth = False
-else:  # OpenRouter
-    endpoint = "https://openrouter.ai/api/v1/chat/completions"
-    auth = st.secrets.get("OPENROUTER_API_KEY", "")
-    model_to_call = st.session_state.modelo_escolhido_id
-    need_auth = True
-
-# Cabeçalhos únicos para TODAS as requests
-headers = {"Content-Type": "application/json"}
-if need_auth:
-    if not auth:
-        st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
-        st.stop()
-    headers["Authorization"] = f"Bearer {auth}"
-
-    # System prompts
+    # Prompt e mensagens
+    prompt = construir_prompt_com_narrador()
     system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
     system_mary = {
         "role": "system",
@@ -1809,13 +1753,44 @@ if need_auth:
             "- Se usar diálogo, use travessão (—) apenas para a fala de Mary."
         )
     }
-
     messages = [system_pt]
     if mary_mode_active:
         messages.append(system_mary)
     messages.append({"role": "system", "content": prompt})
     messages += historico
 
+    # Provedor / modelo / endpoint
+    prov = st.session_state.get("provedor_ia", "OpenRouter")
+    if prov == "Together":
+        endpoint = "https://api.together.xyz/v1/chat/completions"
+        auth = st.secrets.get("TOGETHER_API_KEY", "")
+        model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
+        need_auth = True
+    elif prov == "Hugging Face":
+        endpoint = "HF_CLIENT"
+        auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
+        model_to_call = st.session_state.modelo_escolhido_id
+        need_auth = True
+    elif prov == "LM Studio":
+        endpoint = LMS_BASE_URL.rstrip("/") + "/chat/completions"
+        auth = ""  # LM Studio não precisa
+        model_to_call = st.session_state.modelo_escolhido_id
+        need_auth = False
+    else:  # OpenRouter
+        endpoint = "https://openrouter.ai/api/v1/chat/completions"
+        auth = st.secrets.get("OPENROUTER_API_KEY", "")
+        model_to_call = st.session_state.modelo_escolhido_id
+        need_auth = True
+
+    # Headers únicos
+    headers = {"Content-Type": "application/json"}
+    if need_auth:
+        if not auth:
+            st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
+            st.stop()
+        headers["Authorization"] = f"Bearer {auth}"
+
+    # Payload base
     payload = {
         "model": model_to_call,
         "messages": messages,
@@ -1823,40 +1798,19 @@ if need_auth:
         "temperature": 0.9,
         "stream": True,
     }
-    headers = {"Authorization": f"Bearer {auth}", "Content-Type": "application/json"}
 
-        # =========================================================
-    # BLOQUEIO DE CLÍMAX — Helpers (sempre ativo por padrão)
-    # =========================================================
-
-    # Gatilho explícito do usuário para liberar o clímax
+    # Helpers — clímax (definidos aqui para usar no stream e nos fallbacks)
     CLIMAX_USER_TRIGGER = re.compile(
         r"(?:\b("
-        r"finaliza(?:r)?|"
-        r"pode\s+(?:gozar|finalizar)|"
-        r"liber(?:a|o)\s+(?:o\s+)?(?:cl[ií]max|orgasmo)|"
-        r"cheg(?:a|ou)\s+ao?\s+(?:cl[ií]max|orgasmo)|"
-        r"goza(?:r)?\s+(?:agora|já)|"
-        r"agora\s+goza|"
-        r"permite\s+orgasmo|"
-        r"explod(?:e|iu)\s+em\s+orgasmo"
-        r")\b)",
-        flags=re.IGNORECASE
+        r"finaliza(?:r)?|pode\s+(?:gozar|finalizar)|liber(?:a|o)\s+(?:o\s+)?(?:cl[ií]max|orgasmo)|"
+        r"cheg(?:a|ou)\s+ao?\s+(?:cl[ií]max|orgasmo)|goza(?:r)?\s+(?:agora|já)|agora\s+goza|"
+        r"permite\s+orgasmo|explod(?:e|iu)\s+em\s+orgasmo"
+        r")\b)", flags=re.IGNORECASE
     )
-
-    # Léxico de termos de clímax
     ORGASM_TERMS = r"(?:cl[ií]max|orgasmo|orgásm(?:ic)o|gozou|gozando|gozaram|ejacul(?:a|ou|ar)|cheg(?:a|ou)\s+lá|explod(?:e|iu))"
-
-    # Remove frases inteiras que contenham termos de clímax
     ORGASM_SENT = re.compile(rf"([^.!\n]*\b{ORGASM_TERMS}\b[^.!?\n]*[.!?])", flags=re.IGNORECASE)
 
-    # (Modo Mary) — filtra falas atribuídas a Jânio quando ativo
-    DIALOGO_NAO_MARY = re.compile(r"(^|\n)\s*—\s*(J[âa]nio|ele|donisete)\b.*", re.IGNORECASE)
-
     def _user_allows_climax(msgs: list) -> bool:
-        """
-        True se a ÚLTIMA fala do usuário libera explicitamente o clímax.
-        """
         last_user = ""
         for r in reversed(msgs or []):
             if str(r.get("role","")).lower() == "user":
@@ -1865,9 +1819,6 @@ if need_auth:
         return bool(CLIMAX_USER_TRIGGER.search(last_user))
 
     def _strip_or_soften_climax(texto: str) -> str:
-        """
-        Remove qualquer menção de clímax/ejaculação e encerra em pausa sensorial (sem fade-to-black).
-        """
         if not texto:
             return texto
         texto = ORGASM_SENT.sub("", texto)
@@ -1875,54 +1826,23 @@ if need_auth:
         if not texto.endswith((".", "…", "!", "?")):
             texto += "…"
         finais = [
-            " A tensão fica no ar, sem conclusão, apenas a respiração quente entre eles.",
-            " Eles param no limiar, ainda ofegantes, guardando o resto para o próximo passo.",
-            " Um silêncio elétrico preenche o quarto; nenhum desfecho, só a pele e o pulso acelerado.",
+            " A tensão permanece sem conclusão — só a respiração quente entre eles.",
+            " Eles param no limiar, ofegantes, guardando o resto para o próximo passo.",
+            " Um silêncio pesado preenche o espaço; nenhum desfecho, só a pele e o pulso acelerado.",
         ]
         if all(f not in texto for f in finais):
             texto += random.choice(finais)
         return texto
 
-    
+    # STREAM + FALLBACKS
     with st.chat_message("assistant"):
         placeholder = st.empty()
         resposta_txt = ""
-        # FINALIZA TEXTO VISÍVEL
-        visible_txt = _render_visible(resposta_txt).strip()
-
         last_update = time.time()
-
-        # Reforço memórias usadas no prompt
-        try:
-            usados_prompt = []
-            usados_prompt.extend(st.session_state.get("_ml_topk_texts", []))
-            usados_prompt.extend(st.session_state.get("_ml_recorrentes", []))
-            usados_prompt = [t for t in usados_prompt if t]
-            if usados_prompt:
-                memoria_longa_reforcar(usados_prompt)
-        except Exception:
-            pass
-
-          # ======================
-        # STREAM (PATCH C) — com suporte a HF
-        # ======================
-
-        # (redeclara o payload aqui por segurança; usa o mesmo headers já criado acima)
-        payload = {
-            "model": model_to_call,
-            "messages": messages,
-            "max_tokens": int(st.session_state.get("max_tokens_rsp", 1200)),
-            "temperature": 0.9,
-            "stream": True,
-        }
 
         try:
             if prov == "Hugging Face":
-                # --- STREAM via InferenceClient (sem SSE) ---
-                hf_client = InferenceClient(
-                    token=auth,
-                    timeout=int(st.session_state.get("timeout_s", 300))
-                )
+                hf_client = InferenceClient(token=auth, timeout=int(st.session_state.get("timeout_s", 300)))
                 for chunk in hf_client.chat.completions.create(
                     model=model_to_call,
                     messages=messages,
@@ -1934,24 +1854,19 @@ if need_auth:
                     if not delta:
                         continue
                     resposta_txt += delta
-
-                    # Atualização parcial
                     if time.time() - last_update > 0.10:
                         parcial = _render_visible(resposta_txt) + "▌"
-                        if st.session_state.get("app_bloqueio_intimo", True):
-                            if not _user_allows_climax(st.session_state.session_msgs):
-                                parcial = _strip_or_soften_climax(parcial)
+                        if st.session_state.get("app_bloqueio_intimo", True) and not _user_allows_climax(st.session_state.session_msgs):
+                            parcial = _strip_or_soften_climax(parcial)
                         placeholder.markdown(parcial)
                         last_update = time.time()
-
             else:
-                # --- STREAM via SSE (OpenRouter / Together / LM Studio) ---
                 with requests.post(
                     endpoint,
-                    headers=headers,          # usa o headers único já criado
+                    headers=headers,
                     json=payload,
                     stream=True,
-                    timeout=int(st.session_state.get("timeout_s", 300)),
+                    timeout=int(st.session_state.get("timeout_s", 300))
                 ) as r:
                     if r.status_code == 200:
                         for raw in r.iter_lines(decode_unicode=False):
@@ -1969,12 +1884,10 @@ if need_auth:
                                 if not delta:
                                     continue
                                 resposta_txt += delta
-
                                 if time.time() - last_update > 0.10:
                                     parcial = _render_visible(resposta_txt) + "▌"
-                                    if st.session_state.get("app_bloqueio_intimo", True):
-                                        if not _user_allows_climax(st.session_state.session_msgs):
-                                            parcial = _strip_or_soften_climax(parcial)
+                                    if st.session_state.get("app_bloqueio_intimo", True) and not _user_allows_climax(st.session_state.session_msgs):
+                                        parcial = _strip_or_soften_climax(parcial)
                                     placeholder.markdown(parcial)
                                     last_update = time.time()
                             except Exception:
@@ -1982,14 +1895,13 @@ if need_auth:
                     else:
                         prov_nome = "LM Studio" if prov == "LM Studio" else ("Together" if prov == "Together" else "OpenRouter")
                         st.error(f"Erro {prov_nome}: {r.status_code} - {r.text}")
-
         except Exception as e:
             st.error(f"Erro no streaming: {e}")
 
-            # FINALIZA TEXTO VISÍVEL
+        # Finalização do texto visível
         visible_txt = _render_visible(resposta_txt).strip()
 
-        # Fallback sem stream
+        # Fallback 1 — sem stream
         if not visible_txt:
             try:
                 if prov == "Hugging Face":
@@ -2005,9 +1917,9 @@ if need_auth:
                 else:
                     r2 = requests.post(
                         endpoint,
-                        headers=headers,  # mesmo headers
+                        headers=headers,
                         json={**payload, "stream": False},
-                        timeout=int(st.session_state.get("timeout_s", 300)),
+                        timeout=int(st.session_state.get("timeout_s", 300))
                     )
                     if r2.status_code == 200:
                         try:
@@ -2020,7 +1932,7 @@ if need_auth:
             except Exception as e:
                 st.error(f"Fallback (sem stream) erro: {e}")
 
-        # Fallback com prompts limpos
+        # Fallback 2 — prompts limpos
         if not visible_txt:
             try:
                 if prov == "Hugging Face":
@@ -2036,7 +1948,7 @@ if need_auth:
                 else:
                     r3 = requests.post(
                         endpoint,
-                        headers=headers,  # mesmo headers
+                        headers=headers,
                         json={
                             "model": model_to_call,
                             "messages": [{"role": "system", "content": prompt}] + historico,
@@ -2044,7 +1956,7 @@ if need_auth:
                             "temperature": 0.9,
                             "stream": False,
                         },
-                        timeout=int(st.session_state.get("timeout_s", 300)),
+                        timeout=int(st.session_state.get("timeout_s", 300))
                     )
                     if r3.status_code == 200:
                         try:
@@ -2057,36 +1969,26 @@ if need_auth:
             except Exception as e:
                 st.error(f"Fallback (prompts limpos) erro: {e}")
 
-    # BLOQUEIO DE CLÍMAX FINAL (sempre que a opção estiver ativa, só libera com comando do usuário)
-    if st.session_state.get("app_bloqueio_intimo", True):
-        if not _user_allows_climax(st.session_state.session_msgs):
+        # Clímax final (se bloqueado e não liberado)
+        if st.session_state.get("app_bloqueio_intimo", True) and not _user_allows_climax(st.session_state.session_msgs):
             visible_txt = _strip_or_soften_climax(visible_txt)
 
-        # --- ENFORCER: garantir ao menos 1 fala de Mary, se a opção estiver ativa ---
-    if st.session_state.get("usar_falas_mary", False):
-        falas = st.session_state.get("_falas_mary_list", []) or []
-        if falas and visible_txt:
-            tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
-            if not tem_fala:
-                escolha = random.choice(falas)
-                if st.session_state.get("interpretar_apenas_mary", False):
-                    inj = f"— {escolha}\n\n"
-                else:
-                    inj = f"— {escolha} — diz Mary.\n\n"
-                visible_txt = inj + visible_txt
-    
-    # ===== Render final (sempre) =====
-    placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
-    
-    # ===== Persistência (sempre) =====
-    if visible_txt and visible_txt != "[Sem conteúdo]":
-        salvar_interacao("assistant", visible_txt)
-        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt})
-    else:
-        salvar_interacao("assistant", "[Sem conteúdo]")
-        st.session_state.session_msgs.append({"role": "assistant", "content": "[Sem conteúdo]"})
-    
-    # ===== Reforço pós-resposta (sempre) =====
+        # Enforcer: 1 fala de Mary se solicitado
+        if st.session_state.get("usar_falas_mary", False):
+            falas = st.session_state.get("_falas_mary_list", []) or []
+            if falas and visible_txt:
+                tem_fala = any(re.search(re.escape(f), visible_txt, flags=re.IGNORECASE) for f in falas)
+                if not tem_fala:
+                    escolha = random.choice(falas)
+                    inj = f"— {escolha}\n\n" if st.session_state.get("interpretar_apenas_mary", False) else f"— {escolha} — diz Mary.\n\n"
+                    visible_txt = inj + visible_txt
+
+        # Render + persistência
+        placeholder.markdown(visible_txt if visible_txt else "[Sem conteúdo]")
+        salvar_interacao("assistant", visible_txt if visible_txt else "[Sem conteúdo]")
+        st.session_state.session_msgs.append({"role": "assistant", "content": visible_txt if visible_txt else "[Sem conteúdo]"})
+
+    # Reforço pós-resposta (fora do with)
     try:
         usados = []
         topk_usadas = memoria_longa_buscar_topk(
@@ -2099,17 +2001,3 @@ if need_auth:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
