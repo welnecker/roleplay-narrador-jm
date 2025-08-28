@@ -1359,25 +1359,27 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📝 Utilitários")
 
+    # Gerar resumo do capítulo (pega as últimas interações do Sheets)
     if st.button("📝 Gerar resumo do capítulo"):
         try:
             inter = carregar_interacoes(n=6)
-            texto = "\n".join(f\"{r['role']}: {r['content']}\" for r in inter) if inter else \"\"
+            texto = "\n".join(f"{r['role']}: {r['content']}" for r in inter) if inter else ""
             prompt_resumo = (
-                "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\\n\\n"
-                + texto + "\\n\\nResumo:"
+                "Resuma o seguinte trecho como um capítulo de novela brasileira, mantendo tom e emoções.\n\n"
+                + texto + "\n\nResumo:"
             )
-
-            provedor_local = st.session_state.get("provedor_ia", "OpenRouter")
-            api_url_local, api_key_local, _catalogo = api_config_for_provider(provedor_local)
-
+    
+            # Usa o provedor/modelo selecionados no topo do sidebar
+            provedor = st.session_state.get("provedor_ia", "OpenRouter")
+            api_url_local, api_key_local, _catalogo = api_config_for_provider(provedor)
+    
             model_id_call = (
                 model_id_for_together(st.session_state.modelo_escolhido_id)
-                if provedor_local == "Together"
+                if provedor == "Together"
                 else st.session_state.modelo_escolhido_id
             )
-
-            if provedor_local == "Hugging Face":
+    
+            if provedor == "Hugging Face":
                 try:
                     hf_client = InferenceClient(
                         token=api_key_local,
@@ -1386,7 +1388,7 @@ with st.sidebar:
                     out = hf_client.chat.completions.create(
                         model=model_id_call,
                         messages=[{"role": "user", "content": prompt_resumo}],
-                        max_tokens=600,
+                        max_tokens=800,
                         temperature=0.85,
                         stream=False,
                     )
@@ -1396,46 +1398,43 @@ with st.sidebar:
                     st.success("Resumo gerado e salvo com sucesso!")
                 except Exception as e:
                     st.error(f"Erro ao resumir (HF): {e}")
-
             else:
                 headers = {"Content-Type": "application/json"}
                 if api_key_local:
                     headers["Authorization"] = f"Bearer {api_key_local}"
-
+    
                 payload = {
                     "model": model_id_call,
                     "messages": [{"role": "user", "content": prompt_resumo}],
-                    "max_tokens": 600,
+                    "max_tokens": 800,
                     "temperature": 0.85,
                 }
-
-                try:
-                    r = requests.post(
-                        api_url_local,
-                        headers=headers,
-                        json=payload,
-                        timeout=int(st.session_state.get("timeout_s", 300)),
-                    )
-                    r.raise_for_status()
-                    data = r.json()
-                    resumo = None
-                    if isinstance(data, dict):
-                        ch = data.get("choices") or []
-                        if ch and isinstance(ch[0], dict):
-                            resumo = (
-                                ch[0].get("message", {}).get("content")
-                                or ch[0].get("text")
-                                or ch[0].get("delta", {}).get("content")
-                            )
-                    if not resumo:
-                        resumo = json.dumps(data)
-                    resumo = (resumo or "").strip()
-                    st.session_state.resumo_capitulo = resumo
-                    salvar_resumo(resumo)
-                    st.success("Resumo gerado e salvo com sucesso!")
-                except Exception as e:
-                    st.error(f"Erro ao gerar resumo (requests): {e}")
-
+    
+                r = requests.post(
+                    api_url_local,
+                    headers=headers,
+                    json=payload,
+                    timeout=int(st.session_state.get("timeout_s", 300)),
+                )
+                r.raise_for_status()
+                data = r.json()
+    
+                resumo = None
+                if isinstance(data, dict):
+                    ch = data.get("choices") or []
+                    if ch and isinstance(ch[0], dict):
+                        resumo = (
+                            ch[0].get("message", {}).get("content")
+                            or ch[0].get("text")
+                            or ch[0].get("delta", {}).get("content")
+                        )
+                if not resumo:
+                    resumo = json.dumps(data)
+    
+                resumo = (resumo or "").strip()
+                st.session_state.resumo_capitulo = resumo
+                salvar_resumo(resumo)
+                st.success("Resumo gerado e salvo com sucesso!")
         except Exception as e:
             st.error(f"Erro ao gerar resumo: {e}")
 
@@ -1808,3 +1807,4 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
