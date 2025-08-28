@@ -27,7 +27,7 @@ from gspread.exceptions import APIError, GSpreadException
 ONLY_FASE_MODE = True
 
 # --- LM Studio (via Cloudflare Tunnel) ---
-LMS_BASE_URL = "https://context-frankfurt-environment-virtue.trycloudflare.com/v1"
+LMS_BASE_URL = "https://against-project-secondary-giants.trycloudflare.com/v1"
 
 
 PLANILHA_ID_PADRAO = st.secrets.get("SPREADSHEET_ID", "").strip() or "1f7LBJFlhJvg3NGIWwpLTmJXxH9TH-MNn3F4SQkyfZNM"
@@ -2001,4 +2001,5 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
