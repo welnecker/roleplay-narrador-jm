@@ -1600,7 +1600,7 @@ with st.sidebar:
     st.markdown("### 🧩 Histórico no prompt")
     st.slider("Interações do Sheets (N)", 10, 30, value=int(st.session_state.get("n_sheet_prompt", 15)), step=1, key="n_sheet_prompt")
 
-        st.markdown("---")
+    st.markdown("---")
     st.markdown("### 📝 Utilitários")
 
     # Gerar resumo do capítulo (pega as últimas interações do Sheets)
@@ -2001,3 +2001,4 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
