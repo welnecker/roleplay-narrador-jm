@@ -1441,15 +1441,29 @@ with st.sidebar:
     st.title("🧭 Painel do Roteirista")
 
     # Provedor / modelos
-    provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face", "LM Studio"], index=0, key="provedor_ia")
+    provedor = st.radio(
+        "🌐 Provedor",
+        ["OpenRouter", "Together", "Hugging Face", "LM Studio"],
+        index=0,
+        key="provedor_ia",
+    )
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
+
+    # Só avisa quando for um provedor que exige chave
     if provedor in ("OpenRouter", "Together", "Hugging Face") and not api_key:
-    st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
-    modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
+        st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
+
+    modelo_nome = st.selectbox(
+        "🤖 Modelo de IA",
+        list(modelos_map.keys()),
+        index=0,
+        key="modelo_nome_ui",
+    )
     st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
 
     st.markdown("---")
     st.markdown("### ✍️ Estilo & Progresso Dramático")
+    # ... (restante do sidebar sem mudanças)
 
     # Modo de resposta (NARRADOR ou MARY 1ª pessoa)
     modo_op = st.selectbox(
