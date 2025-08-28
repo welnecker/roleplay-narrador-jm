@@ -1345,7 +1345,7 @@ with st.sidebar:
     st.markdown("### ⏱️ Comprimento/timeout")
     st.slider("Max tokens da resposta", 256, 2500, value=int(st.session_state.get("max_tokens_rsp", 900)), step=32, key="max_tokens_rsp")
     st.slider("Timeout (segundos)", 60, 600, value=int(st.session_state.get("timeout_s", 300)), step=10, key="timeout_s")
-    st.number_input("Contexto máx (tokens, LM Studio)", min_value=2048, max_value=32768, value=int(st.session_state.get("ctx_max_tokens", 4096)), step=512, key="ctx_max_tokens")
+    st.number_input("Contexto máx (tokens, LM Studio)", min_value=1048, max_value=32768, value=int(st.session_state.get("ctx_max_tokens", 4096)), step=512, key="ctx_max_tokens")
 
     st.markdown("---")
     st.markdown("### 🗃️ Memória Longa")
@@ -1807,4 +1807,5 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
