@@ -1734,10 +1734,10 @@ if entrada:
     )
 
     # Histórico: se Modo Mary estiver ativo, prefixamos as falas do usuário como “JÂNIO: ...”
-        historico = []
-        last_idx = len(st.session_state.session_msgs) - 1
+    historico = []
+    last_idx = len(st.session_state.session_msgs) - 1
         
-        for ix, m in enumerate(st.session_state.session_msgs):
+    for ix, m in enumerate(st.session_state.session_msgs):
             role = m.get("role", "user")
             content = m.get("content", "") or ""
         
@@ -2099,6 +2099,7 @@ if need_auth:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
