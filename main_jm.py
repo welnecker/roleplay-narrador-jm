@@ -1443,8 +1443,8 @@ with st.sidebar:
     # Provedor / modelos
     provedor = st.radio("🌐 Provedor", ["OpenRouter", "Together", "Hugging Face", "LM Studio"], index=0, key="provedor_ia")
     api_url, api_key, modelos_map = api_config_for_provider(provedor)
-    if not api_key:
-        st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
+    if provedor in ("OpenRouter", "Together", "Hugging Face") and not api_key:
+    st.warning("⚠️ API key ausente para o provedor selecionado. Defina em st.secrets.")
     modelo_nome = st.selectbox("🤖 Modelo de IA", list(modelos_map.keys()), index=0, key="modelo_nome_ui")
     st.session_state.modelo_escolhido_id = modelos_map[modelo_nome]
 
@@ -1618,14 +1618,14 @@ if st.button("📝 Gerar resumo do capítulo"):
 
             r = requests.post(
                 api_url_local,
-                headers=headers,
+                headers=headers,  # << usa o mesmo headers
                 json=payload,
                 timeout=int(st.session_state.get("timeout_s", 300)),
             )
             r.raise_for_status()
             data = r.json()
-
-            # Extrai conteúdo de forma robusta (OpenAI/OR/Together/LM Studio)
+            
+            # extrai conteúdo de forma robusta
             resumo = None
             if isinstance(data, dict):
                 ch = data.get("choices") or []
@@ -1637,7 +1637,7 @@ if st.button("📝 Gerar resumo do capítulo"):
                     )
             if not resumo:
                 resumo = json.dumps(data)
-
+            
             resumo = (resumo or "").strip()
             st.session_state.resumo_capitulo = resumo
             salvar_resumo(resumo)
@@ -1723,23 +1723,36 @@ if entrada:
         historico.append({"role": role, "content": content})
 
         # Provedor / modelo
+    # Provedor / modelo (inclui LM Studio corretamente)
     prov = st.session_state.get("provedor_ia", "OpenRouter")
+    
+    need_auth = True
     if prov == "Together":
         endpoint = "https://api.together.xyz/v1/chat/completions"
         auth = st.secrets.get("TOGETHER_API_KEY", "")
         model_to_call = model_id_for_together(st.session_state.modelo_escolhido_id)
     elif prov == "Hugging Face":
-        endpoint = "HF_CLIENT"  # marcador: não usa requests
+        endpoint = "HF_CLIENT"  # sem requests
         auth = st.secrets.get("HUGGINGFACE_API_KEY", "")
+        model_to_call = st.session_state.modelo_escolhido_id
+    elif prov == "LM Studio":
+        endpoint = LMS_BASE_URL.rstrip("/") + "/chat/completions"
+        auth = ""               # LM Studio NÃO usa key
+        need_auth = False
         model_to_call = st.session_state.modelo_escolhido_id
     else:
         endpoint = "https://openrouter.ai/api/v1/chat/completions"
         auth = st.secrets.get("OPENROUTER_API_KEY", "")
         model_to_call = st.session_state.modelo_escolhido_id
     
-    if not auth:
+    if need_auth and not auth:
         st.error("A chave de API do provedor selecionado não foi definida em st.secrets.")
         st.stop()
+    
+    # headers genéricos (com Authorization só se necessário)
+    headers = {"Content-Type": "application/json"}
+    if need_auth and auth:
+        headers["Authorization"] = f"Bearer {auth}"
 
     # System prompts
     system_pt = {"role": "system", "content": "Responda em português do Brasil. Mostre apenas a narrativa final."}
@@ -1892,41 +1905,41 @@ if entrada:
                 "stream": True,
             }
             with requests.post(
-                endpoint, headers=headers, json=payload, stream=True,
-                timeout=int(st.session_state.get("timeout_s", 300))
-            ) as r:
-                if r.status_code == 200:
-                    for raw in r.iter_lines(decode_unicode=False):
-                        if not raw:
-                            continue
-                        line = raw.decode("utf-8", errors="ignore").strip()
-                        if not line.startswith("data:"):
-                            continue
-                        data = line[5:].strip()
-                        if data == "[DONE]":
-                            break
-                        try:
-                            j = json.loads(data)
-                            delta = j["choices"][0]["delta"].get("content", "")
-                            if not delta:
-                                continue
-                            resposta_txt += delta
-    
-                            # Atualização parcial
-                            if time.time() - last_update > 0.10:
-                                parcial = _render_visible(resposta_txt) + "▌"
-    
-                                # BLOQUEIO ON-THE-FLY (sempre ativo se a opção estiver ligada)
-                                if st.session_state.get("app_bloqueio_intimo", True):
-                                    if not _user_allows_climax(st.session_state.session_msgs):
-                                        parcial = _strip_or_soften_climax(parcial)
-    
-                                placeholder.markdown(parcial)
-                                last_update = time.time()
-                        except Exception:
-                            continue
-                else:
-                    st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter')}: {r.status_code} - {r.text}")
+    endpoint,
+    headers=headers,              # << usa o headers único
+    json=payload,
+    stream=True,
+    timeout=int(st.session_state.get("timeout_s", 300))
+) as r:
+    if r.status_code == 200:
+        for raw in r.iter_lines(decode_unicode=False):
+            if not raw:
+                continue
+            line = raw.decode("utf-8", errors="ignore").strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                j = json.loads(data)
+                delta = j["choices"][0]["delta"].get("content", "")
+                if not delta:
+                    continue
+                resposta_txt += delta
+
+                if time.time() - last_update > 0.10:
+                    parcial = _render_visible(resposta_txt) + "▌"
+                    if st.session_state.get("app_bloqueio_intimo", True):
+                        if not _user_allows_climax(st.session_state.session_msgs):
+                            parcial = _strip_or_soften_climax(parcial)
+                    placeholder.markdown(parcial)
+                    last_update = time.time()
+            except Exception:
+                continue
+    else:
+        st.error(f"Erro {('Together' if prov=='Together' else 'OpenRouter' if prov!='LM Studio' else 'LM Studio')}: {r.status_code} - {r.text}")
+
     except Exception as e:
         st.error(f"Erro no streaming: {e}")
 
@@ -1948,9 +1961,12 @@ if entrada:
                 visible_txt = _render_visible(resposta_txt).strip()
             else:
                 r2 = requests.post(
-                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
-                    json={**payload, "stream": False},
-                    timeout=int(st.session_state.get("timeout_s", 300))
+                     endpoint,
+                     headers=headers,  # << aqui
+                     json={**payload, "stream": False},
+                     timeout=int(st.session_state.get("timeout_s", 300))
+                    )
+
                 )
                 if r2.status_code == 200:
                     try:
@@ -1978,7 +1994,8 @@ if entrada:
                 visible_txt = _render_visible(resposta_txt).strip()
             else:
                 r3 = requests.post(
-                    endpoint, headers={"Authorization": f"Bearer {auth}", "Content-Type": "application/json"},
+                    endpoint,
+                    headers=headers,  # << aqui
                     json={
                         "model": model_to_call,
                         "messages": [{"role": "system", "content": prompt}] + historico,
@@ -2041,6 +2058,7 @@ if entrada:
         memoria_longa_reforcar(usados)
     except Exception:
         pass
+
 
 
 
