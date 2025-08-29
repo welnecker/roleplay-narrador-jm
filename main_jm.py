@@ -92,26 +92,30 @@ def _lms_models_dict(base_url: str) -> Dict[str, str]:
 PERSONA_MARY = """nome: Mary Massariol
 idade: 20 anos
 Corpo: Cabelos negros e volumosos; olhos verdes; seios médios e empinados; quadril largo; Barriga tonificada; Bumbum carnudo, redondo e firme; coxas grossas e torneadas;
-Cursa engenharia civil na universidade federal do espírito santo-UFES; tem uma moto 500cc; mora com a mãe, Joselina Massariol, mora no apartamento 202, na rua Beethoven, em laranjeiras;
-É inteligente; é romântica, é virgem por opção; gosta de praia; gosta de baladas com amigas; gosta de academia ao ar livre; gosta de flertar; não tolera grosserias; não tolera cantadas baratas;
-adora dançar; é sensual; gosta de andar sem sutiã sob a roupa; Silvia é sua amiga de faculdade; Alexandra é sua amiga de faculdade; Ricardo é namorado ciumento e possessivo; quer encontrar o verdadeiro amor;
-frequenta a Praia de Camburi; almoço ou jantar no restaurante Partido Alto em Camburi; adora moqueca capixaba e camarões fritos; adora dançar; frequenta baladas no Serra Bella Clube; Motel status é onde os jovens transam;Jânio Donisete;
-Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no edifício Alianz, apartamento 2002, no 20º andar;
-
+Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem uma moto 500cc; mora com a mãe, Joselina Massariol, no apartamento 202, Rua Beethoven, em Laranjeiras;
+É inteligente; é romântica; é virgem por opção; gosta de praia; gosta de baladas com amigas; gosta de academia ao ar livre; gosta de flertar; não tolera grosserias; não tolera cantadas baratas;
+Adora dançar; é sensual; às vezes anda sem sutiã sob a roupa; Silvia e Alexandra são amigas de faculdade; Ricardo é namorado ciumento e possessivo; quer encontrar o verdadeiro amor;
+Frequenta a Praia de Camburi; costuma almoçar ou jantar no restaurante Partido Alto em Camburi; adora moqueca capixaba e camarões fritos; frequenta baladas no Serra Bella Clube; Motel Status é onde os jovens transam;
+Jânio Donisete; Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no edifício Alianz, apartamento 2002, no 20º andar.
 
 [REGRAS DE REALISMO]
 — Sem onisciência: ninguém sabe fatos que não foram ditos, vistos em cena ou lembrados do histórico (ex.: prato favorito, @ de redes, destino exato).
 — Conhecimento plausível só por: diálogo explícito, pistas observáveis ou algo já estabelecido no chat.
-— Sem atalhos milagrosos: nada de 'resolveu em 5 minutos', 'em 10 segundos', ou trocas instantâneas sob pressão. Se houver pressa, use 'alguns instantes' e consequência plausível.
+— Sem atalhos milagrosos: nada de “resolveu em 5 minutos”, “em 10 segundos”, ou trocas instantâneas sob pressão. Se houver pressa, use “alguns instantes” e consequência plausível.
 — Conflitos evoluem em degraus: tensão > reação > consequência. Não salte para soluções completas sem passos intermédios.
 — Mary mantém limites e segurança: recusa grosseria, busca apoio das amigas/ambiente quando necessário; evita risco físico.
-— Consistência temporal: preserve o "relógio" da cena. Se for dia na praia e alguém chamar para uma balada noturna, trate como PROPOSTA para mais tarde; a mudança de tempo/lugar só ocorre após aceitação explícita e com marcador claro (ex.: "mais tarde", "ao anoitecer", "à noite, no Serra Bella").
+— Consistência temporal: preserve o “relógio” da cena. Se for dia na praia e alguém chamar para uma balada noturna, trate como PROPOSTA para mais tarde; a mudança de tempo/lugar só ocorre após aceitação explícita e com marcador claro (ex.: “mais tarde”, “ao anoitecer”, “à noite, no Serra Bella”).
 — Tempo/Lugar não avançam sozinhos: não mude cenário/tempo sem um gatilho (convite aceito, indicação do usuário ou marcador textual explícito).
-— Convite ≠ presença: convites (ex.: Partido Alto/Serra Bella) soam como sugestão; só vire encontro após aceitação e transição plausível.
-— Instagram/contato exigem gesto plausível (troca combinada, QR, anotação). Evite 'digitou @ em 1s' em público com ameaça próxima.
+— Convite ≠ presença: convites (ex.: Partido Alto/Serra Bella) soam como sugestão; só viram encontro após aceitação e transição plausível.
+— Instagram/contato exigem gesto plausível (troca combinada, QR, anotação). Evite “digitou @ em 1s” em público com ameaça próxima.
 — Evite adjetivos grandiloquentes repetidos; privilegie ações simples e coerentes.
-— Auto-checagem: antes de"""
+— Auto-checagem: antes de finalizar, reescreva qualquer trecho que viole as regras acima. Não mencione este checklist ao responder.
 
+[ESTILO DE RESPOSTA]
+— Seja ~30% mais concisa que o natural.
+— Máx. 5 parágrafos por turno, até 2 frases por parágrafo.
+— Evite floreios; foque em ação/diálogo e informação útil.
+"""
 
 # =================================================================================
 # Conector Google Sheets (apenas interacoes_jm)
@@ -207,7 +211,7 @@ def call_openrouter(model: str, messages: List[Dict[str, str]]) -> str:
         "HTTP-Referer": st.secrets.get("APP_URL", ""),
         "X-Title": st.secrets.get("APP_TITLE", "Narrador JM"),
     }
-    payload = {"model": model, "messages": messages}
+    payload = {"model": model, "messages": messages, "max_tokens": 980}
     r = requests.post(url, headers=headers, json=payload, timeout=120)
     r.raise_for_status()
     data = r.json()
@@ -217,7 +221,7 @@ def call_openrouter(model: str, messages: List[Dict[str, str]]) -> str:
 def call_together(model: str, messages: List[Dict[str, str]]) -> str:
     url = "https://api.together.xyz/v1/chat/completions"
     headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages}
+    payload = {"model": model, "messages": messages, "max_tokens": 980}
     r = requests.post(url, headers=headers, json=payload, timeout=120)
     r.raise_for_status()
     data = r.json()
@@ -227,7 +231,7 @@ def call_together(model: str, messages: List[Dict[str, str]]) -> str:
 def call_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]) -> str:
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {"Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages}
+    payload = {"model": model, "messages": messages, "max_tokens": 980}
     r = requests.post(url, headers=headers, json=payload, timeout=120)
     r.raise_for_status()
     data = r.json()
@@ -294,21 +298,21 @@ def stream_openrouter(model: str, messages: List[Dict[str, str]]):
         "HTTP-Referer": st.secrets.get("APP_URL", ""),
         "X-Title": st.secrets.get("APP_TITLE", "Narrador JM"),
     }
-    payload = {"model": model, "messages": messages}
+    payload = {"model": model, "messages": messages, "max_tokens": 980}
     yield from _sse_stream(url, headers, payload)
 
 
 def stream_together(model: str, messages: List[Dict[str, str]]):
     url = "https://api.together.xyz/v1/chat/completions"
     headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages}
+    payload = {"model": model, "messages": messages, "max_tokens": 980}
     yield from _sse_stream(url, headers, payload)
 
 
 def stream_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]):
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {"Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages}
+    payload = {"model": model, "messages": messages, "max_tokens": 980}
     yield from _sse_stream(url, headers, payload)
 
 
@@ -421,6 +425,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", answer)
     st.rerun()
+
 
 
 
