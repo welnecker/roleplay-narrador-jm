@@ -127,7 +127,7 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 É inteligente; é romântica; é virgem por opção; gosta de praia; gosta de baladas com amigas; gosta de academia ao ar livre; gosta de flertar; não tolera grosserias; não tolera cantadas baratas;
 Adora dançar; é sensual; às vezes anda sem sutiã sob a roupa; Silvia e Alexandra são amigas de faculdade; Ricardo é namorado ciumento e possessivo; quer encontrar o verdadeiro amor;
 Frequenta a Praia de Camburi; costuma almoçar ou jantar no restaurante Partido Alto em Camburi; adora moqueca capixaba e camarões fritos; frequenta baladas no Serra Bella Clube; Motel Status é onde os jovens transam;
-Jânio Donisete; Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no edifício Alianz, apartamento 2002, no 20º andar; Jânio é arquiteto bem sucedido;
+Jânio Donisete; Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no edifício Alianz, apartamento 2002, no 20º andar; Jânio é arquiteto bem sucedido; Jânio tem 32 anos de idade;
 
 [REGRAS DE REALISMO]
 — Sem onisciência: ninguém sabe fatos que não foram ditos, vistos em cena ou lembrados do histórico (ex.: prato favorito, @ de redes, destino exato).
@@ -482,6 +482,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
