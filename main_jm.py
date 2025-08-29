@@ -21,6 +21,37 @@ from huggingface_hub import InferenceClient
 
 st.set_page_config(page_title="Narrador JM — Clean Messages", page_icon="🎬")
 
+
+# --------- Filtro: silenciar falas/mensagens de Jânio ---------
+_JANIO_MSG_LABEL = re.compile(r"(?im)^\s*\*?\*?Mensagem de J[âa]nio:?\*?\*?\s*$")
+_JANIO_LINE_LABEL = re.compile(r"(?im)^\s*J[âa]nio\s*:\s*.*$")
+
+def silenciar_janio(txt: str) -> str:
+    if not txt:
+        return txt
+    out, skip_block = [], False
+    for line in txt.splitlines():
+        # Bloqueia blocos iniciados por "Mensagem de Jânio:"
+        if _JANIO_MSG_LABEL.match(line):
+            out.append("_Uma notificação chega no celular de Mary._")
+            skip_block = True
+            continue
+        if skip_block:
+            # encerra bloqueio ao encontrar linha em branco
+            if not line.strip():
+                skip_block = False
+            continue
+        # Remove linhas tipo "Jânio: ..."
+        if _JANIO_LINE_LABEL.match(line):
+            out.append("_[Conteúdo de Jânio omitido]_")
+            continue
+        # Heurística leve: falas com travessão que soam como dele (ex.: citando 'Donisete' ou 'arquiteto')
+        if re.match(r"^\s*—\s*[\"“].*[\"”]\s*$", line) and ("donisete" in line.lower() or "arquiteto" in line.lower()):
+            out.append("_[Jânio reage sem falar]_")
+            continue
+        out.append(line)
+    return "\n".join(out)
+
 # =================================================================================
 # Config Planilha
 # =================================================================================
@@ -133,7 +164,6 @@ Jânio Donisete; Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no 
 — Consentimento claro e revogável; use sinais explícitos (ex.: "posso te beijar?", "tudo bem continuar?").
 — Marque passagem de tempo/contexto (ex.: "mais tarde", "dias depois"); sem saltos bruscos.
 — Sexo explícito (sem fade-to-black): permitido detalhes anatômicos, posições, fluidos ou nudez explícita.
-— Segurança e respeito: privacidade, proteção e interrupção imediata se houver desconforto ou risco.
 — Mantenha as REGRAS DE REALISMO, a NARRAÇÃO EM 3ª PESSOA e o ESTILO DE RESPOSTA.
 
 
@@ -439,18 +469,21 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
             for delta in gen:
                 answer += delta
-                ph.markdown(answer + "▌")
+                ph.markdown(silenciar_janio(answer) + "▌")
         except Exception as e:
             answer = f"[Erro ao chamar o modelo: {e}]"
             ph.markdown(answer)
 
-    st.session_state.chat.append({"role": "assistant", "content": answer})
+    _ans_clean = silenciar_janio(answer)
+    st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
     # Mantém apenas as últimas 30 interações na tela
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
-    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", answer)
+    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
+
 
 
 
