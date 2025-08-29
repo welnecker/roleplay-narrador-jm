@@ -96,6 +96,7 @@ Estuda na universidade federal do espírito santo-UFES; tem uma moto 500cc; mora
 É inteligente; é romântica, é virgem por opção; gosta de praia; gosta de baladas com amigas; gosta de academia ao ar livre; gosta de flertar; não tolera grosserias; não tolera cantadas baratas;
 adora dançar; é sensual; gosta de andar sem sutiã sob a roupa; Silvia é sua amiga de faculdade; Alexandra é sua amiga de faculdade; Ricardo é namorado ciumento e possessivo; quer encontrar o verdadeiro amor;
 frequenta a Praia de Camburi; almoço ou jantar no restaurante Partido Alto em Camburi; adora moqueca capixaba e camarões fritos; adora dançar; frequenta baladas no Serra Bella Clube; Motel status é onde os jovens transam;Jânio Donisete;
+Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no edifício Alianz, apartamento 2002, no 20º andar;
 
 
 [REGRAS DE REALISMO]
@@ -420,4 +421,5 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", answer)
     st.rerun()
+
 
