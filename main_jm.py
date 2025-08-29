@@ -101,7 +101,7 @@ PERSONA_MARY = (
     "adora dançar; é sensual; gosta de andar sem sutiã sob a roupa; Silvia é sua amiga de faculdade; Alexandra é sua amiga de faculdade; "
     "Ricardo é namorado ciumento e possessivo; quer encontrar o verdadeiro amor;\n"
     "frequenta a Praia de Camburi; almoço ou jantar no restaurante Partido Alto em Camburi; adora moqueca capixaba e camarões fritos; "
-    "adora dançar; frequenta baladas no Serra Bella Clube; Motel status é onde os jovens transam; Jânio Donisete é o rapaz misterioso\n"
+    "adora dançar; frequenta baladas no Serra Bella Clube; Motel status é onde os jovens transam;\n"
 )
 
 # =================================================================================
@@ -246,6 +246,89 @@ def call_huggingface(model: str, messages: List[Dict[str, str]]) -> str:
     return client.text_generation(model=model, prompt=prompt, max_new_tokens=512)
 
 # =================================================================================
+# Streaming helpers — envia em pedaços para a UI
+# =================================================================================
+
+import time
+
+
+def _sse_stream(url: str, headers: Dict[str, str], payload: Dict[str, any]):
+    """Itera eventos SSE de /chat/completions com stream=True e retorna trechos de texto."""
+    payload_stream = dict(payload)
+    payload_stream["stream"] = True
+    with requests.post(url, headers=headers, json=payload_stream, stream=True, timeout=300) as r:
+        r.raise_for_status()
+        for raw in r.iter_lines(decode_unicode=False):
+            if not raw:
+                continue
+            line = raw.decode("utf-8", errors="ignore").strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                j = json.loads(data)
+                ch = j.get("choices", [{}])[0]
+                delta = (ch.get("delta") or {}).get("content") or (ch.get("message") or {}).get("content")
+                if delta:
+                    yield delta
+            except Exception:
+                continue
+
+
+def stream_openrouter(model: str, messages: List[Dict[str, str]]):
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {st.secrets.get('OPENROUTER_API_KEY', '')}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": st.secrets.get("APP_URL", ""),
+        "X-Title": st.secrets.get("APP_TITLE", "Narrador JM"),
+    }
+    payload = {"model": model, "messages": messages}
+    yield from _sse_stream(url, headers, payload)
+
+
+def stream_together(model: str, messages: List[Dict[str, str]]):
+    url = "https://api.together.xyz/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
+    payload = {"model": model, "messages": messages}
+    yield from _sse_stream(url, headers, payload)
+
+
+def stream_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]):
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    payload = {"model": model, "messages": messages}
+    yield from _sse_stream(url, headers, payload)
+
+
+def _chunker(txt: str, n: int = 48):
+    """Quebra texto em pedaços de ~n caracteres, respeitando espaços quando possível."""
+    buf = []
+    cur = 0
+    while cur < len(txt):
+        end = min(len(txt), cur + n)
+        slice_ = txt[cur:end]
+        if end < len(txt) and " " in slice_:
+            last_sp = slice_.rfind(" ")
+            if last_sp > 0:
+                end = cur + last_sp + 1
+                slice_ = txt[cur:end]
+        buf.append(slice_)
+        cur = end
+    return buf
+
+
+def stream_huggingface(model: str, messages: List[Dict[str, str]]):
+    """HF Inference API nem sempre fornece SSE; simulamos streaming dividindo o texto."""
+    full = call_huggingface(model, messages)
+    for piece in _chunker(full, 48):
+        yield piece
+        time.sleep(0.02)  # leve suavização visual
+
+
+# =================================================================================
 # UI
 # =================================================================================
 if "session_id" not in st.session_state:
@@ -302,17 +385,25 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
     messages = build_minimal_messages(st.session_state.chat)
 
-    try:
-        if prov == "OpenRouter":
-            answer = call_openrouter(model_id, messages)
-        elif prov == "Together":
-            answer = call_together(model_id, messages)
-        elif prov == "Hugging Face":
-            answer = call_huggingface(model_id, messages)
-        else:
-            answer = call_lmstudio(st.session_state.lms_base_url, model_id, messages)
-    except Exception as e:
-        answer = f"[Erro ao chamar o modelo: {e}]"
+    with st.chat_message("assistant"):
+        ph = st.empty()
+        answer = ""
+        try:
+            if prov == "OpenRouter":
+                gen = stream_openrouter(model_id, messages)
+            elif prov == "Together":
+                gen = stream_together(model_id, messages)
+            elif prov == "Hugging Face":
+                gen = stream_huggingface(model_id, messages)
+            else:
+                gen = stream_lmstudio(st.session_state.lms_base_url, model_id, messages)
+
+            for delta in gen:
+                answer += delta
+                ph.markdown(answer + "▌")
+        except Exception as e:
+            answer = f"[Erro ao chamar o modelo: {e}]"
+            ph.markdown(answer)
 
     st.session_state.chat.append({"role": "assistant", "content": answer})
     # Mantém apenas as últimas 30 interações na tela
@@ -321,4 +412,3 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", answer)
     st.rerun()
-
