@@ -101,7 +101,7 @@ PERSONA_MARY = (
     "adora dançar; é sensual; gosta de andar sem sutiã sob a roupa; Silvia é sua amiga de faculdade; Alexandra é sua amiga de faculdade; "
     "Ricardo é namorado ciumento e possessivo; quer encontrar o verdadeiro amor;\n"
     "frequenta a Praia de Camburi; almoço ou jantar no restaurante Partido Alto em Camburi; adora moqueca capixaba e camarões fritos; "
-    "adora dançar; frequenta baladas no Serra Bella Clube; Motel status é onde os jovens transam;\n"
+    "adora dançar; frequenta baladas no Serra Bella Clube; Motel status é onde os jovens transam; Jânio Donisete é o rapaz misterioso\n"
 )
 
 # =================================================================================
@@ -321,3 +321,4 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", answer)
     st.rerun()
+
