@@ -22,34 +22,55 @@ from huggingface_hub import InferenceClient
 st.set_page_config(page_title="Narrador JM — Clean Messages", page_icon="🎬")
 
 
-# --------- Filtro: silenciar falas/mensagens de Jânio ---------
-_JANIO_MSG_LABEL = re.compile(r"(?im)^\s*\*?\*?Mensagem de J[âa]nio:?\*?\*?\s*$")
-_JANIO_LINE_LABEL = re.compile(r"(?im)^\s*J[âa]nio\s*:\s*.*$")
+# --------- Filtro: silenciar falas/mensagens de Jânio (robusto) ---------
+def _is_quoted_or_bulleted(line: str) -> bool:
+    s = line.lstrip()
+    return (
+        s.startswith('—') or
+        s.startswith('"') or s.startswith('“') or
+        s.startswith('*"') or s.startswith('*“') or
+        s[:2] in ('- ', '* ') or
+        (len(s) > 2 and s[0].isdigit() and s[1] in '.)')
+    )
 
 def silenciar_janio(txt: str) -> str:
     if not txt:
         return txt
-    out, skip_block = [], False
+    out: List[str] = []
+    ctx = 0  # >0 indica contexto de mensagem atribuída ao Jânio nas próximas linhas
     for line in txt.splitlines():
-        # Bloqueia blocos iniciados por "Mensagem de Jânio:"
-        if _JANIO_MSG_LABEL.match(line):
-            out.append("_Uma notificação chega no celular de Mary._")
-            skip_block = True
+        raw = line.strip()
+        low = raw.lower()
+
+        # Gatilhos de início de bloco: "Jânio.", "**Jânio.**", "Mensagem de Jânio…"
+        if low in ('jânio.', 'janio.', '**jânio.**', '**janio.**') or \
+           low.startswith('mensagem de jânio') or low.startswith('mensagens de jânio'):
+            out.append('_Uma notificação de Jânio chega ao celular de Mary._')
+            ctx = 3
             continue
-        if skip_block:
-            # encerra bloqueio ao encontrar linha em branco
-            if not line.strip():
-                skip_block = False
+
+        # Linha "Jânio: ..."
+        if low.startswith('jânio:') or low.startswith('janio:'):
+            out.append('_[Conteúdo de Jânio omitido]_')
             continue
-        # Remove linhas tipo "Jânio: ..."
-        if _JANIO_LINE_LABEL.match(line):
-            out.append("_[Conteúdo de Jânio omitido]_")
+
+        # Durante contexto, suprimir citações e listas (provável conteúdo dele)
+        if ctx > 0 and _is_quoted_or_bulleted(line):
+            out.append('_[Conteúdo de Jânio omitido]_')
+            ctx -= 1
             continue
-        # Heurística leve: falas com travessão que soam como dele (ex.: citando 'Donisete' ou 'arquiteto')
-        if re.match(r"^\s*—\s*[\"“].*[\"”]\s*$", line) and ("donisete" in line.lower() or "arquiteto" in line.lower()):
-            out.append("_[Jânio reage sem falar]_")
+
+        # Heurística extra: fala com travessão que claramente soa como dele
+        if re.match(r'^\s*—\s*["“].*["”]\s*$', line) and ('donisete' in low or 'arquiteto' in low):
+            out.append('_[Jânio reage sem falar]_')
             continue
+
+        # Encerrar contexto em linha vazia
+        if ctx > 0 and not raw:
+            ctx = 0
+
         out.append(line)
+
     return "\n".join(out)
 
 # =================================================================================
@@ -469,12 +490,17 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
             for delta in gen:
                 answer += delta
+                # Mostra texto em tempo real já filtrado (sem falas/mensagens do Jânio)
                 ph.markdown(silenciar_janio(answer) + "▌")
         except Exception as e:
             answer = f"[Erro ao chamar o modelo: {e}]"
-            ph.markdown(answer)
+            ph.markdown(silenciar_janio(answer))
+        finally:
+            # Render final sem o cursor e já filtrado
+            _ans_clean = silenciar_janio(answer)
+            ph.markdown(_ans_clean)
 
-    _ans_clean = silenciar_janio(answer)
+    # Salva sempre a versão filtrada
     st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
     # Mantém apenas as últimas 30 interações na tela
     if len(st.session_state.chat) > 30:
@@ -482,6 +508,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
