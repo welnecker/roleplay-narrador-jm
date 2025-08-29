@@ -211,7 +211,7 @@ def call_openrouter(model: str, messages: List[Dict[str, str]]) -> str:
         "HTTP-Referer": st.secrets.get("APP_URL", ""),
         "X-Title": st.secrets.get("APP_TITLE", "Narrador JM"),
     }
-    payload = {"model": model, "messages": messages, "max_tokens": 980}
+    payload = {"model": model, "messages": messages, "max_tokens": 680}
     r = requests.post(url, headers=headers, json=payload, timeout=120)
     r.raise_for_status()
     data = r.json()
@@ -221,7 +221,7 @@ def call_openrouter(model: str, messages: List[Dict[str, str]]) -> str:
 def call_together(model: str, messages: List[Dict[str, str]]) -> str:
     url = "https://api.together.xyz/v1/chat/completions"
     headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages, "max_tokens": 980}
+    payload = {"model": model, "messages": messages, "max_tokens": 680}
     r = requests.post(url, headers=headers, json=payload, timeout=120)
     r.raise_for_status()
     data = r.json()
@@ -231,7 +231,7 @@ def call_together(model: str, messages: List[Dict[str, str]]) -> str:
 def call_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]) -> str:
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {"Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages, "max_tokens": 980}
+    payload = {"model": model, "messages": messages, "max_tokens": 680}
     r = requests.post(url, headers=headers, json=payload, timeout=120)
     r.raise_for_status()
     data = r.json()
@@ -298,21 +298,21 @@ def stream_openrouter(model: str, messages: List[Dict[str, str]]):
         "HTTP-Referer": st.secrets.get("APP_URL", ""),
         "X-Title": st.secrets.get("APP_TITLE", "Narrador JM"),
     }
-    payload = {"model": model, "messages": messages, "max_tokens": 980}
+    payload = {"model": model, "messages": messages, "max_tokens": 680}
     yield from _sse_stream(url, headers, payload)
 
 
 def stream_together(model: str, messages: List[Dict[str, str]]):
     url = "https://api.together.xyz/v1/chat/completions"
     headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages, "max_tokens": 980}
+    payload = {"model": model, "messages": messages, "max_tokens": 680}
     yield from _sse_stream(url, headers, payload)
 
 
 def stream_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]):
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {"Content-Type": "application/json"}
-    payload = {"model": model, "messages": messages, "max_tokens": 980}
+    payload = {"model": model, "messages": messages, "max_tokens": 680}
     yield from _sse_stream(url, headers, payload)
 
 
@@ -425,6 +425,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", answer)
     st.rerun()
+
 
 
 
