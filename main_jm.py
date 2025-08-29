@@ -750,62 +750,106 @@ def carregar_falas_mary() -> List[str]:
 # AJUSTES DE TOM / SINTONIA
 # =========================
 
-def gerar_mary_sensorial(level: int = 2, n: int = 2, hair_on: bool = True, sintonia: bool = True) -> str:
+def _last_assistant_text(hist):
+    """Retorna o último texto do assistente (para continuidade da cena)."""
+    if not hist:
+        return ""
+    for r in reversed(hist):
+        if str(r.get("role", "")).lower() == "assistant":
+            return r.get("content", "") or ""
+    return ""
+
+def gerar_mary_sensorial_adaptativo(prev_txt: str, level: int = 2, n: int = 2, sintonia: bool = True) -> str:
+    """
+    Gera frases sensoriais iniciais com VARIAÇÃO baseada no que aconteceu na
+    RESPOSTA ANTERIOR do assistente (prev_txt). Não força mais 'cabelos...'.
+    """
     if level <= 0 or n <= 0:
         return ""
 
-    base_leve = [
-        "Os cabelos de Mary — negros, volumosos, levemente ondulados — acompanham o passo.",
-        "O olhar de Mary é firme e sereno; a respiração, tranquila.",
-        "Há calor discreto no perfume que ela deixa no ar.",
-        "O sorriso surge pequeno, sincero e atento.",
-    ]
-    base_marcado = [
-        "O tecido roça levemente nas pernas; o passo é seguro, cadenciado.",
-        "Os ombros relaxam quando ela encontra o olhar de Jânio.",
-        "A pele arrepia sutil ao menor toque.",
-        "O olhar de Mary segura o dele por um instante a mais.",
-    ]
-    base_ousado = [
-        "O ritmo do corpo de Mary é deliberado; chama sem exigir.",
-        "O perfume dela exala convidando a aproximação.",
-        "Os lábios entreabertos, esperando o momento certo.",
-        "O olhar pousa e permanece, sugerindo contato.",
-    ]
+    t = (prev_txt or "").lower()
 
-    if level == 1:
-        pool = list(base_leve)
-    elif level == 2:
-        pool = list(base_leve) + list(base_marcado)
-    else:
-        pool = list(base_leve) + list(base_marcado) + list(base_ousado)
+    pool = []
 
+    # Gatilhos de continuidade
+    if re.search(r"\bbeij", t):
+        pool += [
+            "Os lábios roçam de novo, pedindo mais.",
+            "A boca fica entreaberta, pronta para responder.",
+        ]
+    if re.search(r"\bm[aã]o|toque|ded", t):
+        pool += [
+            "As mãos guiam devagar, sentindo a temperatura da pele.",
+            "O toque acende um rastro quente por onde passa.",
+        ]
+    if re.search(r"\bolhar|encar", t):
+        pool += [
+            "O olhar prende o dele por um instante longo.",
+            "Ela sustenta os olhos dele e diminui a distância.",
+        ]
+    if re.search(r"\brespir|suspiro|ofeg", t):
+        pool += [
+            "A respiração encurta no mesmo compasso.",
+            "O peito sobe e desce mais rápido, sem pressa de concluir.",
+        ]
+    if re.search(r"\bquadris|cintura|encostar|corpo\b", t):
+        pool += [
+            "Os quadris cedem meio passo e alinham o ritmo.",
+            "O corpo inclina e encontra o dele, de leve.",
+        ]
+    if re.search(r"\broup|tecido|bot[aã]o|z[ií]per|saia|vestid", t):
+        pool += [
+            "O tecido roça onde não roçava antes.",
+            "A barra teima em fugir do lugar.",
+        ]
+    # cabelo só se já foi citado antes (e mesmo assim de forma opcional)
+    if re.search(r"\bcabelo", t) and random.random() < 0.4:
+        pool += ["O cabelo cai de leve quando ela vira o rosto."]
+
+    # Fallback neutro caso não haja gatilhos
+    if not pool:
+        pool = [
+            "O olhar segura o dele por mais um segundo.",
+            "As mãos procuram caminho sem apressar nada.",
+            "A respiração aquece o intervalo entre uma palavra e outra.",
+        ]
+
+    # Escala por nível
+    if level >= 2:
+        pool += ["Os lábios pedem mais sem dizer nada."]
+    if level >= 3:
+        pool += ["Os quadris respondem num convite claro, ainda contido."]
+
+    # Filtro anti-cenário/metáforas (mesmo padrão do projeto)
     termos_banidos = re.compile(
         r"\b(c[ée]u|mar|onda?s?|vento|brisa|chuva|nublado|luar|horizonte|pier|paisage?m|cen[áa]rio|amanhecer|entardecer|p[ôo]r do sol)\b",
         re.IGNORECASE,
     )
     pool = [f for f in pool if not termos_banidos.search(f)]
 
+    # Sintonia (sem ordens ríspidas)
     if sintonia:
         filtros = [r"\bexigir\b"]
-        def _ok(fr): return not any(re.search(p, fr, re.I) for p in filtros)
+        def _ok(frase): return not any(re.search(p, frase, re.I) for p in filtros)
         pool = [f for f in pool if _ok(f)]
         pool.extend([
-            "A respiração de Mary busca o mesmo compasso de Jânio.",
-            "Ela desacelera e deixa o momento guiar.",
+            "Ela acompanha o ritmo dele, sem impor nem recuar demais.",
             "O toque começa suave, sem precipitação.",
         ])
 
-    n_eff = max(1, min(n, len(pool)))
-    frases = random.sample(pool, k=n_eff) if pool else []
+    # Dedup + amostragem
+    uniq = []
+    for p in pool:
+        if p not in uniq:
+            uniq.append(p)
 
-    if hair_on:
-        hair_line = "Os cabelos negros, volumosos e levemente ondulados moldam o rosto quando ela vira de leve."
-        if hair_line not in frases:
-            frases.insert(0, hair_line)
-            if len(frases) > n_eff:
-                frases = frases[:n_eff]
-    return " ".join(frases)
+    k = max(1, min(n, len(uniq))) if uniq else 0
+    if k == 0:
+        return ""
+    escolhidas = random.sample(uniq, k=k)
+
+    # Frases curtas; o LLM formata como parágrafo
+    return " ".join(escolhidas)
 
 def _last_user_text(hist):
     if not hist:
@@ -843,6 +887,7 @@ def prompt_da_cena(ctx: dict | None = None, modo_finalizacao: str = "ponte") -> 
         f"ABERTURA_SUGERIDA: {primeira_linha if primeira_linha != '.' else ''}\n"
     )
 
+
 def inserir_regras_mary_e_janio(prompt_base: str) -> str:
     calor = int(st.session_state.get("nsfw_max_level", 0))
     regras = f"""
@@ -867,6 +912,7 @@ Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, 
     ctx = st.session_state.get("ctx_cena", {})
     cena_bloco = prompt_da_cena(ctx, st.session_state.get("finalizacao_modo", "ponte"))
 
+    # histórico -> limpeza de termos de cenário (mantido como no seu código)
     def _hist_sanitizado(hist):
         _split = re.compile(r'(?<=[\.\!\?])\s+')
         _amb = re.compile(
@@ -884,20 +930,30 @@ Apenas sensação física, diálogo direto, calor, suor, desejo, roçar, toque, 
                 L.append(f"{role}: {' '.join(s)[:900]}")
         return "\n".join(L) if L else "(sem histórico)"
 
+    # estado/recursos
     memos = carregar_memorias_brutas()
     perfil = carregar_resumo_salvo()
     fase = int(st.session_state.get("mj_fase", mj_carregar_fase_inicial()))
     fdata = FASES_ROMANCE.get(fase, FASES_ROMANCE[0])
     modo_mary = bool(st.session_state.get("interpretar_apenas_mary", False))
 
+    # ===== Camada sensorial ADAPTATIVA (sem frase fixa do cabelo) =====
     _sens_on = bool(st.session_state.get("mary_sensorial_on", True))
     _sens_level = int(st.session_state.get("mary_sensorial_level", 2))
     _sens_n = int(st.session_state.get("mary_sensorial_n", 2))
+
+    # Continuidade baseada na ÚLTIMA resposta do assistente
+    prev_assist_txt = _last_assistant_text(st.session_state.get("session_msgs", []))
+
     mary_sens_txt = (
-        gerar_mary_sensorial(_sens_level, n=_sens_n, sintonia=bool(st.session_state.get("modo_sintonia", True)))
+        gerar_mary_sensorial_adaptativo(
+            prev_assist_txt,
+            level=_sens_level,
+            n=_sens_n,
+            sintonia=bool(st.session_state.get("modo_sintonia", True)),
+        )
         if _sens_on else ""
     )
-
     ritmo_cena = int(st.session_state.get("ritmo_cena", 0))
     ritmo_label = ["muito lento", "lento", "médio", "rápido"][max(0, min(3, ritmo_cena))]
     modo_sintonia = bool(st.session_state.get("modo_sintonia", True))
@@ -1807,5 +1863,6 @@ if entrada:
             memoria_longa_reforcar(usados)
         except Exception:
             pass
+
 
 
