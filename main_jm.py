@@ -146,6 +146,38 @@ def salvar_interacao(ts: str, session_id: str, provider: str, model: str, role: 
         st.warning(f"Falha ao salvar interação: {e}")
 
 # =================================================================================
+# Carregamento de histórico persistente (últimas interações)
+# =================================================================================
+
+from typing import Tuple
+
+
+def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
+    """Carrega ao menos n_min interações da última sessão registrada na aba interacoes_jm.
+    Retorna uma lista de mensagens no formato [{"role": "user|assistant", "content": str}, ...].
+    Limita implicitamente a 30 ao aplicar na tela."""
+    if not WS_INTERACOES:
+        return []
+    try:
+        valores = WS_INTERACOES.get_all_values()  # [[timestamp, session_id, provider, model, role, content], ...]
+        if not valores or len(valores) < 2:
+            return []
+        linhas = [r for r in valores[1:] if len(r) >= 6]
+        if not linhas:
+            return []
+        # Usa a última session_id registrada na planilha
+        last_sid = linhas[-1][1].strip()
+        sess = [r for r in linhas if r[1].strip() == last_sid and r[4] in ("user", "assistant")]
+        if not sess:
+            return []
+        recortes = sess[-max(n_min, 1):]
+        chat = [{"role": r[4].strip(), "content": (r[5] or "").strip()} for r in recortes]
+        return chat
+    except Exception:
+        return []
+
+
+# =================================================================================
 # Helpers — mensagens mínimas
 # =================================================================================
 
@@ -220,6 +252,13 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
 if "chat" not in st.session_state:
     st.session_state.chat: List[Dict[str, str]] = []
+    # 🔁 Carrega as 5 últimas interações salvas da sessão anterior (se houver)
+    try:
+        _loaded = carregar_ultimas_interacoes(5)
+        if _loaded:
+            st.session_state.chat = _loaded[-30:]
+    except Exception:
+        pass
 
 st.title("Narrador JM — Clean Messages 🎬")
 
@@ -256,6 +295,9 @@ for m in st.session_state.chat:
 if user_msg := st.chat_input("Fale com a Mary..."):
     ts = datetime.now().isoformat(sep=" ", timespec="seconds")
     st.session_state.chat.append({"role": "user", "content": user_msg})
+    # Mantém apenas as últimas 30 interações na tela
+    if len(st.session_state.chat) > 30:
+        st.session_state.chat = st.session_state.chat[-30:]
     salvar_interacao(ts, st.session_state.session_id, prov, model_id, "user", user_msg)
 
     messages = build_minimal_messages(st.session_state.chat)
@@ -273,6 +315,9 @@ if user_msg := st.chat_input("Fale com a Mary..."):
         answer = f"[Erro ao chamar o modelo: {e}]"
 
     st.session_state.chat.append({"role": "assistant", "content": answer})
+    # Mantém apenas as últimas 30 interações na tela
+    if len(st.session_state.chat) > 30:
+        st.session_state.chat = st.session_state.chat[-30:]
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", answer)
     st.rerun()
