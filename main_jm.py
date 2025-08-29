@@ -118,6 +118,15 @@ Jânio Donisete; Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no 
 — Evite metáforas e sensorial de ambiente; foque em ações e estado emocional; 
 — Consentimento e respeito sempre; nada de coerção. Mantenha as **REGRAS DE REALISMO** e o **ESTILO DE RESPOSTA**.
 
+[REGRAS DE DIÁLOGO — JÂNIO (SILENCIAR)]
+— Não escreva falas de Jânio (sem linhas com travessão/aspas atribuídas a ele).
+— Não transcreva mensagens/textos enviados por Jânio; resuma como notificação recebida.
+— Mostre apenas reações/gestos de Jânio em narração (olhar, postura, ação), sem fala.
+— As falas de Jânio pertencem ao usuário: só existem se o usuário escrever explicitamente.
+— Se gerar fala de Jânio por engano, reescreva removendo-a antes de finalizar a resposta.
+
+
+
 
 [PROGRESSÃO DE INTIMIDADE]
 — Evolução gradual no tempo: flerte → toques leves → beijo → (se ambos quiserem) avanço íntimo.
@@ -442,6 +451,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", answer)
     st.rerun()
+
 
 
 
