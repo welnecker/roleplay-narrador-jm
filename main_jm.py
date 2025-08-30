@@ -560,26 +560,25 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
             for delta in gen:
                 answer += delta
-                # Mostra texto em tempo real já filtrado (sem falas/mensagens do Jânio)
-                ph.markdown(silenciar_janio(answer) + "▌")
+                # Mostra texto em tempo real já filtrado (Jânio + fala do usuário)
+                ph.markdown(apply_filters(answer) + "▌")
         except Exception as e:
             answer = f"[Erro ao chamar o modelo: {e}]"
-            ph.markdown(apply_filters(answer) + "▌")
+            ph.markdown(apply_filters(answer))
         finally:
-            # Render final sem o cursor e já filtrado
+            # Render final sem cursor, já filtrado
             _ans_clean = apply_filters(answer)
             ph.markdown(_ans_clean)
 
-    # Salva sempre a versão filtrada
+    # Salva sempre a versão filtrada (uma única vez)
     st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
-    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
-
     # Mantém apenas as últimas 30 interações na tela
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
