@@ -256,6 +256,9 @@ Jânio Donisete; Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no 
 # Conector Google Sheets (apenas interacoes_jm)
 # =================================================================================
 
+# =================================================================================
+# Conector Google Sheets (apenas interacoes_jm)
+# =================================================================================
 def _load_google_creds_dict() -> dict:
     raw = st.secrets.get("GOOGLE_CREDS_JSON")
     if raw is None:
@@ -287,7 +290,8 @@ def salvar_interacao(ts: str, session_id: str, provider: str, model: str, role: 
         return
     try:
         WS_INTERACOES.append_row(
-            [ts, session_id, provider, model, role, content], value_input_option="USER_ENTERED"
+            [ts, session_id, provider, model, role, content],
+            value_input_option="USER_ENTERED"
         )
     except (APIError, GSpreadException) as e:
         st.warning(f"Falha ao salvar interação: {e}")
@@ -576,6 +580,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
