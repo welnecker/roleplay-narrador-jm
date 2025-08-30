@@ -11,7 +11,6 @@ import json
 import re
 from datetime import datetime
 from typing import Dict, List, Any
-
 import gspread
 import requests
 import streamlit as st
@@ -21,6 +20,31 @@ from huggingface_hub import InferenceClient
 
 st.set_page_config(page_title="Narrador JM — Clean Messages", page_icon="🎬")
 
+# ================================
+# UI — Roleplay comercial (cards)
+# ================================
+with st.sidebar:
+    st.subheader("Roleplay comercial")
+    st.session_state.setdefault("user_name", "")
+    st.session_state["user_name"] = st.text_input(
+        "Seu nome (como o personagem vai se referir a você)",
+        value=st.session_state["user_name"],
+        max_chars=40,
+    )
+    st.session_state.setdefault("scenario_init", "")
+    st.session_state.setdefault("plot_init", "")
+    st.session_state["scenario_init"] = st.text_area(
+        "Cenário inicial",
+        value=st.session_state["scenario_init"],
+        height=80,
+        placeholder="Ex.: Final de tarde na Praia de Camburi; quiosque perto do calçadão…",
+    )
+    st.session_state["plot_init"] = st.text_area(
+        "Enredo inicial",
+        value=st.session_state["plot_init"],
+        height=80,
+        placeholder="Ex.: Mary encontra o usuário após um mal-entendido com Ricardo…",
+    )
 
 # --------- Filtro: silenciar falas/mensagens de Jânio (robusto) ---------
 def _is_quoted_or_bulleted(line: str) -> bool:
@@ -37,41 +61,72 @@ def silenciar_janio(txt: str) -> str:
     if not txt:
         return txt
     out: List[str] = []
-    ctx = 0  # >0 indica contexto de mensagem atribuída ao Jânio nas próximas linhas
+    msg_ctx = 0     # após "Mensagem de Jânio"/"**Jânio.**": suprime próximas 3 citações
+    near_janio = 0  # após mencionar "Jânio": suprime 2 falas seguintes
+
     for line in txt.splitlines():
         raw = line.strip()
         low = raw.lower()
 
-        # Gatilhos de início de bloco: "Jânio.", "**Jânio.**", "Mensagem de Jânio…"
-        if low in ('jânio.', 'janio.', '**jânio.**', '**janio.**') or \
-           low.startswith('mensagem de jânio') or low.startswith('mensagens de jânio'):
+        # Gatilhos explícitos
+        if low.startswith('mensagem de jânio') or low.startswith('mensagens de jânio') \
+           or low in ('jânio.', 'janio.', '**jânio.**', '**janio.**'):
             out.append('_Uma notificação de Jânio chega ao celular de Mary._')
-            ctx = 3
+            msg_ctx = 3
+            near_janio = 2
             continue
 
-        # Linha "Jânio: ..."
+        # Linha direta "Jânio: ..."
         if low.startswith('jânio:') or low.startswith('janio:'):
             out.append('_[Conteúdo de Jânio omitido]_')
             continue
 
-        # Durante contexto, suprimir citações e listas (provável conteúdo dele)
-        if ctx > 0 and _is_quoted_or_bulleted(line):
+        # Falas com travessão (— "…") e variação "— … — ele …"
+        is_quoted = re.search(r'^\s*—\s*["“].*["”]\s*(?:—\s*[^\n]*\bele\b)?', line, flags=re.IGNORECASE)
+        if is_quoted and (msg_ctx > 0 or near_janio > 0):
             out.append('_[Conteúdo de Jânio omitido]_')
-            ctx -= 1
+            if msg_ctx > 0: msg_ctx -= 1
+            if near_janio > 0: near_janio -= 1
             continue
 
-        # Heurística extra: fala com travessão que claramente soa como dele
-        if re.match(r'^\s*—\s*["“].*["”]\s*$', line) and ('donisete' in low or 'arquiteto' in low):
-            out.append('_[Jânio reage sem falar]_')
+        # Durante contexto de mensagem, também suprime listas/citações
+        if msg_ctx > 0 and _is_quoted_or_bulleted(line):
+            out.append('_[Conteúdo de Jânio omitido]_')
+            msg_ctx -= 1
             continue
 
-        # Encerrar contexto em linha vazia
-        if ctx > 0 and not raw:
-            ctx = 0
+        # Qualquer menção a "Jânio" reabre janela de proximidade
+        if 'jânio' in low or 'janio' in low:
+            near_janio = 2
+
+        # Linha vazia encerra contextos
+        if not raw:
+            msg_ctx = 0
+            near_janio = 0
 
         out.append(line)
 
     return "\n".join(out)
+
+# --------- Filtro extra: impedir fala pelo usuário ---------
+def silenciar_fala_do_usuario(txt: str) -> str:
+    uname = (st.session_state.get("user_name") or "").strip()
+    pats: List[re.Pattern] = []
+    if uname:
+        pats.append(re.compile(rf"(?im)^\s*{re.escape(uname)}\s*:\s*.*$"))
+        pats.append(re.compile(rf"(?im)^.*—\s*[\"“].*[\"”]\s*—\s*(?:disse|fala|respondeu)\s+{re.escape(uname)}\b.*$"))
+    pats.append(re.compile(r"(?im)^\s*(?:você|voce|usuário|usuario)\s*:\s*.*$"))
+    out: List[str] = []
+    for line in txt.splitlines():
+        if any(p.match(line) for p in pats):
+            out.append("_[A fala do usuário é escrita pelo próprio usuário.]_")
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+# Combina filtros (ordem importa)
+def apply_filters(txt: str) -> str:
+    return silenciar_fala_do_usuario(silenciar_janio(txt))
 
 # =================================================================================
 # Config Planilha
@@ -177,9 +232,6 @@ Jânio Donisete; Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no 
 — As falas de Jânio pertencem ao usuário: só existem se o usuário escrever explicitamente.
 — Se gerar fala de Jânio por engano, reescreva removendo-a antes de finalizar a resposta.
 
-
-
-
 [PROGRESSÃO DE INTIMIDADE]
 — Evolução gradual no tempo: flerte → toques leves → beijo → (se ambos quiserem) avanço íntimo.
 — Consentimento claro e revogável; use sinais explícitos (ex.: "posso te beijar?", "tudo bem continuar?").
@@ -187,6 +239,12 @@ Jânio Donisete; Orfeu é o cão labrador de Jânio; Jânio mora em Camburi, no 
 — Sexo explícito (sem fade-to-black): permitido detalhes anatômicos, posições, fluidos ou nudez explícita.
 — Mantenha as REGRAS DE REALISMO, a NARRAÇÃO EM 3ª PESSOA e o ESTILO DE RESPOSTA.
 
+[REGRAS COMERCIAIS — MODO CARD]
+— O personagem fala apenas por si (pensamentos/sentimentos/ações). Nunca fala pelo usuário.
+— Dirija-se ao usuário pelo nome fornecido (se houver). Nunca invente falas do usuário.
+— Reaja somente ao que o usuário transcreve; não crie eventos/falas não informadas.
+— Mantenha o cenário e o enredo iniciais; mudanças só com gatilho explícito do usuário.
+— Se violar qualquer regra acima, reescreva antes de finalizar a resposta.
 
 [ESTILO DE RESPOSTA]
 — Seja ~30% mais concisa que o natural.
@@ -224,7 +282,6 @@ except Exception as e:
     WS_INTERACOES = None
     st.error(f"Não foi possível abrir a aba '{TAB_INTERACOES}'. Verifique permissões/ID. Detalhe: {e}")
 
-
 def salvar_interacao(ts: str, session_id: str, provider: str, model: str, role: str, content: str):
     if not WS_INTERACOES:
         return
@@ -240,7 +297,6 @@ def salvar_interacao(ts: str, session_id: str, provider: str, model: str, role: 
 # =================================================================================
 
 from typing import Tuple
-
 
 def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
     """Carrega ao menos n_min interações da última sessão registrada na aba interacoes_jm.
@@ -266,15 +322,34 @@ def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
     except Exception:
         return []
 
+# =============================================================================
+# Build minimal messages (override) — injeta nome do usuário, cenário e enredo
+# =============================================================================
+def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    user_name = (st.session_state.get("user_name") or "").strip()
+    scenario = (st.session_state.get("scenario_init") or "").strip()
+    plot = (st.session_state.get("plot_init") or "").strip()
 
-# =================================================================================
-# Helpers — mensagens mínimas
-# =================================================================================
+    extra_parts = []
+    if user_name:
+        extra_parts.append(f"[USUÁRIO]\n— Nome a ser reconhecido pelo personagem: {user_name}.")
+    if scenario or plot:
+        extra_parts.append("[CENÁRIO/ENREDO INICIAL]")
+        if scenario:
+            extra_parts.append(f"— Cenário: {scenario}")
+        if plot:
+            extra_parts.append(f"— Enredo: {plot}")
 
-def build_minimal_messages(history: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    """Retorna apenas: system(persona) + histórico bruto user/assistant."""
-    return [{"role": "system", "content": PERSONA_MARY}] + history
+    system_text = PERSONA_MARY
+    if extra_parts:
+        system_text += "\n\n" + "\n".join(extra_parts)
 
+    msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
+    for m in chat:
+        if m.get("role") == "system":
+            continue
+        msgs.append(m)
+    return msgs
 
 # =================================================================================
 # Chamadas por provedor — sem parâmetros extras
@@ -294,7 +369,6 @@ def call_openrouter(model: str, messages: List[Dict[str, str]]) -> str:
     data = r.json()
     return data["choices"][0]["message"]["content"].strip()
 
-
 def call_together(model: str, messages: List[Dict[str, str]]) -> str:
     url = "https://api.together.xyz/v1/chat/completions"
     headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
@@ -303,7 +377,6 @@ def call_together(model: str, messages: List[Dict[str, str]]) -> str:
     r.raise_for_status()
     data = r.json()
     return data["choices"][0]["message"]["content"].strip()
-
 
 def call_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]) -> str:
     url = f"{base_url.rstrip('/')}/chat/completions"
@@ -341,7 +414,6 @@ def call_huggingface(model: str, messages: List[Dict[str, str]]) -> str:
 
 import time
 
-
 def _sse_stream(url: str, headers: Dict[str, str], payload: Dict[str, Any]):
     """Itera eventos SSE de /chat/completions com stream=True e retorna trechos de texto."""
     payload_stream = dict(payload)
@@ -366,7 +438,6 @@ def _sse_stream(url: str, headers: Dict[str, str], payload: Dict[str, Any]):
             except Exception:
                 continue
 
-
 def stream_openrouter(model: str, messages: List[Dict[str, str]]):
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -378,20 +449,17 @@ def stream_openrouter(model: str, messages: List[Dict[str, str]]):
     payload = {"model": model, "messages": messages, "max_tokens": 680}
     yield from _sse_stream(url, headers, payload)
 
-
 def stream_together(model: str, messages: List[Dict[str, str]]):
     url = "https://api.together.xyz/v1/chat/completions"
     headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "max_tokens": 680}
     yield from _sse_stream(url, headers, payload)
 
-
 def stream_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]):
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {"Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "max_tokens": 680}
     yield from _sse_stream(url, headers, payload)
-
 
 def _chunker(txt: str, n: int = 48):
     """Quebra texto em pedaços de ~n caracteres, respeitando espaços quando possível."""
@@ -409,14 +477,12 @@ def _chunker(txt: str, n: int = 48):
         cur = end
     return buf
 
-
 def stream_huggingface(model: str, messages: List[Dict[str, str]]):
     """HF Inference API nem sempre fornece SSE; simulamos streaming dividindo o texto."""
     full = call_huggingface(model, messages)
     for piece in _chunker(full, 48):
         yield piece
         time.sleep(0.02)  # leve suavização visual
-
 
 # =================================================================================
 # UI
@@ -462,7 +528,7 @@ with st.sidebar:
 # Render histórico
 for m in st.session_state.chat:
     with st.chat_message(m["role"]).container():
-        st.markdown(m["content"])  # sem filtros extras
+        st.markdown(apply_filters(m["content"]))  # sem filtros extras
 
 # Entrada
 if user_msg := st.chat_input("Fale com a Mary..."):
@@ -494,20 +560,23 @@ if user_msg := st.chat_input("Fale com a Mary..."):
                 ph.markdown(silenciar_janio(answer) + "▌")
         except Exception as e:
             answer = f"[Erro ao chamar o modelo: {e}]"
-            ph.markdown(silenciar_janio(answer))
+            ph.markdown(apply_filters(answer) + "▌")
         finally:
             # Render final sem o cursor e já filtrado
-            _ans_clean = silenciar_janio(answer)
+            _ans_clean = apply_filters(answer)
             ph.markdown(_ans_clean)
 
     # Salva sempre a versão filtrada
     st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
+    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
+
     # Mantém apenas as últimas 30 interações na tela
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
