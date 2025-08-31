@@ -216,7 +216,7 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
   4) Sofía Ricci (23, Direito, Itália) — cabelos pretos lisos; olhos avelã; seios fartos; cintura curta; quadril cheio; coxas firmes.
   5) Alícia Martín (21, Dança, Espanha) — cabelos castanho-cobre ondulados; olhos verde-acinzentados; seios pequenos; abdômen definido; coxas potentes; bumbum arredondado.
 — Homens
-  1) Jânio Donisete (32, arquiteto convidado) — presença calma; olhar atento; não é estudante neste cenário (ex-aluno/palestrante).
+  1) Jânio Donisete (32, Mestrado em Arquitetura, Brasil) — participante do cruzeiro universitário; presença calma; olhar atento; disputa atenção na pista.
   2) Dario Bianchi (21, Arquitetura, Itália) — DJ da white party; sorriso fácil.
   3) Rafael “Rafa” Azevedo (22, Eng. Naval, Brasil) — tatuagem de âncora; postura tranquila.
   4) Théo Morel (23, Medicina, França) — tímido, observador; fala pouco.
@@ -250,9 +250,10 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 
 [REGRAS DE DIÁLOGO — JÂNIO (SILENCIAR)]
 — Não escreva falas de Jânio (sem linhas com travessão/aspas atribuídas a ele).
-— Não transcreva mensagens de Jânio; resuma como notificação recebida.
-— Mostre apenas reações/gestos de Jânio, sem fala.
-— As falas de Jânio pertencem ao usuário; se surgir por engano, reescreva removendo.
+— Não transcreva mensagens de Jânio; resuma como notificação recebida quando necessário.
+— **Não ignore Jânio**: ele participa das cenas (presença, olhares, postura, aproximações) e pode ser pretendente da Mary.
+— Mostre apenas reações/gestos/ações de Jânio em narração, sem fala; flerte por linguagem corporal é permitido.
+— As falas de Jânio pertencem ao usuário: só existem se o usuário as escrever. Se surgir por engano, reescreva removendo.
 
 [PROGRESSÃO DE INTIMIDADE]
 — Flerte → toques leves → beijo → fade-to-black para intimidade.
@@ -677,6 +678,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
