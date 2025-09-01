@@ -9,6 +9,7 @@
 
 import json
 import re
+import random
 from datetime import datetime
 from typing import Dict, List, Any
 import gspread
@@ -30,7 +31,7 @@ FALA_PRESETS: Dict[str, Dict[str, str]] = {
     },
     "Boquete": {
         "rule": "— Sexy: carga erótica verbal com descrição gráfica; NSFW liberado.",
-        "example": "tira essa calça; deixa eu chuapar seu pau; como é grande e grosso...hummm; goza na minha boa... "
+        "example": "tira essa calça; deixa eu chupar seu pau; como é grande e grosso...hummm; goza na minha boca... "
     },
     "cavalga": {
         "rule": "— Sexy: carga erótica verbal com descrição gráfica; NSFW liberado.",
@@ -46,6 +47,33 @@ FALA_PRESETS: Dict[str, Dict[str, str]] = {
     },
 }
 
+CARINHOSA_FRASES = [
+    '— "Você é uma graça, sabia?"',
+    '— "É tão bonitinho quando você fica inseguro."',
+    '— "Vem cá… me dá um abraço."',
+    '— "Eu gosto de ouvir você assim, sem pressa."',
+    '— "Fica perto de mim um pouquinho?"',
+    '— "Tá tudo bem. Eu tô aqui."',
+    '— "Adoro quando você confia em mim."',
+    '— "Deixa eu cuidar de você agora?"',
+]
+
+_TRIG_CARINHO = re.compile(
+    r"(?i)\b(n[ãa]o sei|talvez|acho que|t[oô] com medo|insegur|desculp|ser[aá] que|pode ser)\b|[?]\s*$"
+)
+
+def inject_carinhosa(texto: str, user_text: str, ativo: bool) -> str:
+    if not ativo or not texto.strip():
+        return texto
+    gatilho = bool(_TRIG_CARINHO.search(user_text or "")) or (random.random() < 0.25)
+    if not gatilho:
+        return texto
+    frase = random.choice(CARINHOSA_FRASES)
+    # mantém estilo: novo parágrafo curto, 1–2 frases
+    sep = "\n\n" if not texto.endswith("\n") else "\n"
+    return (texto.rstrip() + f"{sep}{frase}").strip()
+
+
 def build_fala_block(modos: List[str]) -> str:
     if not modos:
         return ""
@@ -55,6 +83,8 @@ def build_fala_block(modos: List[str]) -> str:
             linhas.append(FALA_PRESETS[m]["rule"])
     linhas.append("— Responda mantendo este(s) tom(ns) em falas e narração de Mary.")
     return "\n".join(linhas)
+
+
 
 
 # ================================
@@ -100,11 +130,18 @@ with st.sidebar:
     if st.checkbox("Ciumenta", key="fala_ciumenta"):
         mods_escolhidos.append("Ciumenta")
 
+    if st.checkbox("Carinhosa", key="fala_carinhosa"):
+        mods_escolhidos.append("Carinhosa")
+    
     st.session_state["fala_mods"] = mods_escolhidos
-
+    
     # (Opcional) dicas rápidas do tom atual
     if mods_escolhidos:
-        exemplos = [FALA_PRESETS[m]["example"] for m in mods_escolhidos if m in FALA_PRESETS]
+        exemplos = [
+            FALA_PRESETS.get(m, {}).get("example")
+            for m in mods_escolhidos if FALA_PRESETS.get(m)
+        ]
+        exemplos = [e for e in exemplos if e]
         if exemplos:
             st.caption("Exemplos de abertura (tom atual): " + " / ".join(exemplos[:3]))
 
@@ -400,11 +437,21 @@ def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
 # Build minimal messages (override) — injeta nome do usuário, cenário e enredo
 # =============================================================================
 def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    # 1) Ler inputs da UI
     user_name = (st.session_state.get("user_name") or "").strip()
-    scenario = (st.session_state.get("scenario_init") or "").strip()
-    plot = (st.session_state.get("plot_init") or "").strip()
+    scenario  = (st.session_state.get("scenario_init") or "").strip()
+    plot      = (st.session_state.get("plot_init") or "").strip()
     fala_mods = st.session_state.get("fala_mods") or []
 
+    # 2) Sanitização leve + limite de tamanho (evita system gigante)
+    def _clean(s: str, maxlen: int = 1200) -> str:
+        s = re.sub(r"\s+", " ", s).strip()
+        return s[:maxlen]
+    user_name = _clean(user_name, 80)
+    scenario  = _clean(scenario, 1000)
+    plot      = _clean(plot, 1000)
+
+    # 3) Parts extras
     extra_parts = []
     if user_name:
         extra_parts.append(f"[USUÁRIO]\n— Nome a ser reconhecido pelo personagem: {user_name}.")
@@ -415,20 +462,25 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         if plot:
             extra_parts.append(f"— Enredo: {plot}")
 
-    # Bloco de Modo de Fala
+    # 4) Modos de fala
     fala_block = build_fala_block(fala_mods)
     if fala_block:
         extra_parts.append(fala_block)
 
+    # 5) Monta system final
     system_text = PERSONA_MARY
     if extra_parts:
         system_text += "\n\n" + "\n".join(extra_parts)
 
+    # 6) Constrói mensagens mínimas
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
     for m in chat:
-        if m.get("role") == "system":
+        role = (m.get("role") or "").strip()
+        if role == "system":
             continue
-        msgs.append(m)
+        content = (m.get("content") or "").strip()
+        if content:
+            msgs.append({"role": role, "content": content})
     return msgs
 
 # =================================================================================
@@ -601,6 +653,9 @@ with st.sidebar:
         modelo = st.selectbox("Modelo (LM Studio)", list(lms_models.keys()), index=0)
         model_id = lms_models[modelo]
 
+    
+    
+
     if st.button("🗑️ Resetar chat"):
         st.session_state.chat.clear()
         st.rerun()
@@ -646,6 +701,21 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             _ans_clean = apply_filters(answer)
             ph.markdown(_ans_clean)
 
+        finally:
+        _ans_clean = apply_filters(answer)
+        _ans_clean = inject_carinhosa(
+            _ans_clean,
+            user_msg,
+            ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
+        )
+        ph.markdown(_ans_clean)
+    
+    # Salvar exatamente essa versão:
+    st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
+    ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
+    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
+
+
     # Salva sempre a versão filtrada (uma única vez)
     st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
     # Mantém apenas as últimas 30 interações na tela
@@ -654,6 +724,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
