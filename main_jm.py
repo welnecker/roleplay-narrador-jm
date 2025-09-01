@@ -20,6 +20,43 @@ from huggingface_hub import InferenceClient
 
 st.set_page_config(page_title="Narrador JM — Clean Messages", page_icon="🎬")
 
+# ------------------------
+# Presets de Modo de Fala
+# ------------------------
+FALA_PRESETS: Dict[str, Dict[str, str]] = {
+    "Oral": {
+        "rule": "— Sexy: carga erótica verbal com descrição gráfica; NSFW liberado.",
+        "example": "tira minha calcinha; Chupa meu clitóris; me faz gozar; vou gozar....chupa gostoso "
+    },
+    "Boquete": {
+        "rule": "— Sexy: carga erótica verbal com descrição gráfica; NSFW liberado.",
+        "example": "tira essa calça; deixa eu chuapar seu pau; como é grande e grosso...hummm; goza na minha boa... "
+    },
+    "cavalga": {
+        "rule": "— Sexy: carga erótica verbal com descrição gráfica; NSFW liberado.",
+        "example": "deita amor...vou montar em você; fode gostoso; calma..não goza ainda; tá gostoso?.. pega na minha bunda; isso...goza..."
+    },
+    "quatro": {
+        "rule": "— Sexy: carga erótica verbal com descrição gráfica; NSFW liberado.",
+        "example": "Vem...mete por trás; porra...que delícia; empurra tudo...humm; calma..não goza ainda; deixa eu rebolar...fica parado; isso...goza...."
+    },
+    "Ciumenta": {
+        "rule": "— Ciumenta: marca território com elegância; perguntas diretas; limites claros; nada de insultos.",
+        "example": "Quem é essa piranha?."
+    },
+}
+
+def build_fala_block(modos: List[str]) -> str:
+    if not modos:
+        return ""
+    linhas = ["[MODO DE FALA — Mary]", "— Modos ativos: " + ", ".join(modos) + "."]
+    for m in modos:
+        if m in FALA_PRESETS:
+            linhas.append(FALA_PRESETS[m]["rule"])
+    linhas.append("— Responda mantendo este(s) tom(ns) em falas e narração de Mary.")
+    return "\n".join(linhas)
+
+
 # ================================
 # UI — Roleplay comercial (cards)
 # ================================
@@ -45,6 +82,32 @@ with st.sidebar:
         height=80,
         placeholder="Ex.: Mary encontra o usuário após um mal-entendido com Ricardo…",
     )
+
+with st.sidebar:
+    st.markdown("**Modo de fala da Mary**")
+    st.session_state.setdefault("fala_mods", [])
+
+    # 5 caixas de seleção (podem combinar)
+    mods_escolhidos: List[str] = []
+    if st.checkbox("Normal", value=True, key="fala_normal"):
+        mods_escolhidos.append("Normal")
+    if st.checkbox("Sensual", key="fala_sensual"):
+        mods_escolhidos.append("Sensual")
+    if st.checkbox("Atrevida", key="fala_atrevida"):
+        mods_escolhidos.append("Atrevida")
+    if st.checkbox("Sexy", key="fala_sexy"):
+        mods_escolhidos.append("Sexy")
+    if st.checkbox("Ciumenta", key="fala_ciumenta"):
+        mods_escolhidos.append("Ciumenta")
+
+    st.session_state["fala_mods"] = mods_escolhidos
+
+    # (Opcional) dicas rápidas do tom atual
+    if mods_escolhidos:
+        exemplos = [FALA_PRESETS[m]["example"] for m in mods_escolhidos if m in FALA_PRESETS]
+        if exemplos:
+            st.caption("Exemplos de abertura (tom atual): " + " / ".join(exemplos[:3]))
+
 
 # --------- Filtro: silenciar falas/mensagens de Jânio (robusto) ---------
 def _is_quoted_or_bulleted(line: str) -> bool:
@@ -340,6 +403,7 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
     user_name = (st.session_state.get("user_name") or "").strip()
     scenario = (st.session_state.get("scenario_init") or "").strip()
     plot = (st.session_state.get("plot_init") or "").strip()
+    fala_mods = st.session_state.get("fala_mods") or []
 
     extra_parts = []
     if user_name:
@@ -350,6 +414,11 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
             extra_parts.append(f"— Cenário: {scenario}")
         if plot:
             extra_parts.append(f"— Enredo: {plot}")
+
+    # Bloco de Modo de Fala
+    fala_block = build_fala_block(fala_mods)
+    if fala_block:
+        extra_parts.append(fala_block)
 
     system_text = PERSONA_MARY
     if extra_parts:
@@ -585,6 +654,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
