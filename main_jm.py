@@ -57,55 +57,42 @@ def _is_quoted_or_bulleted(line: str) -> bool:
         (len(s) > 2 and s[0].isdigit() and s[1] in '.)')
     )
 
+# --------- Silenciar falas/mensagens de Jânio (sem trocar o nome) ---------
+JANIO_SPEECH = re.compile(r'(?i)^\s*(?:jânio|janio)\s*:\s+.*$')
+JANIO_ATTR_QUOTE = re.compile(r'(?i)^\s*—\s*[\"“].*[\"”].*(?:—\s*)?(?:disse|fala|respondeu)\s+j[âa]nio\b.*$')
+MSG_HEADER = re.compile(r'(?i)^\s*\**\s*mensagens? de j[âa]nio\s*\**\s*$')
+
 def silenciar_janio(txt: str) -> str:
     if not txt:
         return txt
     out: List[str] = []
-    msg_ctx = 0     # após "Mensagem de Jânio"/"**Jânio.**": suprime próximas 3 citações
-    near_janio = 0  # após mencionar "Jânio": suprime 2 falas seguintes
-
+    in_msg_block = False
     for line in txt.splitlines():
         raw = line.strip()
-        low = raw.lower()
 
-        # Gatilhos explícitos
-        if low.startswith('mensagem de jânio') or low.startswith('mensagens de jânio') \
-           or low in ('jânio.', 'janio.', '**jânio.**', '**janio.**'):
+        # Bloco "Mensagem de Jânio"
+        if MSG_HEADER.match(raw):
             out.append('_Uma notificação de Jânio chega ao celular de Mary._')
-            msg_ctx = 3
-            near_janio = 2
+            in_msg_block = True
             continue
-
-        # Linha direta "Jânio: ..."
-        if low.startswith('jânio:') or low.startswith('janio:'):
+        if in_msg_block:
+            if not raw:   # linha vazia encerra o bloco
+                in_msg_block = False
+                continue
+            if raw.startswith('—') or _is_quoted_or_bulleted(line):
+                out.append('_[Conteúdo de Jânio omitido]_')
+                continue
+            # qualquer outra linha dentro do bloco é omitida
             out.append('_[Conteúdo de Jânio omitido]_')
             continue
 
-        # Falas com travessão (— "…") e variação "— … — ele …"
-        is_quoted = re.search(r'^\s*—\s*["“].*["”]\s*(?:—\s*[^\n]*\bele\b)?', line, flags=re.IGNORECASE)
-        if is_quoted and (msg_ctx > 0 or near_janio > 0):
+        # Linha direta "Jânio: ..." ou citação atribuída a Jânio
+        if JANIO_SPEECH.match(line) or JANIO_ATTR_QUOTE.match(line):
             out.append('_[Conteúdo de Jânio omitido]_')
-            if msg_ctx > 0: msg_ctx -= 1
-            if near_janio > 0: near_janio -= 1
             continue
 
-        # Durante contexto de mensagem, também suprime listas/citações
-        if msg_ctx > 0 and _is_quoted_or_bulleted(line):
-            out.append('_[Conteúdo de Jânio omitido]_')
-            msg_ctx -= 1
-            continue
-
-        # Qualquer menção a "Jânio" reabre janela de proximidade
-        if 'jânio' in low or 'janio' in low:
-            near_janio = 2
-
-        # Linha vazia encerra contextos
-        if not raw:
-            msg_ctx = 0
-            near_janio = 0
-
+        # Menções a Jânio (presença/ação) passam normalmente
         out.append(line)
-
     return "\n".join(out)
 
 # --------- Filtro extra: impedir fala pelo usuário ---------
@@ -267,6 +254,9 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 — Reaja somente ao que o usuário transcreve; não crie eventos/falas não informadas.
 — Mantenha o cenário/enredo definidos; mudanças só com gatilho explícito do usuário.
 
+[NOMES PRÓPRIOS — NÃO SUBSTITUIR]
+— Nunca substitua nomes de personagens (ex.: “Jânio”) por alternativas. Se precisar silenciar, omita a fala mantendo o nome e a presença na cena.
+
 [ESTILO DE RESPOSTA]
 — Seja ~30% mais concisa que o natural.
 — Máx. 5 parágrafos por turno, até 2 frases por parágrafo.
@@ -323,7 +313,6 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 
 [CONDUÇÃO PELO USUÁRIO — MARY AUTÔNOMA]
 — O usuário conduz atitudes e rumo da cena; Mary reage e decide, sem criar falas/ações de terceiros.
-— Mary não está vinculada a Jânio; o elenco pode variar. Ignore exclusividade.
 — Nunca coloque palavras na boca do usuário ou de outros; aguarde o que o usuário transcrever.
 — Mary pode iniciar flerte/convites, mas confirma consentimento explícito antes de qualquer avanço.
 
@@ -678,6 +667,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
