@@ -89,14 +89,14 @@ with st.sidebar:
 
     # 5 caixas de seleção (podem combinar)
     mods_escolhidos: List[str] = []
-    if st.checkbox("Normal", value=True, key="fala_normal"):
-        mods_escolhidos.append("Normal")
-    if st.checkbox("Sensual", key="fala_sensual"):
-        mods_escolhidos.append("Sensual")
-    if st.checkbox("Atrevida", key="fala_atrevida"):
-        mods_escolhidos.append("Atrevida")
-    if st.checkbox("Sexy", key="fala_sexy"):
-        mods_escolhidos.append("Sexy")
+    if st.checkbox("Boquete", value=True, key="fala_Boquete"):
+        mods_escolhidos.append("Boquete")
+    if st.checkbox("Oral", key="fala_Oral"):
+        mods_escolhidos.append("Oral")
+    if st.checkbox("cavalga", key="fala_cavalga"):
+        mods_escolhidos.append("cavalga")
+    if st.checkbox("quatro", key="fala_quatro"):
+        mods_escolhidos.append("quatro")
     if st.checkbox("Ciumenta", key="fala_ciumenta"):
         mods_escolhidos.append("Ciumenta")
 
@@ -654,6 +654,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
