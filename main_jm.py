@@ -696,12 +696,8 @@ if user_msg := st.chat_input("Fale com a Mary..."):
         except Exception as e:
             answer = f"[Erro ao chamar o modelo: {e}]"
             ph.markdown(apply_filters(answer))
-        finally:
-            # Render final sem cursor, já filtrado
-            _ans_clean = apply_filters(answer)
-            ph.markdown(_ans_clean)
 
-        finally:
+        # Render final (sem cursor), aplica filtros e o tom carinhoso se ativo
         _ans_clean = apply_filters(answer)
         _ans_clean = inject_carinhosa(
             _ans_clean,
@@ -709,21 +705,16 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
         )
         ph.markdown(_ans_clean)
-    
-    # Salvar exatamente essa versão:
-    st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
-    ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
-    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
-
-    # Salva sempre a versão filtrada (uma única vez)
+    # Salva exatamente essa versão
     st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
-    # Mantém apenas as últimas 30 interações na tela
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
+
     st.rerun()
+
 
 
 
