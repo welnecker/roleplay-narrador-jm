@@ -125,7 +125,7 @@ PLANILHA_ID = (
 ).strip()
 TAB_INTERACOES = "interacoes_jm"
 
-# =================================================================================
+# =================================================================================#
 # Modelos (mantidos como no app original do Janio)
 # =================================================================================
 MODELOS_OPENROUTER = {
@@ -585,6 +585,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
