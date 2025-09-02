@@ -274,12 +274,13 @@ def _limit_phys_per_para(text: str) -> str:
     return "\n\n".join(out_paras).strip()
 
 def _clamp_structure(text: str) -> str:
-    paras = [p for p in text.split("\n\n") if p.strip()][:5]
+    paras = [p for p in text.split("\n\n") if p.strip()][:5]  # máx. 5 §§
     trimmed = []
     for p in paras:
         sents = [s for s in _SENT_SPLIT.split(p) if s.strip()]
-        trimmed.append(" ".join(sents[:2]))
+        trimmed.append(" ".join(sents[:3]))  # máx. 3 frases/§ (antes eram 2)
     return "\n\n".join(trimmed).strip()
+
 
 def apply_style_filters(text: str) -> str:
     if not text.strip():
@@ -687,9 +688,7 @@ def stream_huggingface(model: str, messages: List[Dict[str, str]]):
         yield piece
         time.sleep(0.02)  # leve suavização visual
 
-# =================================================================================
-# UI
-# =================================================================================
+
 # =================================================================================
 # UI
 # =================================================================================
@@ -697,6 +696,7 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
 if "chat" not in st.session_state:
     st.session_state.chat: List[Dict[str, str]] = []
+    # 🔁 Carrega as 5 últimas interações salvas da sessão anterior (se houver)
     try:
         _loaded = carregar_ultimas_interacoes(5)
         if _loaded:
@@ -739,6 +739,7 @@ for m in st.session_state.chat:
 if user_msg := st.chat_input("Fale com a Mary..."):
     ts = datetime.now().isoformat(sep=" ", timespec="seconds")
     st.session_state.chat.append({"role": "user", "content": user_msg})
+    # Mantém apenas as últimas 30 interações na tela
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     salvar_interacao(ts, st.session_state.session_id, prov, model_id, "user", user_msg)
@@ -760,6 +761,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
             for delta in gen:
                 answer += delta
+                # Mostra texto parcial já filtrado
                 ph.markdown(apply_filters(answer) + "▌")
 
         except Exception as e:
@@ -767,10 +769,12 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             ph.markdown(apply_filters(answer))
 
         finally:
-            _ans_clean  = apply_filters(answer)
-            _ans_styled = apply_style_filters(_ans_clean)  # ou: _ans_clean se quiser desativar estilo
-            _ans_final  = inject_carinhosa(
-                _ans_styled, user_msg,
+            # Render final: filtros → estilo → (opcional) carinhosa
+            _ans_clean = apply_filters(answer)
+            _ans_styled = apply_style_filters(_ans_clean)  # use _ans_clean se quiser desativar estilo
+            _ans_final = inject_carinhosa(
+                _ans_styled,
+                user_msg,
                 ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
             )
             ph.markdown(_ans_final)
@@ -782,6 +786,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_final)
     st.rerun()
+
 
 
 
