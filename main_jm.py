@@ -673,7 +673,7 @@ st.title("Narrador JM — Clean Messages 🎬")
 
 with st.sidebar:
     prov = st.radio("🌐 Provedor", ["OpenRouter", "Together", "LM Studio", "Hugging Face"], index=0)
-
+    st.session_state["prov"] = prov  # <-- ADICIONE ESTA LINHA
     if prov == "OpenRouter":
         modelo = st.selectbox("Modelo (OpenRouter)", list(MODELOS_OPENROUTER.keys()), index=0)
         model_id = MODELOS_OPENROUTER[modelo]
@@ -690,6 +690,7 @@ with st.sidebar:
         lms_models = _lms_models_dict(st.session_state.lms_base_url)
         modelo = st.selectbox("Modelo (LM Studio)", list(lms_models.keys()), index=0)
         model_id = lms_models[modelo]
+    st.session_state["model_id"] = model_id  # <-- ADICIONE ESTA LINHA
 
     
     
@@ -752,6 +753,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
