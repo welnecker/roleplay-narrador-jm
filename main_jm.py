@@ -127,17 +127,18 @@ with st.sidebar:
 
     # 6 caixas de seleção (combináveis)
     mods_escolhidos: List[str] = []
-    if st.checkbox("Normal", value=True, key="fala_Normal"):
-        mods_escolhidos.append("Normal")
-    if st.checkbox("Sensual", key="fala_Sensual"):
-        mods_escolhidos.append("Sensual")
-    if st.checkbox("Atrevida", key="fala_Atrevida"):
-        mods_escolhidos.append("Atrevida")
-    if st.checkbox("Sexy", key="fala_Sexy"):
-        mods_escolhidos.append("Sexy")
-    if st.checkbox("Ciumenta", key="fala_Ciumenta"):
+    if st.checkbox("Boquete", value=True, key="fala_Boquete"):
+        mods_escolhidos.append("Boquete")
+    if st.checkbox("Oral", key="fala_Oral"):
+        mods_escolhidos.append("Oral")
+    if st.checkbox("cavalga", key="fala_cavalga"):
+        mods_escolhidos.append("cavalga")
+    if st.checkbox("quatro", key="fala_quatro"):
+        mods_escolhidos.append("quatro")
+    if st.checkbox("Ciumenta", key="fala_ciumenta"):
         mods_escolhidos.append("Ciumenta")
-    if st.checkbox("Carinhosa", key="fala_Carinhosa"):
+
+    if st.checkbox("Carinhosa", key="fala_carinhosa"):
         mods_escolhidos.append("Carinhosa")
 
     st.session_state["fala_mods"] = mods_escolhidos
@@ -689,11 +690,13 @@ def stream_huggingface(model: str, messages: List[Dict[str, str]]):
 # =================================================================================
 # UI
 # =================================================================================
+# =================================================================================
+# UI
+# =================================================================================
 if "session_id" not in st.session_state:
     st.session_state.session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
 if "chat" not in st.session_state:
     st.session_state.chat: List[Dict[str, str]] = []
-    # 🔁 Carrega as 5 últimas interações salvas da sessão anterior (se houver)
     try:
         _loaded = carregar_ultimas_interacoes(5)
         if _loaded:
@@ -730,13 +733,12 @@ with st.sidebar:
 # Render histórico
 for m in st.session_state.chat:
     with st.chat_message(m["role"]).container():
-        st.markdown(apply_filters(m["content"]))  # sem filtros extras
+        st.markdown(apply_filters(m["content"]))
 
 # Entrada
 if user_msg := st.chat_input("Fale com a Mary..."):
     ts = datetime.now().isoformat(sep=" ", timespec="seconds")
     st.session_state.chat.append({"role": "user", "content": user_msg})
-    # Mantém apenas as últimas 30 interações na tela
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     salvar_interacao(ts, st.session_state.session_id, prov, model_id, "user", user_msg)
@@ -758,7 +760,6 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
             for delta in gen:
                 answer += delta
-                # Mostra texto parcial já filtrado
                 ph.markdown(apply_filters(answer) + "▌")
 
         except Exception as e:
@@ -766,24 +767,22 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             ph.markdown(apply_filters(answer))
 
         finally:
-            # Render final: filtros → sanitização extra → estilo → carinhosa
             _ans_clean  = apply_filters(answer)
-            _ans_clean  = apply_extra_sanitizers(_ans_clean)   # << NOVO
-            _ans_styled = apply_style_filters(_ans_clean)
+            _ans_styled = apply_style_filters(_ans_clean)  # ou: _ans_clean se quiser desativar estilo
             _ans_final  = inject_carinhosa(
                 _ans_styled, user_msg,
                 ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
             )
             ph.markdown(_ans_final)
 
-
-    # Salvar e truncar
+    # salvar resposta final e persistir
     st.session_state.chat.append({"role": "assistant", "content": _ans_final})
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_final)
     st.rerun()
+
 
 
 
