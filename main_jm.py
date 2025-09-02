@@ -21,9 +21,6 @@ from huggingface_hub import InferenceClient
 
 st.set_page_config(page_title="Narrador JM — Clean Messages", page_icon="🎬")
 
-
-
-
 # ------------------------
 # Presets de Modo de Fala
 # ------------------------
@@ -48,10 +45,6 @@ FALA_PRESETS: Dict[str, Dict[str, str]] = {
         "rule": "— Ciumenta: marca território com elegância; perguntas diretas; limites claros; nada de insultos.",
         "example": "Quem é essa piranha?."
     },
-    "Carinhosa": {
-        "rule": "— Carinhosa: tom afetuoso; valida sentimentos; convites a toque/abraço; 1–2 frases; sem pressão.",
-        "example": '“Vem cá… me dá um abraço.”'
-    },
 }
 
 CARINHOSA_FRASES = [
@@ -68,7 +61,6 @@ CARINHOSA_FRASES = [
 _TRIG_CARINHO = re.compile(
     r"(?i)\b(n[ãa]o sei|talvez|acho que|t[oô] com medo|insegur|desculp|ser[aá] que|pode ser)\b|[?]\s*$"
 )
-
 
 def inject_carinhosa(texto: str, user_text: str, ativo: bool) -> str:
     if not ativo or not texto.strip():
@@ -125,7 +117,7 @@ with st.sidebar:
     st.markdown("**Modo de fala da Mary**")
     st.session_state.setdefault("fala_mods", [])
 
-    # 6 caixas de seleção (combináveis)
+    # 5 caixas de seleção (podem combinar)
     mods_escolhidos: List[str] = []
     if st.checkbox("Boquete", value=True, key="fala_Boquete"):
         mods_escolhidos.append("Boquete")
@@ -140,9 +132,9 @@ with st.sidebar:
 
     if st.checkbox("Carinhosa", key="fala_carinhosa"):
         mods_escolhidos.append("Carinhosa")
-
+    
     st.session_state["fala_mods"] = mods_escolhidos
-
+    
     # (Opcional) dicas rápidas do tom atual
     if mods_escolhidos:
         exemplos = [
@@ -165,6 +157,7 @@ def _is_quoted_or_bulleted(line: str) -> bool:
         (len(s) > 2 and s[0].isdigit() and s[1] in '.)')
     )
 
+# --------- Silenciar falas/mensagens de Jânio (sem trocar o nome) ---------
 JANIO_SPEECH = re.compile(r'(?i)^\s*(?:jânio|janio)\s*:\s+.*$')
 JANIO_ATTR_QUOTE = re.compile(r'(?i)^\s*—\s*[\"“].*[\"”].*(?:—\s*)?(?:disse|fala|respondeu)\s+j[âa]nio\b.*$')
 MSG_HEADER = re.compile(r'(?i)^\s*\**\s*mensagens? de j[âa]nio\s*\**\s*$')
@@ -177,6 +170,7 @@ def silenciar_janio(txt: str) -> str:
     for line in txt.splitlines():
         raw = line.strip()
 
+        # Bloco "Mensagem de Jânio"
         if MSG_HEADER.match(raw):
             out.append('_Uma notificação de Jânio chega ao celular de Mary._')
             in_msg_block = True
@@ -188,13 +182,16 @@ def silenciar_janio(txt: str) -> str:
             if raw.startswith('—') or _is_quoted_or_bulleted(line):
                 out.append('_[Conteúdo de Jânio omitido]_')
                 continue
+            # qualquer outra linha dentro do bloco é omitida
             out.append('_[Conteúdo de Jânio omitido]_')
             continue
 
+        # Linha direta "Jânio: ..." ou citação atribuída a Jânio
         if JANIO_SPEECH.match(line) or JANIO_ATTR_QUOTE.match(line):
             out.append('_[Conteúdo de Jânio omitido]_')
             continue
 
+        # Menções a Jânio (presença/ação) passam normalmente
         out.append(line)
     return "\n".join(out)
 
@@ -216,88 +213,7 @@ def silenciar_fala_do_usuario(txt: str) -> str:
 
 # Combina filtros (ordem importa)
 def apply_filters(txt: str) -> str:
-    # 1) limpa meta e ponto de vista do usuário
-    t = apply_extra_sanitizers(txt)
-    # 2) silencia Jânio
-    t = silenciar_janio(t)
-    # 3) impede fala atribuída ao usuário
-    t = silenciar_fala_do_usuario(t)
-    return t
-
-# --------- Sanitização extra: remover meta e 1ª/2ª pessoa do "usuário vê" ---------
-_META_LINE = re.compile(r'(?im)^\s*\[(?:DICA|NOTA|TIP|SUGEST[AÃ]O|INSTRU[CÇ][AÃ]O)[^]]*\]\s*:?.*$')
-_USER_VIEW = re.compile(r'(?i)\b(?:o|a)\s+usu[áa]ri[oa]\s+(?:vê|ver|observa|nota|enxerga)\b')
-
-def strip_meta_lines(t: str) -> str:
-    return "\n".join(l for l in t.splitlines() if not _META_LINE.match(l.strip()))
-
-def strip_user_viewpoint(t: str) -> str:
-    return _USER_VIEW.sub("alguém", t)
-
-def apply_extra_sanitizers(t: str) -> str:
-    t = strip_meta_lines(t)
-    t = strip_user_viewpoint(t)
-    return t
-
-# --------- Estilo: cortar natureza/tecido/luz e limitar detalhes físicos ---------
-_BANNED_SCENERY = re.compile(
-    r'\b('
-    r'mar|ondas?|areia|p[ôo]r[- ]?do[- ]?sol|sol\b|horizonte|luz(?:es)?|'
-    r'brisa|vento|chuva|névoa|neblina|tecido(?:s)?|seda|linho|'
-    r'reflexo(?:s)?'
-    r')\b', flags=re.IGNORECASE
-)
-
-_PHYS_PATTERN = re.compile(
-    r'\b('
-    r'cabel\w+|olhos?|seios?|busto|cintur\w+|quadril\w+|barrig\w+|'
-    r'bumb\w+|gl[úu]te\w+|cox\w+|pern\w+|ombr\w+|l[áa]bio\w+'
-    r')\b', flags=re.IGNORECASE
-)
-
-# Sem lookbehind variável (compatível com Python 3.13):
-_SENT_SPLIT = re.compile(r"(?:(?<=[.!?…][\"”'])|(?<=[.!?…]))\s+")
-
-def _strip_scenery(text: str) -> str:
-    paras = [p for p in text.split("\n\n") if p.strip()]
-    cleaned = []
-    for p in paras:
-        sents = [s for s in _SENT_SPLIT.split(p) if s.strip()]
-        sents = [s for s in sents if not _BANNED_SCENERY.search(s)]
-        if sents:
-            cleaned.append(" ".join(sents))
-    return "\n\n".join(cleaned).strip()
-
-def _limit_phys_per_para(text: str) -> str:
-    out_paras = []
-    for p in [p for p in text.split("\n\n") if p.strip()]:
-        count = 0
-        def repl(m):
-            nonlocal count
-            count += 1
-            return m.group(0) if count == 1 else ""
-        out_paras.append(_PHYS_PATTERN.sub(repl, p))
-    return "\n\n".join(out_paras).strip()
-
-def _clamp_structure(text: str) -> str:
-    paras = [p for p in text.split("\n\n") if p.strip()][:5]  # máx. 5 §§
-    trimmed = []
-    for p in paras:
-        sents = [s for s in _SENT_SPLIT.split(p) if s.strip()]
-        trimmed.append(" ".join(sents[:3]))  # máx. 3 frases/§ (antes eram 2)
-    return "\n\n".join(trimmed).strip()
-
-
-def apply_style_filters(text: str) -> str:
-    if not text.strip():
-        return text
-    t = _strip_scenery(text)
-    t = _limit_phys_per_para(t)
-    t = _clamp_structure(t)
-    t = re.sub(r'[ \t]+', ' ', t)
-    t = re.sub(r'\n{3,}', '\n\n', t).strip()
-    return t
-
+    return silenciar_fala_do_usuario(silenciar_janio(txt))
 
 # =================================================================================
 # Config Planilha
@@ -365,19 +281,17 @@ def _lms_models_dict(base_url: str) -> Dict[str, str]:
         return {"<digite manualmente> (LM Studio)": "llama-3.1-8b-instruct"}
 
 # =================================================================================
-# Persona — system mínimo (academia ao ar livre)
+# Persona — system mínimo (como solicitado)
 # =================================================================================
 PERSONA_MARY = """nome: Mary Massariol
 idade: 20 anos
 Corpo: Cabelos negros e volumosos; olhos verdes; seios médios e firmes; cintura definida; quadril largo; barriga tonificada; bumbum redondo e firme; coxas grossas e torneadas.
 Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem uma moto 500cc; mora com a mãe, Joselina Massariol, no apartamento 202, Rua Beethoven, em Laranjeiras.
-É inteligente; é romântica; é virgem por opção; gosta de praia, treinos ao ar livre e flertar; não tolera grosserias ou cantadas baratas; busca respeito e liberdade para escolher.
+É inteligente; é romântica; é virgem por opção; gosta de praia e de flertar; não tolera grosserias ou cantadas baratas; busca respeito e liberdade para escolher.
 
-[CENÁRIO — ACADEMIA AO AR LIVRE (PRAIA DE CAMBURI)]
-— Contexto base: fim de tarde; Mary treina buscando paz/energia.
-— Gatilho inicial: notificação de Ricardo (relacionamento autoritário/sufocante).
-— Reação imediata: Mary se enfurece e deixa o aparelho/máquina cair; um rapaz próximo está no supino com halteres.
-— O tempo/lugar só avança com marcador explícito do usuário (ex.: “mais tarde”, “após o treino”, “no dia seguinte”).
+[CENÁRIO — Academia ao ar livre]
+— Mary está na academia. ela se prepara em uma série de agachamentos na máquina quando o celular toca. é Ricardo, seu namorado ciumento e sufocante querendo saber onde ela está. ela deixa cair o celular no chão de raiva e exclama: Droga!!! Próximo, um rapaz observa, dizendo:
+
 
 [ELENCO]
 — Mulheres
@@ -393,42 +307,49 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
   4) Gustavo Resinetti (23, Medicina) — tímido, observador.
   5) Hernando Cola (24, Economia) — carismático; ótimo em aproximações gentis.
 
+
 [REGRAS DE REALISMO]
 — Sem onisciência: ninguém sabe o que não foi dito, visto ou lembrado no histórico.
-— Conhecimento plausível só por diálogo explícito, pistas observáveis ou algo já estabelecido.
-— Sem atalhos milagrosos: nada de “resolveu em 5 minutos” sob pressão.
+— Conhecimento plausível só por: diálogo explícito, pistas observáveis ou algo já estabelecido.
+— Sem atalhos milagrosos: nada de “resolveu em 5 minutos” ou trocas instantâneas sob pressão.
 — Conflitos evoluem em degraus: tensão > reação > consequência.
 — Mary mantém limites e segurança: recusa grosseria; busca apoio do ambiente quando preciso.
-— Convites ≠ presença: encontros só viram evento após aceitação e transição clara.
-— Troca de contatos exige gesto plausível (QR, anotação, pedido direto).
+— Consistência temporal: propostas para mais tarde permanecem propostas até marcador explícito.
+— Convite ≠ presença: encontros só viram evento após aceitação e transição clara.
+— Contatos (insta/telefone) exigem gesto plausível (troca combinada, QR, anotação).
 
 [NARRAÇÃO EM 3ª PESSOA — TOM SUTILMENTE SENSUAL]
-— Leve sensualidade respeitosa.
-— 1 referência física estática por parágrafo (perfil já descrito).
-— Evite metáforas excessivas; foque em ações/emoções.
+— Em 3ª pessoa, use leve sensualidade respeitosa.
+— Use referências diretas ao perfil físico de Mary (e do elenco feminino) já descrito. Não cite movimento, luz, tecido, clima ou cenário.
+— Máx. 1 detalhe físico por parágrafo; evite listas e repetição.
+— Foque em ações e estado emocional.
 
 [NARRAÇÃO — SENSORIAL FEMININO]
-— Ao descrever mulheres, 1 traço corporal estático por parágrafo; sem listas.
+— Ao descrever mulheres, escolha 1 traço corporal estático por parágrafo a partir dos dotes listados no ELENCO.
+— Evite menções a movimento/luz/tecido/clima; mantenha o tom conciso.
 
 [CONDUÇÃO PELO USUÁRIO — MARY AUTÔNOMA]
-— O usuário conduz atitudes e rumo da cena; Mary reage e decide.
-— Não colocar palavras na boca do usuário/terceiros; aguarde o que o usuário transcrever.
-— Mary pode iniciar flerte/convites, mas confirma consentimento claro antes de avançar.
+— O usuário conduz atitudes e rumo da cena; Mary reage e decide, sem criar falas/ações de terceiros.
+— Nunca coloque palavras na boca do usuário ou de outros; aguarde o que o usuário transcrever.
+— Mary pode iniciar flerte/convites, mas confirma consentimento explícito antes de qualquer avanço.
 
 [REGRAS DE DIÁLOGO — JÂNIO (SILENCIAR)]
-— Não escrever falas de Jânio (sem travessão/aspas atribuídas); não transcrever mensagens dele.
-— Mostrar só reações/gestos/ações de Jânio, sem fala.
-— As falas de Jânio pertencem ao usuário; se surgirem por engano, reescrever removendo.
+— Não escreva falas de Jânio (sem linhas com travessão/aspas atribuídas a ele).
+— Não transcreva mensagens de Jânio; resuma como notificação recebida.
+— Mostre apenas reações/gestos de Jânio, sem fala.
+— As falas de Jânio pertencem ao usuário; se surgir por engano, reescreva removendo.
 
 [PROGRESSÃO DE INTIMIDADE]
-— Flerte → toques leves → beijo → (se ambos quiserem) avanço íntimo com consentimento explícito.
-— Marcar passagem de tempo/contexto (“mais tarde”, “no dia seguinte”); sem saltos bruscos.
+— Flerte → toques leves → beijo → carícias → toques íntimos → sexo explícito
+— Marque passagem de tempo/contexto (“mais tarde”, “no dia 3 em Nice/Mônaco”); sem saltos bruscos.
+— Com descrição explícita de atos sexuais, posições, fluidos ou nudez gráfica.
+— Nsfw totalmente liberado, sem fade-to-black.
 
 [REGRAS COMERCIAIS — MODO CARD]
 — O personagem fala apenas por si (pensamentos/sentimentos/ações). Nunca fala pelo usuário.
-— Dirigir-se ao usuário pelo nome fornecido (se houver).
-— Reagir somente ao que o usuário transcreve; não criar eventos/falas não informadas.
-— Manter o cenário/enredo definidos; mudanças só com gatilho explícito do usuário.
+— Dirija-se ao usuário pelo nome fornecido (se houver).
+— Reaja somente ao que o usuário transcreve; não crie eventos/falas não informadas.
+— Mantenha o cenário/enredo definidos; mudanças só com gatilho explícito do usuário.
 
 [ESTILO DE RESPOSTA]
 — Seja ~30% mais concisa que o natural.
@@ -694,52 +615,6 @@ def stream_huggingface(model: str, messages: List[Dict[str, str]]):
         yield piece
         time.sleep(0.02)  # leve suavização visual
 
-
-def ensure_min_output(t: str, min_chars: int = 260, min_paras: int = 5) -> str:
-    """
-    Garante exatamente `min_paras` parágrafos.
-    - Redistribui sentenças pelos parágrafos.
-    - Preenche com linhas neutras se faltar conteúdo.
-    - Assegura um tamanho mínimo em caracteres.
-    """
-    t = (t or "").strip()
-
-    NEUTRAL = [
-        "Ela respira fundo e se recompõe, sem pressa.",
-        "Prefere responder só quando estiver calma.",
-        "Observa o próprio ritmo e não se apressa.",
-        "Mantém o foco no que lhe faz bem.",
-        "Volta a atenção ao que importa agora.",
-    ]
-
-    if not t:
-        return "\n\n".join(NEUTRAL[:min_paras])
-
-    # Parágrafos atuais → sentenças
-    paras = [p for p in t.split("\n\n") if p.strip()]
-    sents = []
-    for p in paras:
-        sents.extend([s for s in _SENT_SPLIT.split(p) if s.strip()])
-
-    # Distribui sentenças em N baldes
-    target = max(min_paras, 1)
-    buckets = [[] for _ in range(target)]
-    for i, s in enumerate(sents):
-        buckets[i % target].append(s)
-
-    # Concatena e completa com neutras
-    paras = [" ".join(b).strip() for b in buckets]
-    while len(paras) < min_paras:
-        paras.append(NEUTRAL[len(paras) % len(NEUTRAL)])
-
-    out = "\n\n".join(paras[:min_paras]).strip()
-
-    # Tamanho mínimo
-    if len(out) < min_chars:
-        out += "\n\nEla escolhe palavras simples e mantém a cabeça no lugar."
-    return out
-
-
 # =================================================================================
 # UI
 # =================================================================================
@@ -777,6 +652,9 @@ with st.sidebar:
         modelo = st.selectbox("Modelo (LM Studio)", list(lms_models.keys()), index=0)
         model_id = lms_models[modelo]
 
+    
+    
+
     if st.button("🗑️ Resetar chat"):
         st.session_state.chat.clear()
         st.rerun()
@@ -784,7 +662,7 @@ with st.sidebar:
 # Render histórico
 for m in st.session_state.chat:
     with st.chat_message(m["role"]).container():
-        st.markdown(apply_filters(m["content"]))
+        st.markdown(apply_filters(m["content"]))  # sem filtros extras
 
 # Entrada
 if user_msg := st.chat_input("Fale com a Mary..."):
@@ -812,41 +690,29 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
             for delta in gen:
                 answer += delta
-                # Mostra texto parcial já filtrado
+                # Mostra texto em tempo real já filtrado (Jânio + fala do usuário)
                 ph.markdown(apply_filters(answer) + "▌")
-
         except Exception as e:
             answer = f"[Erro ao chamar o modelo: {e}]"
             ph.markdown(apply_filters(answer))
 
-        finally:
-            # Render final: filtros → estilo → 5 parágrafos → (opcional) carinhosa
-            _ans_clean  = apply_filters(answer)
-            _ans_styled = apply_style_filters(_ans_clean)     # mantenha seus clamps/limpezas
-            _ans_styled = ensure_min_output(_ans_styled, min_paras=5)  # <<< garante 5 §§
-            _ans_final  = inject_carinhosa(
-                _ans_styled,
-                user_msg,
-                ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
-            )
-            ph.markdown(_ans_final)
+        # Render final (sem cursor), aplica filtros e o tom carinhoso se ativo
+        _ans_clean = apply_filters(answer)
+        _ans_clean = inject_carinhosa(
+            _ans_clean,
+            user_msg,
+            ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
+        )
+        ph.markdown(_ans_clean)
 
-
-    # salvar resposta final e persistir
-    st.session_state.chat.append({"role": "assistant", "content": _ans_final})
+    # Salva exatamente essa versão
+    st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
-    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_final)
+    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
+
     st.rerun()
-
-
-
-
-
-
-
-
 
 
 
