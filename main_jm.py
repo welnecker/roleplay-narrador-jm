@@ -45,6 +45,10 @@ FALA_PRESETS: Dict[str, Dict[str, str]] = {
         "rule": "— Ciumenta: marca território com elegância; perguntas diretas; limites claros; nada de insultos.",
         "example": "Quem é essa piranha?."
     },
+    "Carinhosa": {
+        "rule": "— Carinhosa: tom afetuoso; valida sentimentos; convites a toque/abraço; 1–2 frases; sem pressão.",
+        "example": '“Vem cá… me dá um abraço.”'
+    },
 }
 
 CARINHOSA_FRASES = [
@@ -708,6 +712,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
