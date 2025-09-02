@@ -219,6 +219,65 @@ def silenciar_fala_do_usuario(txt: str) -> str:
 def apply_filters(txt: str) -> str:
     return silenciar_fala_do_usuario(silenciar_janio(txt))
 
+# --------- Estilo: cortar natureza/tecido/luz e limitar detalhes físicos ---------
+_BANNED_SCENERY = re.compile(
+    r'\b('
+    r'mar|ondas?|areia|p[ôo]r[- ]?do[- ]?sol|sol\b|horizonte|luz(?:es)?|'
+    r'brisa|vento|chuva|névoa|neblina|tecido(?:s)?|seda|linho|'
+    r'perfume|cheiro|aroma|reflexo(?:s)?'
+    r')\b', flags=re.IGNORECASE
+)
+
+_PHYS_PATTERN = re.compile(
+    r'\b('
+    r'cabel\w+|olhos?|seios?|busto|cintur\w+|quadril\w+|barrig\w+|'
+    r'bumb\w+|gl[úu]te\w+|cox\w+|pern\w+|ombr\w+|l[áa]bio\w+'
+    r')\b', flags=re.IGNORECASE
+)
+
+_SENT_SPLIT = re.compile(r'(?<=[\.\!\?…]["”\']?)\s+')
+
+def _strip_scenery(text: str) -> str:
+    paras = [p for p in text.split("\n\n") if p.strip()]
+    cleaned = []
+    for p in paras:
+        sents = [s for s in _SENT_SPLIT.split(p) if s.strip()]
+        sents = [s for s in sents if not _BANNED_SCENERY.search(s)]
+        if sents:
+            cleaned.append(" ".join(sents))
+    return "\n\n".join(cleaned).strip()
+
+def _limit_phys_per_para(text: str) -> str:
+    out_paras = []
+    for p in [p for p in text.split("\n\n") if p.strip()]:
+        count = 0
+        def repl(m):
+            nonlocal count
+            count += 1
+            return m.group(0) if count == 1 else ""  # remove menções extras
+        out_paras.append(_PHYS_PATTERN.sub(repl, p))
+    return "\n\n".join(out_paras).strip()
+
+def _clamp_structure(text: str) -> str:
+    paras = [p for p in text.split("\n\n") if p.strip()][:5]  # máx. 5 §§
+    trimmed = []
+    for p in paras:
+        sents = [s for s in _SENT_SPLIT.split(p) if s.strip()]
+        trimmed.append(" ".join(sents[:2]))  # máx. 2 frases/§
+    return "\n\n".join(trimmed).strip()
+
+def apply_style_filters(text: str) -> str:
+    if not text.strip():
+        return text
+    t = _strip_scenery(text)
+    t = _limit_phys_per_para(t)
+    t = _clamp_structure(t)
+    # limpeza leve de espaços duplos
+    t = re.sub(r'[ \t]+', ' ', t)
+    t = re.sub(r'\n{3,}', '\n\n', t).strip()
+    return t
+
+
 # =================================================================================
 # Config Planilha
 # =================================================================================
@@ -688,30 +747,29 @@ if user_msg := st.chat_input("Fale com a Mary..."):
                 gen = stream_lmstudio(st.session_state.lms_base_url, model_id, messages)
 
             for delta in gen:
-                answer += delta
-                # Mostra texto em tempo real já filtrado (Jânio + fala do usuário)
-                ph.markdown(apply_filters(answer) + "▌")
-        except Exception as e:
-            answer = f"[Erro ao chamar o modelo: {e}]"
-            ph.markdown(apply_filters(answer))
-
-        # Render final (sem cursor), aplica filtros e o tom carinhoso se ativo
+            answer += delta
+            ph.markdown(apply_filters(answer) + "▌")
+    except Exception as e:
+        answer = f"[Erro ao chamar o modelo: {e}]"
+        ph.markdown(apply_filters(answer))
+    finally:
         _ans_clean = apply_filters(answer)
-        _ans_clean = inject_carinhosa(
-            _ans_clean,
+        _ans_styled = apply_style_filters(_ans_clean)
+        _ans_final = inject_carinhosa(
+            _ans_styled,
             user_msg,
             ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
         )
-        ph.markdown(_ans_clean)
+        ph.markdown(_ans_final)
 
-    # Salva exatamente essa versão
-    st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
-    if len(st.session_state.chat) > 30:
-        st.session_state.chat = st.session_state.chat[-30:]
-    ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
-    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
+# Salvar e truncar
+st.session_state.chat.append({"role": "assistant", "content": _ans_final})
+if len(st.session_state.chat) > 30:
+    st.session_state.chat = st.session_state.chat[-30:]
+ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
+salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_final)
+st.rerun()
 
-    st.rerun()
 
 
 
