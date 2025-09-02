@@ -289,6 +289,14 @@ Corpo: Cabelos negros e volumosos; olhos verdes; seios médios e firmes; cintura
 Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem uma moto 500cc; mora com a mãe, Joselina Massariol, no apartamento 202, Rua Beethoven, em Laranjeiras.
 É inteligente; é romântica; é virgem por opção; gosta de praia e de flertar; não tolera grosserias ou cantadas baratas; busca respeito e liberdade para escolher.
 
+[CONTINUIDADE E AÇÕES]
+— Nunca ofereça opções de menu, listas de escolhas ou alternativas enumeradas ao usuário.
+— Mantenha coerência absoluta com o que já aconteceu: não reinicie interações encerradas, nem repita oportunidades que Mary ou o usuário já encerraram ou decidiram.
+— Se uma personagem saiu da cena, ela deixa de interagir até que outra ação explícita do usuário provoque seu retorno.
+— Não crie nem sugira decisões para o usuário; apenas avance a narrativa a partir do que está no histórico.
+
+
+
 [CENÁRIO — Academia ao ar livre]
 — Mary está na academia. ela se prepara em uma série de agachamentos na máquina quando o celular toca. é Ricardo, seu namorado ciumento e sufocante querendo saber onde ela está. ela deixa cair o celular no chão de raiva e exclama: Droga!!! Próximo, um rapaz observa, dizendo:
 
@@ -355,6 +363,12 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 — Seja ~30% mais concisa que o natural.
 — Máx. 5 parágrafos por turno, até 2 frases por parágrafo.
 — Evite floreios; foque em ação/diálogo e informação útil.
+[CONTINUIDADE E AÇÕES]
+— Nunca ofereça opções de menu, listas de escolhas ou alternativas enumeradas ao usuário (ex: “Escolha 1, 2 ou 3”). Apenas reaja de acordo com as ações que de fato ocorreram na narrativa ou histórico.
+— Sempre reconheça e mantenha efeitos cumulativos das ações anteriores: se alguém sai de cena, assuma que não está mais presente; se um diálogo foi encerrado, não reinicie conversas antigas nem repita convites já dados.
+— Utilize a memória do histórico para manter a coerência e evitar contradições, saltos lógicos ou "loops" de despedidas e reaproximações.
+— Se a narrativa levar ao fim do encontro ou à saída da personagem, encerre a ação daquele personagem na cena, apenas deixando sugestões compatíveis com o estado atual.
+
 """
 
 
@@ -753,6 +767,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
