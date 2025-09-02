@@ -125,24 +125,23 @@ with st.sidebar:
     st.markdown("**Modo de fala da Mary**")
     st.session_state.setdefault("fala_mods", [])
 
-    # 5 caixas de seleção (podem combinar)
+    # 6 caixas de seleção (combináveis)
     mods_escolhidos: List[str] = []
-    if st.checkbox("Boquete", value=True, key="fala_Boquete"):
-        mods_escolhidos.append("Boquete")
-    if st.checkbox("Oral", key="fala_Oral"):
-        mods_escolhidos.append("Oral")
-    if st.checkbox("cavalga", key="fala_cavalga"):
-        mods_escolhidos.append("cavalga")
-    if st.checkbox("quatro", key="fala_quatro"):
-        mods_escolhidos.append("quatro")
-    if st.checkbox("Ciumenta", key="fala_ciumenta"):
+    if st.checkbox("Normal", value=True, key="fala_Normal"):
+        mods_escolhidos.append("Normal")
+    if st.checkbox("Sensual", key="fala_Sensual"):
+        mods_escolhidos.append("Sensual")
+    if st.checkbox("Atrevida", key="fala_Atrevida"):
+        mods_escolhidos.append("Atrevida")
+    if st.checkbox("Sexy", key="fala_Sexy"):
+        mods_escolhidos.append("Sexy")
+    if st.checkbox("Ciumenta", key="fala_Ciumenta"):
         mods_escolhidos.append("Ciumenta")
-
-    if st.checkbox("Carinhosa", key="fala_carinhosa"):
+    if st.checkbox("Carinhosa", key="fala_Carinhosa"):
         mods_escolhidos.append("Carinhosa")
-    
+
     st.session_state["fala_mods"] = mods_escolhidos
-    
+
     # (Opcional) dicas rápidas do tom atual
     if mods_escolhidos:
         exemplos = [
@@ -165,7 +164,6 @@ def _is_quoted_or_bulleted(line: str) -> bool:
         (len(s) > 2 and s[0].isdigit() and s[1] in '.)')
     )
 
-# --------- Silenciar falas/mensagens de Jânio (sem trocar o nome) ---------
 JANIO_SPEECH = re.compile(r'(?i)^\s*(?:jânio|janio)\s*:\s+.*$')
 JANIO_ATTR_QUOTE = re.compile(r'(?i)^\s*—\s*[\"“].*[\"”].*(?:—\s*)?(?:disse|fala|respondeu)\s+j[âa]nio\b.*$')
 MSG_HEADER = re.compile(r'(?i)^\s*\**\s*mensagens? de j[âa]nio\s*\**\s*$')
@@ -178,7 +176,6 @@ def silenciar_janio(txt: str) -> str:
     for line in txt.splitlines():
         raw = line.strip()
 
-        # Bloco "Mensagem de Jânio"
         if MSG_HEADER.match(raw):
             out.append('_Uma notificação de Jânio chega ao celular de Mary._')
             in_msg_block = True
@@ -190,16 +187,13 @@ def silenciar_janio(txt: str) -> str:
             if raw.startswith('—') or _is_quoted_or_bulleted(line):
                 out.append('_[Conteúdo de Jânio omitido]_')
                 continue
-            # qualquer outra linha dentro do bloco é omitida
             out.append('_[Conteúdo de Jânio omitido]_')
             continue
 
-        # Linha direta "Jânio: ..." ou citação atribuída a Jânio
         if JANIO_SPEECH.match(line) or JANIO_ATTR_QUOTE.match(line):
             out.append('_[Conteúdo de Jânio omitido]_')
             continue
 
-        # Menções a Jânio (presença/ação) passam normalmente
         out.append(line)
     return "\n".join(out)
 
@@ -223,6 +217,21 @@ def silenciar_fala_do_usuario(txt: str) -> str:
 def apply_filters(txt: str) -> str:
     return silenciar_fala_do_usuario(silenciar_janio(txt))
 
+# --------- Sanitização extra: remover meta e 1ª/2ª pessoa do "usuário vê" ---------
+_META_LINE = re.compile(r'(?im)^\s*\[(?:DICA|NOTA|TIP|SUGEST[AÃ]O|INSTRU[CÇ][AÃ]O)[^]]*\]\s*:?.*$')
+_USER_VIEW = re.compile(r'(?i)\b(?:o|a)\s+usu[áa]ri[oa]\s+(?:vê|ver|observa|nota|enxerga)\b')
+
+def strip_meta_lines(t: str) -> str:
+    return "\n".join(l for l in t.splitlines() if not _META_LINE.match(l.strip()))
+
+def strip_user_viewpoint(t: str) -> str:
+    return _USER_VIEW.sub("alguém", t)
+
+def apply_extra_sanitizers(t: str) -> str:
+    t = strip_meta_lines(t)
+    t = strip_user_viewpoint(t)
+    return t
+
 # --------- Estilo: cortar natureza/tecido/luz e limitar detalhes físicos ---------
 _BANNED_SCENERY = re.compile(
     r'\b('
@@ -239,6 +248,7 @@ _PHYS_PATTERN = re.compile(
     r')\b', flags=re.IGNORECASE
 )
 
+# Sem lookbehind variável (compatível com Python 3.13):
 _SENT_SPLIT = re.compile(r"(?:(?<=[.!?…][\"”'])|(?<=[.!?…]))\s+")
 
 def _strip_scenery(text: str) -> str:
@@ -258,16 +268,16 @@ def _limit_phys_per_para(text: str) -> str:
         def repl(m):
             nonlocal count
             count += 1
-            return m.group(0) if count == 1 else ""  # remove menções extras
+            return m.group(0) if count == 1 else ""
         out_paras.append(_PHYS_PATTERN.sub(repl, p))
     return "\n\n".join(out_paras).strip()
 
 def _clamp_structure(text: str) -> str:
-    paras = [p for p in text.split("\n\n") if p.strip()][:5]  # máx. 5 §§
+    paras = [p for p in text.split("\n\n") if p.strip()][:5]
     trimmed = []
     for p in paras:
         sents = [s for s in _SENT_SPLIT.split(p) if s.strip()]
-        trimmed.append(" ".join(sents[:2]))  # máx. 2 frases/§
+        trimmed.append(" ".join(sents[:2]))
     return "\n\n".join(trimmed).strip()
 
 def apply_style_filters(text: str) -> str:
@@ -276,7 +286,6 @@ def apply_style_filters(text: str) -> str:
     t = _strip_scenery(text)
     t = _limit_phys_per_para(t)
     t = _clamp_structure(t)
-    # limpeza leve de espaços duplos
     t = re.sub(r'[ \t]+', ' ', t)
     t = re.sub(r'\n{3,}', '\n\n', t).strip()
     return t
@@ -757,15 +766,16 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             ph.markdown(apply_filters(answer))
 
         finally:
-            # Render final: filtros → estilo → carinhosa
-            _ans_clean = apply_filters(answer)
+            # Render final: filtros → sanitização extra → estilo → carinhosa
+            _ans_clean  = apply_filters(answer)
+            _ans_clean  = apply_extra_sanitizers(_ans_clean)   # << NOVO
             _ans_styled = apply_style_filters(_ans_clean)
-            _ans_final = inject_carinhosa(
-                _ans_styled,
-                user_msg,
+            _ans_final  = inject_carinhosa(
+                _ans_styled, user_msg,
                 ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
             )
             ph.markdown(_ans_final)
+
 
     # Salvar e truncar
     st.session_state.chat.append({"role": "assistant", "content": _ans_final})
@@ -774,6 +784,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_final)
     st.rerun()
+
 
 
 
