@@ -69,8 +69,6 @@ _TRIG_CARINHO = re.compile(
     r"(?i)\b(n[ãa]o sei|talvez|acho que|t[oô] com medo|insegur|desculp|ser[aá] que|pode ser)\b|[?]\s*$"
 )
 
-def apply_style_filters(txt: str) -> str:
-    return txt
 
 def inject_carinhosa(texto: str, user_text: str, ativo: bool) -> str:
     if not ativo or not texto.strip():
@@ -230,7 +228,7 @@ _BANNED_SCENERY = re.compile(
     r'\b('
     r'mar|ondas?|areia|p[ôo]r[- ]?do[- ]?sol|sol\b|horizonte|luz(?:es)?|'
     r'brisa|vento|chuva|névoa|neblina|tecido(?:s)?|seda|linho|'
-    r'perfume|cheiro|aroma|reflexo(?:s)?'
+    r'reflexo(?:s)?'
     r')\b', flags=re.IGNORECASE
 )
 
@@ -241,7 +239,7 @@ _PHYS_PATTERN = re.compile(
     r')\b', flags=re.IGNORECASE
 )
 
-_SENT_SPLIT = re.compile(r'(?<=[\.\!\?…]["”\']?)\s+')
+_SENT_SPLIT = re.compile(r"(?:(?<=[.!?…][\"”'])|(?<=[.!?…]))\s+")
 
 def _strip_scenery(text: str) -> str:
     paras = [p for p in text.split("\n\n") if p.strip()]
@@ -373,7 +371,7 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
   5) Rebeca Costa (21, Dança) — cabelos castanho-cobre ondulados; olhos verde-acinzentados; coxas potentes.
 — Homens
   1) Ricardo Belutti (21, Arquitetura) — namorado autoritário/ciumento; manda mensagens controladoras.
-  2) Jânio Donisete (32, Gerente honda Motors) — presença calma; olhar atento; pode estar treinando nas barras.
+  2) Jânio Donisete (32, Gerente Honda Motors) — presença calma; olhar atento; pode estar treinando nas barras.
   3) Rafael “Rafa” Azevedo (22, Eng. Naval) — postura tranquila.
   4) Gustavo Resinetti (23, Medicina) — tímido, observador.
   5) Hernando Cola (24, Economia) — carismático; ótimo em aproximações gentis.
@@ -776,6 +774,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_final)
     st.rerun()
+
 
 
 
