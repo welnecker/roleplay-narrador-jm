@@ -734,25 +734,29 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     messages = build_minimal_messages(st.session_state.chat)
 
     with st.chat_message("assistant"):
-        ph = st.empty()
-        answer = ""
-        try:
-            if prov == "OpenRouter":
-                gen = stream_openrouter(model_id, messages)
-            elif prov == "Together":
-                gen = stream_together(model_id, messages)
-            elif prov == "Hugging Face":
-                gen = stream_huggingface(model_id, messages)
-            else:
-                gen = stream_lmstudio(st.session_state.lms_base_url, model_id, messages)
+    ph = st.empty()
+    answer = ""
+    try:
+        if prov == "OpenRouter":
+            gen = stream_openrouter(model_id, messages)
+        elif prov == "Together":
+            gen = stream_together(model_id, messages)
+        elif prov == "Hugging Face":
+            gen = stream_huggingface(model_id, messages)
+        else:
+            gen = stream_lmstudio(st.session_state.lms_base_url, model_id, messages)
 
-            for delta in gen:
+        for delta in gen:
             answer += delta
+            # Mostra texto parcial já filtrado
             ph.markdown(apply_filters(answer) + "▌")
+
     except Exception as e:
         answer = f"[Erro ao chamar o modelo: {e}]"
         ph.markdown(apply_filters(answer))
+
     finally:
+        # Render final: filtros → estilo → carinhosa
         _ans_clean = apply_filters(answer)
         _ans_styled = apply_style_filters(_ans_clean)
         _ans_final = inject_carinhosa(
@@ -769,6 +773,7 @@ if len(st.session_state.chat) > 30:
 ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
 salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_final)
 st.rerun()
+
 
 
 
