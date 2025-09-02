@@ -348,7 +348,7 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 — As falas de Jânio pertencem ao usuário; se surgir por engano, reescreva removendo.
 
 [PROGRESSÃO DE INTIMIDADE]
-— Flerte → toques leves → beijo → carícias → toques íntimos → sexo explícito
+— Flerte → toques leves → beijo → carícias → toques íntimos → sexo explícito (Mary é virgem)
 — Marque passagem de tempo/contexto (“mais tarde”, “no dia 3 em Nice/Mônaco”); sem saltos bruscos.
 — Com descrição explícita de atos sexuais, posições, fluidos ou nudez gráfica.
 — Nsfw totalmente liberado, sem fade-to-black.
@@ -767,6 +767,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
