@@ -432,9 +432,29 @@ def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
     except Exception:
         return []
 
+def resumir_chat(chat_msgs: list[dict], call_model_func, model_id: str) -> str:
+    """
+    Usa o modelo LLM atual para gerar um resumo de uma lista de mensagens.
+    call_model_func: função que faz chamada ao modelo escolhido (por ex: call_openrouter, call_together...).
+    """
+    # Une apenas mensagens relevantes (não 'system')
+    texto = "\n".join(
+        f"[{m['role']}]: {m['content']}"
+        for m in chat_msgs if m['role'] in ('user', 'assistant') and m['content'].strip()
+    )
+    prompt = (
+        "Resuma o diálogo abaixo focando nas decisões, fatos e sentimentos essenciais para a continuidade da história. "
+        "Seja breve e preserve o tom do roleplay.\n\n"
+        + texto
+    )
+    resumo = call_model_func(model_id, [{"role": "user", "content": prompt}])
+    return resumo.strip()
+
+
 # =============================================================================
 # Build minimal messages (override) — injeta nome do usuário, cenário e enredo
 # =============================================================================
+
 def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
     # 1) Ler inputs da UI
     user_name = (st.session_state.get("user_name") or "").strip()
@@ -460,20 +480,44 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
             extra_parts.append(f"— Cenário: {scenario}")
         if plot:
             extra_parts.append(f"— Enredo: {plot}")
-
-    # 4) Modos de fala
     fala_block = build_fala_block(fala_mods)
     if fala_block:
         extra_parts.append(fala_block)
 
-    # 5) Monta system final
+    # 4) Monta system final
     system_text = PERSONA_MARY
     if extra_parts:
         system_text += "\n\n" + "\n".join(extra_parts)
 
-    # 6) Constrói mensagens mínimas
+    # 5) Sumarização automática do histórico extenso
+    HIST_THRESHOLD = 10  # limite máximo de mensagens detalhadas no histórico
+
+    mensagens_chat = [m for m in chat if m.get("role") in ("user", "assistant")]
+    if len(mensagens_chat) > HIST_THRESHOLD:
+        qtd_resumir = len(mensagens_chat) - HIST_THRESHOLD + 1
+        parte_antiga = mensagens_chat[:qtd_resumir]
+        parte_recente = mensagens_chat[qtd_resumir:]
+
+        # >> Função de sumarização automática (deve estar criada no seu script)
+        # Usando o provedor/model_id da sessão atual
+        prov = st.session_state.get("prov")
+        model_id = st.session_state.get("model_id")
+        if prov == "OpenRouter":
+            resumo = resumir_chat(parte_antiga, call_openrouter, model_id)
+        elif prov == "Together":
+            resumo = resumir_chat(parte_antiga, call_together, model_id)
+        elif prov == "Hugging Face":
+            resumo = resumir_chat(parte_antiga, call_huggingface, model_id)
+        else:
+            resumo = resumir_chat(parte_antiga, call_lmstudio, model_id)
+
+        chat_resumido = [{"role": "user", "content": f"Resumo da história até aqui: {resumo}"}] + parte_recente
+    else:
+        chat_resumido = mensagens_chat
+
+    # 6) Constrói mensagens mínimas finais
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
-    for m in chat:
+    for m in chat_resumido:
         role = (m.get("role") or "").strip()
         if role == "system":
             continue
@@ -713,6 +757,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
