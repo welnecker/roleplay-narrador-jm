@@ -216,7 +216,13 @@ def silenciar_fala_do_usuario(txt: str) -> str:
 
 # Combina filtros (ordem importa)
 def apply_filters(txt: str) -> str:
-    return silenciar_fala_do_usuario(silenciar_janio(txt))
+    # 1) limpa meta e ponto de vista do usuário
+    t = apply_extra_sanitizers(txt)
+    # 2) silencia Jânio
+    t = silenciar_janio(t)
+    # 3) impede fala atribuída ao usuário
+    t = silenciar_fala_do_usuario(t)
+    return t
 
 # --------- Sanitização extra: remover meta e 1ª/2ª pessoa do "usuário vê" ---------
 _META_LINE = re.compile(r'(?im)^\s*\[(?:DICA|NOTA|TIP|SUGEST[AÃ]O|INSTRU[CÇ][AÃ]O)[^]]*\]\s*:?.*$')
@@ -689,6 +695,51 @@ def stream_huggingface(model: str, messages: List[Dict[str, str]]):
         time.sleep(0.02)  # leve suavização visual
 
 
+def ensure_min_output(t: str, min_chars: int = 260, min_paras: int = 5) -> str:
+    """
+    Garante exatamente `min_paras` parágrafos.
+    - Redistribui sentenças pelos parágrafos.
+    - Preenche com linhas neutras se faltar conteúdo.
+    - Assegura um tamanho mínimo em caracteres.
+    """
+    t = (t or "").strip()
+
+    NEUTRAL = [
+        "Ela respira fundo e se recompõe, sem pressa.",
+        "Prefere responder só quando estiver calma.",
+        "Observa o próprio ritmo e não se apressa.",
+        "Mantém o foco no que lhe faz bem.",
+        "Volta a atenção ao que importa agora.",
+    ]
+
+    if not t:
+        return "\n\n".join(NEUTRAL[:min_paras])
+
+    # Parágrafos atuais → sentenças
+    paras = [p for p in t.split("\n\n") if p.strip()]
+    sents = []
+    for p in paras:
+        sents.extend([s for s in _SENT_SPLIT.split(p) if s.strip()])
+
+    # Distribui sentenças em N baldes
+    target = max(min_paras, 1)
+    buckets = [[] for _ in range(target)]
+    for i, s in enumerate(sents):
+        buckets[i % target].append(s)
+
+    # Concatena e completa com neutras
+    paras = [" ".join(b).strip() for b in buckets]
+    while len(paras) < min_paras:
+        paras.append(NEUTRAL[len(paras) % len(NEUTRAL)])
+
+    out = "\n\n".join(paras[:min_paras]).strip()
+
+    # Tamanho mínimo
+    if len(out) < min_chars:
+        out += "\n\nEla escolhe palavras simples e mantém a cabeça no lugar."
+    return out
+
+
 # =================================================================================
 # UI
 # =================================================================================
@@ -769,15 +820,17 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             ph.markdown(apply_filters(answer))
 
         finally:
-            # Render final: filtros → estilo → (opcional) carinhosa
-            _ans_clean = apply_filters(answer)
-            _ans_styled = apply_style_filters(_ans_clean)  # use _ans_clean se quiser desativar estilo
-            _ans_final = inject_carinhosa(
+            # Render final: filtros → estilo → 5 parágrafos → (opcional) carinhosa
+            _ans_clean  = apply_filters(answer)
+            _ans_styled = apply_style_filters(_ans_clean)     # mantenha seus clamps/limpezas
+            _ans_styled = ensure_min_output(_ans_styled, min_paras=5)  # <<< garante 5 §§
+            _ans_final  = inject_carinhosa(
                 _ans_styled,
                 user_msg,
                 ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
             )
             ph.markdown(_ans_final)
+
 
     # salvar resposta final e persistir
     st.session_state.chat.append({"role": "assistant", "content": _ans_final})
@@ -786,6 +839,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_final)
     st.rerun()
+
 
 
 
