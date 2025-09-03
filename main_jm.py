@@ -498,7 +498,7 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
     if fala_block:
         extra_parts.append(fala_block)
     # 4) Monta system final
-    system_text = PERSONA_MARY
+    system_text = PERSONA_VITTA_PRIVE
     if extra_parts:
         system_text += "\n\n" + "\n".join(extra_parts)
     # 5) Sumarização automática do histórico extenso
@@ -770,6 +770,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
