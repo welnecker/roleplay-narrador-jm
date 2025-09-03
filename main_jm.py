@@ -561,25 +561,31 @@ def call_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]) -> 
     return data["choices"][0]["message"]["content"].strip()
 
 
-def call_huggingface(model: str, messages: List[Dict[str, str]]) -> str:
-    # Converte chat → prompt simples
-    parts: List[str] = []
-    for m in messages:
-        role = m.get("role")
-        content = (m.get("content") or "").strip()
-        if not content:
-            continue
-        if role == "system":
-            parts.append(f"[SYSTEM]\n{content}\n")
-        elif role == "user":
-            parts.append(f"[USER]\n{content}\n")
-        else:
-            parts.append(f"[ASSISTANT]\n{content}\n")
-    prompt = "\n".join(parts) + "\n[ASSISTANT]\n"
+from huggingface_hub import InferenceClient
 
+def call_huggingface(model: str, messages: List[Dict[str, str]]) -> str:
     client = InferenceClient(api_key=st.secrets.get("HUGGINGFACE_API_KEY", ""))
-    # Parâmetros mínimos (sem temperature/top_p etc.)
-    return client.text_generation(model=model, prompt=prompt, max_new_tokens=512)
+    # Modelos preferencialmente "chat", adapte a lista conforme surgirem novos modelos
+    CHAT_COMPLETION_MODELS = [
+        "deepseek-ai/DeepSeek-R1",
+        "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+        "Qwen/Qwen2.5-7B-Instruct-1M",
+        "zai-org/GLM-4.5-Air",
+        # Adicione outros se testar e garantir que são chat-completion
+    ]
+    try:
+        if model in CHAT_COMPLETION_MODELS:
+            response = client.chat_completion(model=model, messages=messages)
+            return response.choices[0].message.content.strip()
+        else:
+            prompt = "\n".join(
+                f"[{m['role'].upper()}]\n{m['content']}\n" for m in messages
+                if m.get("content")
+            )
+            text = client.text_generation(model=model, prompt=prompt, max_new_tokens=512)
+            return text
+    except Exception as e:
+        return f"[Erro ao chamar o modelo Hugging Face: {e}]"
 
 # =================================================================================
 # Streaming helpers — envia em pedaços para a UI
@@ -756,6 +762,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
