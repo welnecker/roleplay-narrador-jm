@@ -283,7 +283,7 @@ def _lms_models_dict(base_url: str) -> Dict[str, str]:
 # =================================================================================
 # Persona — system mínimo (como solicitado)
 # =================================================================================
-BORDEL DE LUXO: VITTA PRIVÉ = """[BORDEL DE LUXO: VITTA PRIVÉ]
+VITTA PRIVÉ = """[BORDEL DE LUXO: VITTA PRIVÉ]
 
 O Vitta Privé é um espaço sofisticado em Vitória, com ambientes climatizados, decoração refinada, espumantes e trilha sonora sensual. Cinco acompanhantes de alto padrão atendem com discrição e profissionalismo, cada uma com estilo e especialidade única.
 
@@ -783,6 +783,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
