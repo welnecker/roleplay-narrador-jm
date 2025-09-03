@@ -468,21 +468,22 @@ def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
 
 def resumir_chat(chat_msgs: list[dict], call_model_func, model_id: str) -> str:
     """
-    Usa o modelo LLM atual para gerar um resumo de uma lista de mensagens.
-    call_model_func: função que faz chamada ao modelo escolhido (por ex: call_openrouter, call_together...).
+    Usa o modelo LLM para gerar um resumo robusto das mensagens antigas, preservando cenário e contexto.
     """
-    # Une apenas mensagens relevantes (não 'system')
     texto = "\n".join(
         f"[{m['role']}]: {m['content']}"
         for m in chat_msgs if m['role'] in ('user', 'assistant') and m['content'].strip()
     )
     prompt = (
-        "Resuma o diálogo abaixo focando nas decisões, fatos e sentimentos essenciais para a continuidade da história. "
-        "Seja breve e preserve o tom do roleplay.\n\n"
+        "Resuma o diálogo abaixo destacando sempre: 1) o local/situação atual dos personagens, "
+        "2) mudanças de ambiente ou cenário (se ocorreram), 3) estado emocional predominante, "
+        "e 4) decisões ou fatos relevantes para o desenvolvimento da história. "
+        "Seja breve e preserve o tom do roleplay. Se houve saída do motel, viagem, chegada a outro lugar, cite explicitamente.\n\n"
         + texto
     )
     resumo = call_model_func(model_id, [{"role": "user", "content": prompt}])
     return resumo.strip()
+
 
 
 # =============================================================================
@@ -787,6 +788,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
