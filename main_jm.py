@@ -259,6 +259,7 @@ MODELOS_TOGETHER_UI = {
 
 MODELOS_HF = {
     "Llama 3.1 8B Instruct (HF)": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "meituan-longcat": "meituan-longcat/LongCat-Flash-Chat",
     "Qwen2.5 7B Instruct (HF)": "Qwen/Qwen3-235B-A22B-Instruct-2507",
     "zai-org: GLM-4.5-Air (HF)": "zai-org/GLM-4.5-Air",
     "Mixtral 8x7B Instruct (HF)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -755,6 +756,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
