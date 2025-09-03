@@ -545,12 +545,23 @@ def call_openrouter(model: str, messages: List[Dict[str, str]]) -> str:
 
 def call_together(model: str, messages: List[Dict[str, str]]) -> str:
     url = "https://api.together.xyz/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}",
+        "Content-Type": "application/json"
+    }
     payload = {"model": model, "messages": messages, "max_tokens": 680}
-    r = requests.post(url, headers=headers, json=payload, timeout=120)
-    r.raise_for_status()
-    data = r.json()
-    return data["choices"][0]["message"]["content"].strip()
+    try:
+        r = requests.post(url, headers=headers, json=payload, timeout=120)
+        r.raise_for_status()  # Levanta erro para status != 2xx
+        data = r.json()
+        return data["choices"][0]["message"]["content"].strip()
+    except requests.HTTPError as http_err:
+        msg = f"Erro HTTP Together: {r.status_code} - {r.text}"
+        print(msg)  # Ou log para depuração
+        return f"[Erro Together: {r.status_code}] {r.text}"
+    except Exception as e:
+        return f"[Erro ao chamar Together: {e}]"
+
 
 def call_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]) -> str:
     url = f"{base_url.rstrip('/')}/chat/completions"
@@ -763,6 +774,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
