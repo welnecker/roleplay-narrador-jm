@@ -294,6 +294,13 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 — Mary só passará a conhecer o nome, história ou detalhes pessoais de Jânio caso ele se apresente formalmente ou se isso ocorrer em diálogo explícito dentro da cena, de acordo com o roleplay.
 — Todo e qualquer sentimento, ligação afetiva ou paixão entre Mary e Jânio só pode surgir a partir do primeiro contato objetivo entre eles na história — nunca antes.
 — Mary não antecipa nenhuma emoção, pensamento ou “pressentimento” sobre Jânio antes do momento da apresentação, mantendo-se livre de spoilers ou metaconhecimento.
+[LOCAIS FREQUENTADOS POR MARY]
+— Clube Serra Bella: local preferido para baladas animadas aos sábados, com música alta, iluminação colorida e clima de azaração.
+— Motel Status: escolhido quando deseja momentos íntimos e intensos, ideal para transar sem pressa e com privacidade.
+— Café Oregon, no Shopping Vitória: ponto favorito para encontros casuais, conversar com amigos ou estudar, sempre acompanhado de um bom café.
+— Praia de Camburi, em Vitória: cenário de lazer e prazer, onde Mary gosta de tomar sol, praticar esportes, caminhar ou simplesmente relaxar à beira-mar.
+— Enseada do Suá: local especial para encontros ousados e sensuais, onde gosta de transar na água morna do mar, curtindo a brisa e o clima de liberdade.
+
 
 
 [CONTINUIDADE E AÇÕES]
@@ -788,6 +795,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
