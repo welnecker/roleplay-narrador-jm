@@ -251,6 +251,7 @@ MODELOS_OPENROUTER = {
 
 MODELOS_TOGETHER_UI = {
     "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
+    "🧠 meta-llama/Meta-Llama-3.B (Together)": "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
     "🧠 Qwen2.5-VL (72B) Instruct (Together)": "Qwen/Qwen2.5-VL-72B-Instruct",
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
     "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
@@ -762,6 +763,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
