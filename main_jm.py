@@ -736,57 +736,58 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
     messages = build_minimal_messages(st.session_state.chat)
 
-    def format_roleplay(text, max_paragraphs=4):
-    import re
-    sentences = re.split(r'(?<=[.!?…])\s+', text)
-    parags, tmp = [], ""
-    for sent in sentences:
-        if len(tmp.split()) + len(sent.split()) > 35 or len(tmp) > 120:
+        def format_roleplay(text, max_paragraphs=4):
+        import re
+        sentences = re.split(r'(?<=[.!?…])\s+', text)
+        parags, tmp = [], ""
+        for sent in sentences:
+            if len(tmp.split()) + len(sent.split()) > 35 or len(tmp) > 120:
+                parags.append(tmp.strip())
+                tmp = sent
+            else:
+                tmp = tmp + " " + sent if tmp else sent
+            if len(parags) >= max_paragraphs:
+                break
+        if tmp and len(parags) < max_paragraphs:
             parags.append(tmp.strip())
-            tmp = sent
-        else:
-            tmp = tmp + " " + sent if tmp else sent
-        if len(parags) >= max_paragraphs:
-            break
-    if tmp and len(parags) < max_paragraphs:
-        parags.append(tmp.strip())
-    return "\n\n".join(p for p in parags if p)
+        return "\n\n".join(p for p in parags if p)
+    
+    with st.chat_message("assistant"):
+        ph = st.empty()
+        answer = ""
+        try:
+            if prov == "OpenRouter":
+                gen = stream_openrouter(model_id, messages)
+            elif prov == "Together":
+                gen = stream_together(model_id, messages)
+            elif prov == "Hugging Face":
+                gen = stream_huggingface(model_id, messages)
+            else:
+                gen = stream_lmstudio(st.session_state.lms_base_url, model_id, messages)
+            for delta in gen:
+                answer += delta
+                # Exibe realtime sem roleplay-format ainda
+                ph.markdown(apply_filters(answer) + "▌")
+        except Exception as e:
+            answer = f"[Erro ao chamar o modelo: {e}]"
+            ph.markdown(apply_filters(answer))
+        # Pós-processa com filtros, tom carinhoso e formato de roleplay
+        _ans_clean = apply_filters(answer)
+        _ans_clean = inject_carinhosa(
+            _ans_clean,
+            user_msg,
+            ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
+        )
+        _ans_clean = format_roleplay(_ans_clean)
+        ph.markdown(_ans_clean)
+    # Salva e mantém histórico como antes
+    st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
+    if len(st.session_state.chat) > 30:
+        st.session_state.chat = st.session_state.chat[-30:]
+    ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
+    salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
+    st.rerun()
 
-with st.chat_message("assistant"):
-    ph = st.empty()
-    answer = ""
-    try:
-        if prov == "OpenRouter":
-            gen = stream_openrouter(model_id, messages)
-        elif prov == "Together":
-            gen = stream_together(model_id, messages)
-        elif prov == "Hugging Face":
-            gen = stream_huggingface(model_id, messages)
-        else:
-            gen = stream_lmstudio(st.session_state.lms_base_url, model_id, messages)
-        for delta in gen:
-            answer += delta
-            # Exibe realtime sem roleplay-format ainda
-            ph.markdown(apply_filters(answer) + "▌")
-    except Exception as e:
-        answer = f"[Erro ao chamar o modelo: {e}]"
-        ph.markdown(apply_filters(answer))
-    # Pós-processa com filtros, tom carinhoso e formato de roleplay
-    _ans_clean = apply_filters(answer)
-    _ans_clean = inject_carinhosa(
-        _ans_clean,
-        user_msg,
-        ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
-    )
-    _ans_clean = format_roleplay(_ans_clean)
-    ph.markdown(_ans_clean)
-# Salva e mantém histórico como antes
-st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
-if len(st.session_state.chat) > 30:
-    st.session_state.chat = st.session_state.chat[-30:]
-ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
-salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
-st.rerun()
 
 
 
