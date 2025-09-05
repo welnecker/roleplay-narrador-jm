@@ -311,6 +311,11 @@ O Vitta Privé é um espaço sofisticado em Vitória, com ambientes climatizados
 — O que realiza: Práticas sensoriais, sexo tântrico, golden/shower (se negociado), bondage leve.
 Ambiente sempre limpo, música baixa, privacidade total. Todas se testam regularmente, oferecem bebidas, conversam se o cliente desejar, e prezam pelo sigilo absoluto.
 
+[MODO DE FALA — Mary]
+— Modos ativos: Oral, Boquete.
+— Sexy: carga erótica verbal com descrição gráfica; NSFW liberado.
+— Responda mantendo este(s) tom(ns) em falas e narração de Mary.
+
 [CONTINUIDADE E AÇÕES]
 — Nunca ofereça opções de menu, listas de escolhas ou alternativas enumeradas ao usuário.
 — Mantenha coerência absoluta com o que já aconteceu: não reinicie interações encerradas, nem repita oportunidades que Mary ou o usuário já encerraram ou decidiram.
@@ -437,18 +442,21 @@ def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
 
 def resumir_chat(chat_msgs: list[dict], call_model_func, model_id: str) -> str:
     """
-    Usa o modelo LLM para gerar um resumo robusto das mensagens antigas, preservando cenário e contexto.
+    Usa o modelo LLM para gerar um resumo robusto das mensagens antigas,
+    preservando cenário, contexto de roleplay e detalhes sensoriais essenciais.
     """
     texto = "\n".join(
         f"[{m['role']}]: {m['content']}"
         for m in chat_msgs if m['role'] in ('user', 'assistant') and m['content'].strip()
     )
     prompt = (
-        "Resuma o diálogo abaixo destacando sempre: 1) o local/situação atual dos personagens, "
-        "2) mudanças de ambiente ou cenário (se ocorreram), 3) estado emocional predominante, "
-        "e 4) decisões ou fatos relevantes para o desenvolvimento da história. "
-        "Seja breve e preserve o tom do roleplay. Se houve saída do motel, viagem, chegada a outro lugar, cite explicitamente.\n\n"
-        + texto
+        "Resuma o diálogo abaixo para roleplay adulto, trazendo sempre nesta ordem:\n"
+        "1. Localização e situação atual dos personagens, de maneira sensorial (quarto, jacuzzi, sala, etc).\n"
+        "2. Toda transição de ambiente/cenário (detalhado quando aconteceu).\n"
+        "3. Estado emocional dominante (tensão, desejo, desconforto, etc).\n"
+        "4. Fatos e decisões fundamentais já tomadas que impactam o enredo.\n"
+        "O resumo deve ser conciso, seguir o tom sensual e não omitir saídas, viagens ou trocas de ambiente. Utilize frases diretas e foco sensorial/ações. Nunca resuma como narrador onisciente — só cite o que foi explicitamente mostrado ou dito no diálogo.\n\n"
+        f"{texto}"
     )
     resumo = call_model_func(model_id, [{"role": "user", "content": prompt}])
     return resumo.strip()
@@ -787,6 +795,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
