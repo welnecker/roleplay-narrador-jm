@@ -311,11 +311,6 @@ O Vitta Privé é um espaço sofisticado em Vitória, com ambientes climatizados
 — O que realiza: Práticas sensoriais, sexo tântrico, golden/shower (se negociado), bondage leve.
 Ambiente sempre limpo, música baixa, privacidade total. Todas se testam regularmente, oferecem bebidas, conversam se o cliente desejar, e prezam pelo sigilo absoluto.
 
-[MODO DE FALA — Mary]
-— Modos ativos: Oral, Boquete.
-— Sexy: carga erótica verbal com descrição gráfica; NSFW liberado.
-— Responda mantendo este(s) tom(ns) em falas e narração de Mary.
-
 [CONTINUIDADE E AÇÕES]
 — Nunca ofereça opções de menu, listas de escolhas ou alternativas enumeradas ao usuário.
 — Mantenha coerência absoluta com o que já aconteceu: não reinicie interações encerradas, nem repita oportunidades que Mary ou o usuário já encerraram ou decidiram.
@@ -467,19 +462,25 @@ def resumir_chat(chat_msgs: list[dict], call_model_func, model_id: str) -> str:
 # Build minimal messages (override) — injeta nome do usuário, cenário e enredo
 # =============================================================================
 def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    # 1) Ler inputs da UI
+    import re
+
+    # 1) Ler inputs da UI, sanitizar
     user_name = (st.session_state.get("user_name") or "").strip()
     scenario  = (st.session_state.get("scenario_init") or "").strip()
     plot      = (st.session_state.get("plot_init") or "").strip()
     fala_mods = st.session_state.get("fala_mods") or []
-    # 2) Sanitização leve + limite de tamanho (evita system gigante)
+
     def _clean(s: str, maxlen: int = 1200) -> str:
         s = re.sub(r"\s+", " ", s).strip()
         return s[:maxlen]
     user_name = _clean(user_name, 80)
     scenario  = _clean(scenario, 1000)
     plot      = _clean(plot, 1000)
-    # 3) Parts extras
+
+    # 2) Monta o bloco dos modos de fala DINÂMICO (sempre gerado pelo sidebar)
+    fala_block = build_fala_block(fala_mods)  # <= aqui está o segredo!
+
+    # 3) Monta partes extras
     extra_parts = []
     if user_name:
         extra_parts.append(f"[USUÁRIO]\n— Nome a ser reconhecido pelo personagem: {user_name}.")
@@ -489,15 +490,18 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
             extra_parts.append(f"— Cenário: {scenario}")
         if plot:
             extra_parts.append(f"— Enredo: {plot}")
-    fala_block = build_fala_block(fala_mods)
+
+    # 4) Monta o system prompt FINAL, respeitando a ordem e o peso do fala_block
+    parts = []
     if fala_block:
-        extra_parts.append(fala_block)
-    # 4) Monta system final
-    system_text = PERSONA_VITTA_PRIVE
+        parts.append(fala_block)         # SEMPRE PRIMEIRO!
+    parts.append(PERSONA_VITTA_PRIVE)    # Persona completa, SEM modos fixos!
     if extra_parts:
-        system_text += "\n\n" + "\n".join(extra_parts)
+        parts.append("\n".join(extra_parts))
+    system_text = "\n\n".join(parts)
+
     # 5) Sumarização automática do histórico extenso
-    HIST_THRESHOLD = 10  # limite máximo de mensagens detalhadas no histórico
+    HIST_THRESHOLD = 10
     mensagens_chat = [m for m in chat if m.get("role") in ("user", "assistant")]
     if len(mensagens_chat) > HIST_THRESHOLD:
         qtd_resumir = len(mensagens_chat) - HIST_THRESHOLD + 1
@@ -512,7 +516,6 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         elif prov == "Hugging Face":
             resumo = resumir_chat(parte_antiga, call_huggingface, model_id)
         else:
-            # Ajuste aqui: passa base_url pelo lambda
             base_url = st.session_state.get("lms_base_url") or DEFAULT_LMS_BASE_URL
             resumo = resumir_chat(
                 parte_antiga,
@@ -522,7 +525,8 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         chat_resumido = [{"role": "user", "content": f"Resumo da história até aqui: {resumo}"}] + parte_recente
     else:
         chat_resumido = mensagens_chat
-    # 6) Constrói mensagens mínimas finais
+
+    # 6) Constrói mensagens mínimas finais: system + histórico
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
     for m in chat_resumido:
         role = (m.get("role") or "").strip()
@@ -795,6 +799,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
