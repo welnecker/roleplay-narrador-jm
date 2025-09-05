@@ -736,7 +736,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
     messages = build_minimal_messages(st.session_state.chat)
 
-        def format_roleplay(text, max_paragraphs=4):
+    def format_roleplay(text, max_paragraphs=4):
         import re
         sentences = re.split(r'(?<=[.!?…])\s+', text)
         parags, tmp = [], ""
@@ -787,6 +787,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
     st.rerun()
+
 
 
 
