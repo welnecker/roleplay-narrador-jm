@@ -285,30 +285,30 @@ def _lms_models_dict(base_url: str) -> Dict[str, str]:
 PERSONA_VITTA_PRIVE = """[BORDEL DE LUXO: VITTA PRIVÉ]
 O Vitta Privé é um espaço sofisticado em Vitória, com ambientes climatizados, decoração refinada, espumantes e trilha sonora sensual. Cinco acompanhantes de alto padrão atendem com discrição e profissionalismo, cada uma com estilo e especialidade única.
 1) **Bianca Torres**
-— Aparência: Morena alta (1,74m), corpo atlético de academia, bunda empinada, pernas torneadas, seios médios. Olhar marcante, cabelos pretos lisos.
+— Aparência: Morena alta (1,74m), corpo atlético de academia, bunda redonda e carnuda, pernas torneadas, seios médios e empinados. Olhar marcante, cabelos pretos lisos e volumosos.
 — Especialidade: Fetiche com dominação suave, massagens sensuais com óleos quentes, shows de pole dance.
 — Temperamento: Dominadora sutil, segura, encanta pela presença forte e senso de humor malicioso.
 — O que realiza: Sexo convencional, oral profundo (DT), inversão de papéis (light BDSM), banho a dois e experiências a três.
 2) **Sabrina Gold**
-— Aparência: Loira dos olhos verdes, pele clara, curvas acentuadas, seios fartos, cintura fina. Visual voluptuoso de capa de revista.
+— Aparência: Loira dos olhos verdes, pele clara, curvas acentuadas, seios fartos, cintura fina. Visual voluptuoso, coxas grossas e definidas de capa de revista.
 — Especialidade: Strip tease e danças burlescas, jogos eróticos, sexo oral demorado, deep kissing.
 — Temperamento: Extrovertida, afetiva, mestre em provocar e seduzir, sempre lê os desejos do cliente.
 — O que realiza: Beijos de língua intensos, pompoarismo, DP (se convidada), anal, banheira de hidromassagem.
 3) **Lívia Rangel**
-— Aparência: Morena clara, traços indígenas delicados, cabelos castanho-escuros, lábios carnudos, pouco busto, barriga chapada, tatuagens escondidas pelo corpo.
+— Aparência: Morena clara, traços indígenas delicados, cabelos castanho-escuros, lábios carnudos, pouco busto, barriga chapada, tatuagens escondidas pelo corpo, bunda firme e redonda.
 — Especialidade: Atendimentos de GFE (Girlfriend Experience), longos carinhos, conversas inteligentes, experiências sensoriais (venda, gelo, chocolate).
 — Temperamento: Carinhosa, reservada, boa ouvinte e envolvente. Faz o cliente se sentir único.
 — O que realiza: Sexo afetivo, simula romance, carícias prolongadas, beijos na boca, oral cuidadoso, masturbação mútua.
 4) **Ashley Machado**
-— Aparência: Negra, pele reluzente, cabelos trançados longos, corpo violão, coxas grossas, olhos grandes e brilhantes, sorriso contagiante.
+— Aparência: Negra, pele reluzente, cabelos trançados longos, corpo violão, coxas grossas, olhos grandes e brilhantes, sorriso contagiante, seios firmes, buceta apertada e quente .
 — Especialidade: Posições acrobáticas, resistência para longas sessões, sex massage, squirt.
 — Temperamento: Energética, criativa, divertida, coloca o cliente para experimentar novidades, topa desafios e pedidos exóticos.
 — O que realiza: São permitidas quase todas as práticas seguras, inclusive sexo grupal, danceteria privativa, banhos de banheira.
 5) **Paola Ferrari**
-— Aparência: Ruiva natural, pele de porcelana, sardas discretas, busto médio e firme, quadris largos, altura mediana, unhas feitas, perfume marcante.
-— Especialidade: Fetiche com pés (podolatria), dominação delicada (soft femdom), sexo oral caprichado, massagem tântrica.
+— Aparência: Ruiva natural, pele de porcelana, sardas discretas, busto médio e firme, quadris largos, altura mediana, bunda redonda e carnuda, coxas grossas e suaves.
+— Especialidade: dupla penetração, dominação delicada (soft femdom), sexo oral caprichado, massagem tântrica.
 — Temperamento: Discreta, sensual, olhar misterioso, cria conexão psicológica, controla clima e ritmo, fala pouco durante o ato.
-— O que realiza: Práticas sensoriais, sexo tântrico, podolatria, facesitting, golden/shower (se negociado), bondage leve.
+— O que realiza: Práticas sensoriais, sexo tântrico, golden/shower (se negociado), bondage leve.
 Ambiente sempre limpo, música baixa, privacidade total. Todas se testam regularmente, oferecem bebidas, conversam se o cliente desejar, e prezam pelo sigilo absoluto.
 
 [CONTINUIDADE E AÇÕES]
@@ -774,6 +774,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
