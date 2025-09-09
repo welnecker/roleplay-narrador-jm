@@ -92,6 +92,7 @@ def build_fala_block(modos: List[str]) -> str:
 # ================================
 with st.sidebar:
     st.subheader("Roleplay comercial")
+
     st.session_state.setdefault("user_name", "")
     st.session_state["user_name"] = st.text_input(
         "Seu nome (como o personagem vai se referir a você)",
@@ -113,10 +114,24 @@ with st.sidebar:
         placeholder="Ex.: Mary encontra o usuário após um mal-entendido com Ricardo…",
     )
 
+    # Presets de clima inicial (equilíbrio)
+    roleplay_modes = {
+        "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial.",
+        "Mellow": "Clima levemente sugestivo, insinuações, mas sem abordagem sexual direta.",
+        "Standard": "Flerte e química surgem naturalmente, mas nada explícito sem gatilho do usuário.",
+        "Real": "Reage de maneira realista ao contexto, histórico e ações do usuário.",
+        "Hot": "Flerte aberto, direto e mais ousado já de início, sem ser explícito de cara.",
+        "Inner Secret": "Desejos, fetiches e fantasias revelados gradualmente conforme a aproximação.",
+        "Explicit": "Sexualidade aberta e explícita permitida desde o início do diálogo, sem restrição de conteúdo."
+    }
+    st.session_state.setdefault("equilibrio_modo", "Standard")
+    modo_eq = st.selectbox("Clima de início", list(roleplay_modes.keys()), index=2)
+    st.session_state["equilibrio_modo"] = modo_eq
+    st.caption(roleplay_modes.get(modo_eq, ""))  # Mostra a descrição do preset escolhido
+
 with st.sidebar:
     st.markdown("**Modo de fala da Mary**")
     st.session_state.setdefault("fala_mods", [])
-
     # 5 caixas de seleção (podem combinar)
     mods_escolhidos: List[str] = []
     if st.checkbox("Boquete", value=True, key="fala_Boquete"):
@@ -129,7 +144,6 @@ with st.sidebar:
         mods_escolhidos.append("quatro")
     if st.checkbox("Ciumenta", key="fala_ciumenta"):
         mods_escolhidos.append("Ciumenta")
-
     if st.checkbox("Carinhosa", key="fala_carinhosa"):
         mods_escolhidos.append("Carinhosa")
     
@@ -485,14 +499,29 @@ def resumir_chat(chat_msgs: list[dict], call_model_func, model_id: str) -> str:
 
 
 # =============================================================================
-# Build minimal messages (override) — injeta nome do usuário, cenário e enredo
+# Build minimal messages (override) — injeta nome do usuário, cenário e enredo + clima inicial
 # =============================================================================
 def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    import re
+
     # 1) Ler inputs da UI
     user_name = (st.session_state.get("user_name") or "").strip()
     scenario  = (st.session_state.get("scenario_init") or "").strip()
     plot      = (st.session_state.get("plot_init") or "").strip()
     fala_mods = st.session_state.get("fala_mods") or []
+    clima_modo = st.session_state.get("equilibrio_modo", "Standard")
+
+    # Presets de clima inicial disponíveis (mantenha este dicionário igual ao que aparece no sidebar)
+    roleplay_modes = {
+        "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial.",
+        "Mellow": "Clima levemente sugestivo, insinuações, mas sem abordagem sexual direta.",
+        "Standard": "Flerte e química surgem naturalmente, mas nada explícito sem gatilho do usuário.",
+        "Real": "Reage de maneira realista ao contexto, histórico e ações do usuário.",
+        "Hot": "Flerte aberto, direto e mais ousado já de início, sem ser explícito de cara.",
+        "Inner Secret": "Desejos, fetiches e fantasias revelados gradualmente conforme a aproximação.",
+        "Explicit": "Sexualidade aberta e explícita permitida desde o início do diálogo, sem restrição de conteúdo."
+    }
+
     # 2) Sanitização leve + limite de tamanho (evita system gigante)
     def _clean(s: str, maxlen: int = 1200) -> str:
         s = re.sub(r"\s+", " ", s).strip()
@@ -500,7 +529,17 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
     user_name = _clean(user_name, 80)
     scenario  = _clean(scenario, 1000)
     plot      = _clean(plot, 1000)
-    # 3) Parts extras
+
+    # 3) Clima inicial e outros extras
+    def build_equilibrio_block(modo):
+        desc = roleplay_modes.get(modo, "Flerte conforme interesse do usuário.")
+        return (
+            f"[CLIMA INICIAL — {modo}]\n"
+            f"— {desc}\n"
+            "— Siga este clima enquanto não houver mudança clara provocada pelo usuário."
+        )
+    equilibrio_block = build_equilibrio_block(clima_modo)
+
     extra_parts = []
     if user_name:
         extra_parts.append(f"[USUÁRIO]\n— Nome a ser reconhecido pelo personagem: {user_name}.")
@@ -510,13 +549,19 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
             extra_parts.append(f"— Cenário: {scenario}")
         if plot:
             extra_parts.append(f"— Enredo: {plot}")
+
     fala_block = build_fala_block(fala_mods)
+    # parts: sempre equilibrío, depois modos de fala, depois persona, depois extras
+    parts = []
+    if equilibrio_block:
+        parts.append(equilibrio_block)
     if fala_block:
-        extra_parts.append(fala_block)
-    # 4) Monta system final
-    system_text = PERSONA_MARY
+        parts.append(fala_block)
+    parts.append(PERSONA_MARY)
     if extra_parts:
-        system_text += "\n\n" + "\n".join(extra_parts)
+        parts.append('\n'.join(extra_parts))
+    system_text = '\n\n'.join(parts)
+
     # 5) Sumarização automática do histórico extenso
     HIST_THRESHOLD = 10  # limite máximo de mensagens detalhadas no histórico
     mensagens_chat = [m for m in chat if m.get("role") in ("user", "assistant")]
@@ -533,7 +578,6 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         elif prov == "Hugging Face":
             resumo = resumir_chat(parte_antiga, call_huggingface, model_id)
         else:
-            # Ajuste aqui: passa base_url pelo lambda
             base_url = st.session_state.get("lms_base_url") or DEFAULT_LMS_BASE_URL
             resumo = resumir_chat(
                 parte_antiga,
@@ -543,6 +587,7 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         chat_resumido = [{"role": "user", "content": f"Resumo da história até aqui: {resumo}"}] + parte_recente
     else:
         chat_resumido = mensagens_chat
+
     # 6) Constrói mensagens mínimas finais
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
     for m in chat_resumido:
@@ -553,6 +598,7 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         if content:
             msgs.append({"role": role, "content": content})
     return msgs
+
 
 # =================================================================================
 # Chamadas por provedor — sem parâmetros extras
@@ -786,6 +832,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
