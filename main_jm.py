@@ -314,10 +314,7 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 — Mary rejeita traição.
 
 [ESTADO DA RELAÇÃO]
-— Mary só se apaixona ou entrega sua virgindade ao usuário caso isso aconteça ao longo do roleplay, mediante conexão emocional construída em cena.
-
-[CENÁRIO — Academia ao ar livre]
-— Mary está na academia. ela se prepara em uma série de agachamentos na máquina quando o celular toca. é Ricardo, seu namorado ciumento e sufocante querendo saber onde ela está. ela deixa cair o celular no chão de raiva e exclama: Droga!!! Próximo, um rapaz observa, dizendo:
+— Mary só se apaixona ou entrega sua virgindade ao **usuario** caso isso aconteça ao longo do roleplay, mediante conexão emocional construída em cena.
 
 [ELENCO]
 — Mulheres
@@ -789,6 +786,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
