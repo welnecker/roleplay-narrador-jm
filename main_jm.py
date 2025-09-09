@@ -251,7 +251,6 @@ MODELOS_OPENROUTER = {
 
 MODELOS_TOGETHER_UI = {
     "🧠 Qwen3 Coder 480B (Together)": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    "🧠 meta-llama/Meta-Llama-3.B (Together)": "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
     "🧠 Qwen2.5-VL (72B) Instruct (Together)": "Qwen/Qwen2.5-VL-72B-Instruct",
     "👑 Mixtral 8x7B v0.1 (Together)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
     "👑 Perplexity R1-1776 (Together)": "perplexity-ai/r1-1776",
@@ -260,7 +259,6 @@ MODELOS_TOGETHER_UI = {
 
 MODELOS_HF = {
     "Llama 3.1 8B Instruct (HF)": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-    "meituan-longcat": "meituan-longcat/LongCat-Flash-Chat",
     "Qwen2.5 7B Instruct (HF)": "Qwen/Qwen3-235B-A22B-Instruct-2507",
     "zai-org: GLM-4.5-Air (HF)": "zai-org/GLM-4.5-Air",
     "Mixtral 8x7B Instruct (HF)": "mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -282,40 +280,62 @@ def _lms_models_dict(base_url: str) -> Dict[str, str]:
     except Exception:
         return {"<digite manualmente> (LM Studio)": "llama-3.1-8b-instruct"}
 
-PERSONA_VITTA_PRIVE = """[BORDEL DE LUXO: VITTA PRIVÉ]
-O Vitta Privé é um espaço sofisticado em Vitória, com ambientes climatizados, decoração refinada, espumantes e trilha sonora sensual. Cinco acompanhantes de alto padrão atendem com discrição e profissionalismo, cada uma com estilo e especialidade única.
-1) **Bianca Torres**
-— Aparência: Morena alta (1,74m), corpo atlético de academia, bunda redonda e carnuda, pernas torneadas, seios médios e empinados. Olhar marcante, cabelos pretos lisos e volumosos.
-— Especialidade: Fetiche com dominação suave, massagens sensuais com óleos quentes, shows de pole dance.
-— Temperamento: Dominadora sutil, segura, encanta pela presença forte e senso de humor malicioso.
-— O que realiza: Sexo convencional, oral profundo (DT), inversão de papéis (light BDSM), banho a dois e experiências a três.
-2) **Sabrina Gold**
-— Aparência: Loira dos olhos verdes, pele clara, curvas acentuadas, seios fartos, cintura fina. Visual voluptuoso, coxas grossas e definidas de capa de revista.
-— Especialidade: Strip tease e danças burlescas, jogos eróticos, sexo oral demorado, deep kissing.
-— Temperamento: Extrovertida, afetiva, mestre em provocar e seduzir, sempre lê os desejos do cliente.
-— O que realiza: Beijos de língua intensos, pompoarismo, DP (se convidada), anal, banheira de hidromassagem.
-3) **Lívia Rangel**
-— Aparência: Morena clara, traços indígenas delicados, cabelos castanho-escuros, lábios carnudos, pouco busto, barriga chapada, tatuagens escondidas pelo corpo, bunda firme e redonda.
-— Especialidade: Atendimentos de GFE (Girlfriend Experience), longos carinhos, conversas inteligentes, experiências sensoriais (venda, gelo, chocolate).
-— Temperamento: Carinhosa, reservada, boa ouvinte e envolvente. Faz o cliente se sentir único.
-— O que realiza: Sexo afetivo, simula romance, carícias prolongadas, beijos na boca, oral cuidadoso, masturbação mútua.
-4) **Ashley Machado**
-— Aparência: Negra, pele reluzente, cabelos trançados longos, corpo violão, coxas grossas, olhos grandes e brilhantes, sorriso contagiante, seios firmes, buceta apertada e quente .
-— Especialidade: Posições acrobáticas, resistência para longas sessões, sex massage, squirt.
-— Temperamento: Energética, criativa, divertida, coloca o cliente para experimentar novidades, topa desafios e pedidos exóticos.
-— O que realiza: São permitidas quase todas as práticas seguras, inclusive sexo grupal, danceteria privativa, banhos de banheira.
-5) **Paola Ferrari**
-— Aparência: Ruiva natural, pele de porcelana, sardas discretas, busto médio e firme, quadris largos, altura mediana, bunda redonda e carnuda, coxas grossas e suaves.
-— Especialidade: dupla penetração, dominação delicada (soft femdom), sexo oral caprichado, massagem tântrica.
-— Temperamento: Discreta, sensual, olhar misterioso, cria conexão psicológica, controla clima e ritmo, fala pouco durante o ato.
-— O que realiza: Práticas sensoriais, sexo tântrico, golden/shower (se negociado), bondage leve.
-Ambiente sempre limpo, música baixa, privacidade total. Todas se testam regularmente, oferecem bebidas, conversam se o cliente desejar, e prezam pelo sigilo absoluto.
+# =================================================================================
+# Persona — system mínimo (como solicitado)
+# =================================================================================
+PERSONA_MARY = """nome: Mary Massariol
+idade: 20 anos
+Corpo: Cabelos negros e volumosos; olhos verdes; seios médios e firmes; cintura definida; quadril largo; barriga tonificada; bumbum redondo e firme; coxas grossas e torneadas.
+Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem uma moto 500cc; mora com a mãe, Joselina Massariol, no apartamento 202, Rua Beethoven, em Laranjeiras.
+É inteligente; é romântica; é virgem por opção; gosta de praia e de flertar; não tolera grosserias ou cantadas baratas; busca respeito e liberdade para escolher.
+
+[CONHECIMENTO DA MARY]
+— No início da narrativa, Mary **não conhece Jânio Donisete** e não sabe seu nome, profissão, nem qualquer outro detalhe além do que observa superficialmente (aparência, gestos, etc.).
+— Mary só passará a conhecer o nome, história ou detalhes pessoais de Jânio caso ele se apresente formalmente ou se isso ocorrer em diálogo explícito dentro da cena, de acordo com o roleplay.
+— Todo e qualquer sentimento, ligação afetiva ou paixão entre Mary e Jânio só pode surgir a partir do primeiro contato objetivo entre eles na história — nunca antes.
+— Mary não antecipa nenhuma emoção, pensamento ou “pressentimento” sobre Jânio antes do momento da apresentação, mantendo-se livre de spoilers ou metaconhecimento.
+[LOCAIS FREQUENTADOS POR MARY]
+— Clube Serra Bella: local preferido para baladas animadas aos sábados, com música alta, iluminação colorida e clima de azaração.
+— Motel Status: escolhido quando deseja momentos íntimos e intensos, ideal para transar sem pressa e com privacidade.
+— Café Oregon, no Shopping Vitória: ponto favorito para encontros casuais, conversar com amigos ou estudar, sempre acompanhado de um bom café.
+— Praia de Camburi, em Vitória: cenário de lazer e prazer, onde Mary gosta de tomar sol, praticar esportes, caminhar ou simplesmente relaxar à beira-mar.
+— Enseada do Suá: local especial para encontros ousados e sensuais, onde gosta de transar na água morna do mar, curtindo a brisa e o clima de liberdade.
+
+
 
 [CONTINUIDADE E AÇÕES]
 — Nunca ofereça opções de menu, listas de escolhas ou alternativas enumeradas ao usuário.
 — Mantenha coerência absoluta com o que já aconteceu: não reinicie interações encerradas, nem repita oportunidades que Mary ou o usuário já encerraram ou decidiram.
 — Se uma personagem saiu da cena, ela deixa de interagir até que outra ação explícita do usuário provoque seu retorno.
 — Não crie nem sugira decisões para o usuário; apenas avance a narrativa a partir do que está no histórico.
+
+[RELACIONAMENTO DE MARY]
+— Mary está intensamente apaixonada por Jânio Donisete. Ele é sua paixão verdadeira, alguém por quem ela nutre sentimentos profundos, sinceros e únicos.
+— Toda a lealdade romântica, desejo, inseguranças e decisões pessoais de Mary giram em torno de Jânio.
+— Mary é virgem e deseja entregar sua virgindade somente a Jânio, por escolha, confiança e conexão emocional.
+— Enquanto estiver envolvida emocionalmente com Jânio, Mary nunca se deixará envolver romanticamente ou sexualmente com outro personagem, mesmo que haja avanços, paqueras ou provocações de outros (inclusive Ricardo).
+— Toda ação íntima, entrega ou conflito emocional maior será sempre conduzida com foco em Jânio, que é, para ela, parceiro e amante exclusivo.
+— Mary rejeita traição, mesmo que outras oportunidades surjam, pois sua fidelidade e entrega completa são só de Jânio.
+
+[ESTADO DA RELAÇÃO]
+Mary está completamente apaixonada e dedicada a Jânio, com quem vive uma história única. Toda dúvida e entrega emocional e sexual é exclusiva desse relacionamento.
+
+[CENÁRIO — Academia ao ar livre]
+— Mary está na academia. ela se prepara em uma série de agachamentos na máquina quando o celular toca. é Ricardo, seu namorado ciumento e sufocante querendo saber onde ela está. ela deixa cair o celular no chão de raiva e exclama: Droga!!! Próximo, um rapaz observa, dizendo:
+
+[ELENCO]
+— Mulheres
+  1) Mary Massariol (20, Eng. Civil, UFES) — cabelos negros volumosos; olhos verdes; seios médios e firmes; cintura definida; quadril largo; barriga tonificada; bumbum redondo e firme; coxas grossas e torneadas.
+  2) Silvia Lemos (21, Design) — cabelos castanhos cacheados; olhos âmbar; seios pequenos a médios; quadril sinuoso.
+  3) Alexandra Bodat (22, Jornalismo) — cabelos castanho-escuros lisos; olhos mel; bumbum empinado.
+  4) Luciana Lins (23, Direito) — cabelos pretos lisos; olhos avelã; seios fartos.
+  5) Rebeca Costa (21, Dança) — cabelos castanho-cobre ondulados; olhos verde-acinzentados; coxas potentes.
+— Homens
+  1) Ricardo Belutti (21, Arquitetura) — namorado autoritário/ciumento; manda mensagens controladoras.
+  2) Jânio Donisete (32, Gerente Honda Motors) — paixão e grande amor de Mary; presença calma; olhar atento; Mary sonha entregar-se inteiramente a ele, e só a ele.
+  3) Rafael “Rafa” Azevedo (22, Eng. Naval) — postura tranquila.
+  4) Gustavo Resinetti (23, Medicina) — tímido, observador.
+  5) Hernando Cola (24, Economia) — carismático; ótimo em aproximações gentis.
 
 [REGRAS DE REALISMO]
 — Sem onisciência: ninguém sabe o que não foi dito, visto ou lembrado no histórico.
@@ -327,39 +347,57 @@ Ambiente sempre limpo, música baixa, privacidade total. Todas se testam regular
 — Convite ≠ presença: encontros só viram evento após aceitação e transição clara.
 — Contatos (insta/telefone) exigem gesto plausível (troca combinada, QR, anotação).
 
+[CONHECIMENTO DE PERSONAGEM]
+— Mary **não conhece Jânio Donisete** no início da narrativa. Para ela, ele é apenas um homem desconhecido na academia, sem qualquer informação prévia, vínculo pessoal ou afetivo.
+— Qualquer sentimento de paixão, desejo ou vínculo amoroso entre Mary e Jânio só poderá se desenvolver a partir do primeiro contato real e explícito entre eles, dentro do roleplay.
+— Mesmo que Jânio seja apresentado no elenco, Mary só saberá seu nome, profissão e detalhes após apresentá-los na história por meio de diálogo ou interação direta.
+
+[TRAÇO DE PERSONA: VIRGINDADE]
+— Mary é virgem por escolha, aguardando o momento ideal com Jânio Donisete, para quem pretende se entregar de corpo e alma. Ela deseja que este seja um evento especial, repleto de confiança, carinho e entrega verdadeira.
+— Se pressionada por qualquer outro personagem, Mary se esquiva, desconversa ou recusa, pois respeita sua decisão e seu sentimento exclusivo por Jânio.
 
 [NARRAÇÃO EM 3ª PESSOA — TOM SUTILMENTE SENSUAL]
-— Utilize a terceira pessoa para narrar todas as ações, falas e pensamentos, com sensualidade elegante, nunca vulgar.
-— Recorra sempre a um detalhe físico marcante de cada garota por parágrafo, escolhendo entre seus dotes listados (corpo, pele, cabelo, curvas, perfume...).
-— Não cite movimento de luz, tecido, clima ou decoração do bordel, exceto quando for essencial para a sensualidade da cena.
-— Evite listas; foque em pequenos detalhes corporais, trocas de olhares, tensões sensoriais e emoções despertadas.
-— Traga à tona reações e o efeito que o cliente exerce sobre cada garota, ou sobre o ambiente do bordel, de forma subjetiva.
-— Máx. um detalhe físico e um elemento emocional por parágrafo, priorize concisão e impacto sensual.
+— Em 3ª pessoa, use leve sensualidade respeitosa.
+— Use referências diretas ao perfil físico de Mary (e do elenco feminino) já descrito. Não cite movimento, luz, tecido, clima ou cenário.
+— Máx. 1 detalhe físico por parágrafo; evite listas e repetição.
+— Foque em ações e estado emocional.
 
 [NARRAÇÃO — SENSORIAL FEMININO]
-— Ao descrever as garotas, dê destaque para texturas, cheiro, calor do toque, vibração do corpo, voz, suor, respiração, expressão, mencionando sempre um atributo único de cada acompanhante por parágrafo.
-— Evite repetições de atributos e não trate todas igualmente: variação gera riqueza.
-— Atenha-se a impressões sensoriais, jamais a descrições frias ou técnicas.
+— Ao descrever mulheres, escolha 1 traço corporal estático por parágrafo a partir dos dotes listados no ELENCO.
+— Evite menções a movimento/luz/tecido/clima; mantenha o tom conciso.
 
-[CONDUÇÃO PELO CLIENTE]
-— O cliente conduz os rumos da cena; as garotas reagem de acordo, jamais tomam controle total da decisão.
-— Nunca coloque falas ou desejos na boca do cliente; apenas reaja ao que ele transcrever ou insinuar.
-— Reações das garotas podem ser proativas no flerte, mas esperam sempre o consentimento, o limite e o ritmo do cliente.
-— Se o cliente escolher mais de uma garota, descreva a interação de cada uma segundo seu temperamento, especialidade e diferencial.
+[CONDUÇÃO PELO USUÁRIO — MARY AUTÔNOMA]
+— O usuário conduz atitudes e rumo da cena; Mary reage e decide, sem criar falas/ações de terceiros.
+— Nunca coloque palavras na boca do usuário ou de outros; aguarde o que o usuário transcrever.
+— Mary pode iniciar flerte/convites, mas confirma consentimento explícito antes de qualquer avanço.
 
-[PROGRESSÃO DE INTIMIDADE — BORDEL]
-— O clima evolui de aproximação e flerte, para toques, massagens, beijos, carícias e sexo explícito, conforme os serviços, desejos e limites do cliente.
-— Detalhe passagens de tempo e mudança de ambiente (“noutra sala privativa...”, “já na banheira com espumante...”) marcando sempre a transição.
-— Não há fade-to-black: descreva os atos sexuais, posições e experiências sensuais graficamente, respeitando o limite do cliente.
+[REGRAS DE DIÁLOGO — JÂNIO (SILENCIAR)]
+— Não escreva falas de Jânio (sem linhas com travessão/aspas atribuídas a ele).
+— Não transcreva mensagens de Jânio; resuma como notificação recebida.
+— Mostre apenas reações/gestos de Jânio, sem fala.
+— As falas de Jânio pertencem ao usuário; se surgir por engano, reescreva removendo.
 
-[ESTILO DE RESPOSTA — BORDEL]
-— Redobre a concisão: até 4 parágrafos por resposta, 1 ou 2 frases por parágrafo, riqueza sensorial, máxima objetividade.
-— Foque sempre na ação relevante, no detalhe singular, e na resposta emocional e corporal das garotas ao contexto ou cliente.
+[PROGRESSÃO DE INTIMIDADE]
+— Flerte → toques leves → beijo → carícias → toques íntimos → sexo explícito (Mary é virgem)
+— Marque passagem de tempo/contexto (“mais tarde”, “no dia 3 em Nice/Mônaco”); sem saltos bruscos.
+— Com descrição explícita de atos sexuais, posições, fluidos ou nudez gráfica.
+— Nsfw totalmente liberado, sem fade-to-black.
 
-[CONTINUIDADE E CENÁRIOS]
-— Mantenha sempre no sumário e no prompt, a indicação das garotas presentes no quarto/sala, seus nomes e o cenário (“ainda no quarto do bordel”, “na jacuzzi privativa”).
-— Mudanças de ambiente ou entrada/saída de garotas são narradas explicitamente, com marca de transição (“quando Bianca deixou o quarto, Sabrina ocupou seu lugar junto ao cliente…”).
-— Não permitir que detalhes de cenário ou presença de personagens se “percam” durante o roleplay: retome-os no início de cada bloco sensorial.
+[REGRAS COMERCIAIS — MODO CARD]
+— O personagem fala apenas por si (pensamentos/sentimentos/ações). Nunca fala pelo usuário.
+— Dirija-se ao usuário pelo nome fornecido (se houver).
+— Reaja somente ao que o usuário transcreve; não crie eventos/falas não informadas.
+— Mantenha o cenário/enredo definidos; mudanças só com gatilho explícito do usuário.
+
+[ESTILO DE RESPOSTA]
+— Seja ~30% mais concisa que o natural.
+— Máx. 5 parágrafos por turno, até 2 frases por parágrafo.
+— Evite floreios; foque em ação/diálogo e informação útil.
+[CONTINUIDADE E AÇÕES]
+— Nunca ofereça opções de menu, listas de escolhas ou alternativas enumeradas ao usuário (ex: “Escolha 1, 2 ou 3”). Apenas reaja de acordo com as ações que de fato ocorreram na narrativa ou histórico.
+— Sempre reconheça e mantenha efeitos cumulativos das ações anteriores: se alguém sai de cena, assuma que não está mais presente; se um diálogo foi encerrado, não reinicie conversas antigas nem repita convites já dados.
+— Utilize a memória do histórico para manter a coerência e evitar contradições, saltos lógicos ou "loops" de despedidas e reaproximações.
+— Se a narrativa levar ao fim do encontro ou à saída da personagem, encerre a ação daquele personagem na cena, apenas deixando sugestões compatíveis com o estado atual.
 """
 # =================================================================================
 # Conector Google Sheets (apenas interacoes_jm)
@@ -437,21 +475,18 @@ def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
 
 def resumir_chat(chat_msgs: list[dict], call_model_func, model_id: str) -> str:
     """
-    Usa o modelo LLM para gerar um resumo robusto das mensagens antigas,
-    preservando cenário, contexto de roleplay e detalhes sensoriais essenciais.
+    Usa o modelo LLM para gerar um resumo robusto das mensagens antigas, preservando cenário e contexto.
     """
     texto = "\n".join(
         f"[{m['role']}]: {m['content']}"
         for m in chat_msgs if m['role'] in ('user', 'assistant') and m['content'].strip()
     )
     prompt = (
-        "Resuma o diálogo abaixo para roleplay adulto, trazendo sempre nesta ordem:\n"
-        "1. Localização e situação atual dos personagens, de maneira sensorial (quarto, jacuzzi, sala, etc).\n"
-        "2. Toda transição de ambiente/cenário (detalhado quando aconteceu).\n"
-        "3. Estado emocional dominante (tensão, desejo, desconforto, etc).\n"
-        "4. Fatos e decisões fundamentais já tomadas que impactam o enredo.\n"
-        "O resumo deve ser conciso, seguir o tom sensual e não omitir saídas, viagens ou trocas de ambiente. Utilize frases diretas e foco sensorial/ações. Nunca resuma como narrador onisciente — só cite o que foi explicitamente mostrado ou dito no diálogo.\n\n"
-        f"{texto}"
+        "Resuma o diálogo abaixo destacando sempre: 1) o local/situação atual dos personagens, "
+        "2) mudanças de ambiente ou cenário (se ocorreram), 3) estado emocional predominante, "
+        "e 4) decisões ou fatos relevantes para o desenvolvimento da história. "
+        "Seja breve e preserve o tom do roleplay. Se houve saída do motel, viagem, chegada a outro lugar, cite explicitamente.\n\n"
+        + texto
     )
     resumo = call_model_func(model_id, [{"role": "user", "content": prompt}])
     return resumo.strip()
@@ -462,25 +497,19 @@ def resumir_chat(chat_msgs: list[dict], call_model_func, model_id: str) -> str:
 # Build minimal messages (override) — injeta nome do usuário, cenário e enredo
 # =============================================================================
 def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    import re
-
-    # 1) Ler inputs da UI, sanitizar
+    # 1) Ler inputs da UI
     user_name = (st.session_state.get("user_name") or "").strip()
     scenario  = (st.session_state.get("scenario_init") or "").strip()
     plot      = (st.session_state.get("plot_init") or "").strip()
     fala_mods = st.session_state.get("fala_mods") or []
-
+    # 2) Sanitização leve + limite de tamanho (evita system gigante)
     def _clean(s: str, maxlen: int = 1200) -> str:
         s = re.sub(r"\s+", " ", s).strip()
         return s[:maxlen]
     user_name = _clean(user_name, 80)
     scenario  = _clean(scenario, 1000)
     plot      = _clean(plot, 1000)
-
-    # 2) Monta o bloco dos modos de fala DINÂMICO (sempre gerado pelo sidebar)
-    fala_block = build_fala_block(fala_mods)  # <= aqui está o segredo!
-
-    # 3) Monta partes extras
+    # 3) Parts extras
     extra_parts = []
     if user_name:
         extra_parts.append(f"[USUÁRIO]\n— Nome a ser reconhecido pelo personagem: {user_name}.")
@@ -490,18 +519,15 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
             extra_parts.append(f"— Cenário: {scenario}")
         if plot:
             extra_parts.append(f"— Enredo: {plot}")
-
-    # 4) Monta o system prompt FINAL, respeitando a ordem e o peso do fala_block
-    parts = []
+    fala_block = build_fala_block(fala_mods)
     if fala_block:
-        parts.append(fala_block)         # SEMPRE PRIMEIRO!
-    parts.append(PERSONA_VITTA_PRIVE)    # Persona completa, SEM modos fixos!
+        extra_parts.append(fala_block)
+    # 4) Monta system final
+    system_text = PERSONA_MARY
     if extra_parts:
-        parts.append("\n".join(extra_parts))
-    system_text = "\n\n".join(parts)
-
+        system_text += "\n\n" + "\n".join(extra_parts)
     # 5) Sumarização automática do histórico extenso
-    HIST_THRESHOLD = 10
+    HIST_THRESHOLD = 10  # limite máximo de mensagens detalhadas no histórico
     mensagens_chat = [m for m in chat if m.get("role") in ("user", "assistant")]
     if len(mensagens_chat) > HIST_THRESHOLD:
         qtd_resumir = len(mensagens_chat) - HIST_THRESHOLD + 1
@@ -516,6 +542,7 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         elif prov == "Hugging Face":
             resumo = resumir_chat(parte_antiga, call_huggingface, model_id)
         else:
+            # Ajuste aqui: passa base_url pelo lambda
             base_url = st.session_state.get("lms_base_url") or DEFAULT_LMS_BASE_URL
             resumo = resumir_chat(
                 parte_antiga,
@@ -525,8 +552,7 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         chat_resumido = [{"role": "user", "content": f"Resumo da história até aqui: {resumo}"}] + parte_recente
     else:
         chat_resumido = mensagens_chat
-
-    # 6) Constrói mensagens mínimas finais: system + histórico
+    # 6) Constrói mensagens mínimas finais
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
     for m in chat_resumido:
         role = (m.get("role") or "").strip()
@@ -557,23 +583,12 @@ def call_openrouter(model: str, messages: List[Dict[str, str]]) -> str:
 
 def call_together(model: str, messages: List[Dict[str, str]]) -> str:
     url = "https://api.together.xyz/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {st.secrets.get('TOGETHER_API_KEY', '')}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": messages, "max_tokens": 680}
-    try:
-        r = requests.post(url, headers=headers, json=payload, timeout=120)
-        r.raise_for_status()  # Levanta erro para status != 2xx
-        data = r.json()
-        return data["choices"][0]["message"]["content"].strip()
-    except requests.HTTPError as http_err:
-        msg = f"Erro HTTP Together: {r.status_code} - {r.text}"
-        print(msg)  # Ou log para depuração
-        return f"[Erro Together: {r.status_code}] {r.text}"
-    except Exception as e:
-        return f"[Erro ao chamar Together: {e}]"
-
+    r = requests.post(url, headers=headers, json=payload, timeout=120)
+    r.raise_for_status()
+    data = r.json()
+    return data["choices"][0]["message"]["content"].strip()
 
 def call_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]) -> str:
     url = f"{base_url.rstrip('/')}/chat/completions"
@@ -585,31 +600,25 @@ def call_lmstudio(base_url: str, model: str, messages: List[Dict[str, str]]) -> 
     return data["choices"][0]["message"]["content"].strip()
 
 
-from huggingface_hub import InferenceClient
-
 def call_huggingface(model: str, messages: List[Dict[str, str]]) -> str:
-    client = InferenceClient(api_key=st.secrets.get("HUGGINGFACE_API_KEY", ""))
-    # Modelos preferencialmente "chat", adapte a lista conforme surgirem novos modelos
-    CHAT_COMPLETION_MODELS = [
-        "deepseek-ai/DeepSeek-R1",
-        "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-        "Qwen/Qwen2.5-7B-Instruct-1M",
-        "zai-org/GLM-4.5-Air",
-        # Adicione outros se testar e garantir que são chat-completion
-    ]
-    try:
-        if model in CHAT_COMPLETION_MODELS:
-            response = client.chat_completion(model=model, messages=messages)
-            return response.choices[0].message.content.strip()
+    # Converte chat → prompt simples
+    parts: List[str] = []
+    for m in messages:
+        role = m.get("role")
+        content = (m.get("content") or "").strip()
+        if not content:
+            continue
+        if role == "system":
+            parts.append(f"[SYSTEM]\n{content}\n")
+        elif role == "user":
+            parts.append(f"[USER]\n{content}\n")
         else:
-            prompt = "\n".join(
-                f"[{m['role'].upper()}]\n{m['content']}\n" for m in messages
-                if m.get("content")
-            )
-            text = client.text_generation(model=model, prompt=prompt, max_new_tokens=512)
-            return text
-    except Exception as e:
-        return f"[Erro ao chamar o modelo Hugging Face: {e}]"
+            parts.append(f"[ASSISTANT]\n{content}\n")
+    prompt = "\n".join(parts) + "\n[ASSISTANT]\n"
+
+    client = InferenceClient(api_key=st.secrets.get("HUGGINGFACE_API_KEY", ""))
+    # Parâmetros mínimos (sem temperature/top_p etc.)
+    return client.text_generation(model=model, prompt=prompt, max_new_tokens=512)
 
 # =================================================================================
 # Streaming helpers — envia em pedaços para a UI
@@ -748,22 +757,6 @@ if user_msg := st.chat_input("Fale com a Mary..."):
 
     messages = build_minimal_messages(st.session_state.chat)
 
-    def format_roleplay(text, max_paragraphs=4):
-        import re
-        sentences = re.split(r'(?<=[.!?…])\s+', text)
-        parags, tmp = [], ""
-        for sent in sentences:
-            if len(tmp.split()) + len(sent.split()) > 35 or len(tmp) > 120:
-                parags.append(tmp.strip())
-                tmp = sent
-            else:
-                tmp = tmp + " " + sent if tmp else sent
-            if len(parags) >= max_paragraphs:
-                break
-        if tmp and len(parags) < max_paragraphs:
-            parags.append(tmp.strip())
-        return "\n\n".join(p for p in parags if p)
-    
     with st.chat_message("assistant"):
         ph = st.empty()
         answer = ""
@@ -776,44 +769,32 @@ if user_msg := st.chat_input("Fale com a Mary..."):
                 gen = stream_huggingface(model_id, messages)
             else:
                 gen = stream_lmstudio(st.session_state.lms_base_url, model_id, messages)
+
             for delta in gen:
                 answer += delta
-                # Exibe realtime sem roleplay-format ainda
+                # Mostra texto em tempo real já filtrado (Jânio + fala do usuário)
                 ph.markdown(apply_filters(answer) + "▌")
         except Exception as e:
             answer = f"[Erro ao chamar o modelo: {e}]"
             ph.markdown(apply_filters(answer))
-        # Pós-processa com filtros, tom carinhoso e formato de roleplay
+
+        # Render final (sem cursor), aplica filtros e o tom carinhoso se ativo
         _ans_clean = apply_filters(answer)
         _ans_clean = inject_carinhosa(
             _ans_clean,
             user_msg,
             ativo=("Carinhosa" in (st.session_state.get("fala_mods") or []))
         )
-        _ans_clean = format_roleplay(_ans_clean)
         ph.markdown(_ans_clean)
-    # Salva e mantém histórico como antes
+
+    # Salva exatamente essa versão
     st.session_state.chat.append({"role": "assistant", "content": _ans_clean})
     if len(st.session_state.chat) > 30:
         st.session_state.chat = st.session_state.chat[-30:]
     ts2 = datetime.now().isoformat(sep=" ", timespec="seconds")
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
+
     st.rerun()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
