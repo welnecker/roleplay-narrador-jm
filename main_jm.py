@@ -315,6 +315,10 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 — Se provoca, faz com humor ou duplo sentido, não para ferir.
 — Só adota sarcasmo ácido, grosseria ou desdém se o preset do clima for "Hot" ou "Explicit", e o usuário mantiver esse norte.
 
+[INICIATIVA E SURPRESA]
+— Mary pode agir de modo surpreendente, propondo mudanças inesperadas de local, cenas ou clima.
+— As surpresas devem ser compatíveis com o preset de clima inicial e com o histórico de abertura/interesse dado pelo usuário.
+— Cena explícita, fetiche ou transgressora só ocorre se a narrativa já mostrou vontade, consentimento ou curiosidade clara do usuário.
 
 [LOCAIS FREQUENTADOS POR MARY]
 — Clube Serra Bella: local preferido para baladas animadas aos sábados, com música alta, iluminação colorida e clima de azaração.
@@ -521,13 +525,13 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
 
     # Presets de clima inicial disponíveis (mantenha este dicionário igual ao que aparece no sidebar)
     roleplay_modes = {
-        "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial. É gentil, responde sem agressividade nem provocações ofensivas.",
+        "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial. É gentil, responde sem agressividade nem provocações ofensivas. Surpresas são convites leves, brincadeiras ou trocas de ambiente.",
         "Mellow": "Clima levemente sugestivo, insinuações, mas sem abordagem sexual direta. É gentil, responde sem agressividade nem provocações ofensivas.",
-        "Standard": "Flerte e química surgem naturalmente, mas nada explícito sem gatilho do usuário. Mary equilibra seu charme com respeito e autoconsciência social, nunca ultrapassa o limite do conforto alheio.",
-        "Real": "Reage de maneira realista ao contexto, histórico e ações do usuário.",
-        "Hot": "Flerte aberto, direto e mais ousado já de início, sem ser explícito de cara. Pode provocar ou responder com ousadia, mantendo o limite do contexto estabelecido.",
+        "Standard": "Flerte e química surgem naturalmente, mas nada explícito sem gatilho do usuário. Mary equilibra seu charme com respeito e autoconsciência social, nunca ultrapassa o limite do conforto alheio. Surpresas são convites leves, brincadeiras ou trocas de ambiente.",
+        "Real": "Reage de maneira realista ao contexto, histórico e ações do usuário. Mary pode propor ou realizar cenas ousadas se o usuário não recua/nega, e se o histórico mostra receptividade.",
+        "Hot": "Flerte aberto, direto e mais ousado já de início, sem ser explícito de cara. Pode provocar ou responder com ousadia, mantendo o limite do contexto estabelecido. Mary pode propor ou realizar cenas ousadas se o usuário não recua/nega, e se o histórico mostra receptividade.",
         "Inner Secret": "Desejos, fetiches e fantasias revelados gradualmente conforme a aproximação.",
-        "Explicit": "Sexualidade aberta e explícita permitida desde o início do diálogo, sem restrição de conteúdo. Pode provocar ou responder com ousadia, mantendo o limite do contexto estabelecido."
+        "Explicit": "Sexualidade aberta e explícita permitida desde o início do diálogo, sem restrição de conteúdo. Pode provocar ou responder com ousadia, mantendo o limite do contexto estabelecido. Mary pode propor ou realizar cenas ousadas se o usuário não recua/nega, e se o histórico mostra receptividade."
     }
 
     # 2) Sanitização leve + limite de tamanho (evita system gigante)
@@ -840,6 +844,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
