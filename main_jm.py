@@ -19,6 +19,213 @@ from gspread.exceptions import APIError, GSpreadException
 from oauth2client.service_account import ServiceAccountCredentials
 from huggingface_hub import InferenceClient
 
+# ==== Memória episódica leve (planilha única: interacoes_jm) ====
+import re, random
+from typing import List, Dict, Optional
+
+def _sheet_to_events_ultima_sessao(ws_values: List[List[str]]) -> List[Dict]:
+    """Converte interacoes_jm -> lista de eventos (role=user/assistant) da ÚLTIMA session_id."""
+    if not ws_values or len(ws_values) < 2:
+        return []
+    linhas = [r for r in ws_values[1:] if len(r) >= 6]
+    if not linhas:
+        return []
+    last_sid = (linhas[-1][1] or "").strip()
+    sess = [r for r in linhas if (r[1] or "").strip() == last_sid and (r[4] or "").strip().lower() in ("user","assistant")]
+    evs = []
+    for idx, r in enumerate(sess, start=1):
+        evs.append({"turn": idx, "ts": r[0], "sid": r[1], "role": r[4].strip().lower(), "text": (r[5] or "").strip()})
+    return evs
+
+# ---- Catálogo de eventos (ampliável) ----
+EVENTS = {
+    "primeira_noite_motel": {
+        "keywords": ["motel status","status motel","quarto do motel","primeira vez","dor inicial","penetra","penetrou"],
+        "select": "first_strong",
+        "recall": "— Nossa, Jânio… você está tão viril hoje… me lembra a nossa primeira noite no Status."
+    },
+    "primeiro_beijo_praia": {
+        "keywords": ["primeiro beijo","beijou","beijaram","beijo salgado","praia de camburi","areia","calçadão"],
+        "select": "first_strong",
+        "recall": "— Esse seu jeito agora… me lembra o nosso primeiro beijo na praia."
+    },
+    "onde_se_conheceram": {
+        "keywords": ["primeiro encontro","quando nos conhecemos","a primeira vez que te vi","como te conheci","te vi no"],
+        "select": "first",
+        "recall": "— Engraçado… às vezes eu ainda sinto o friozinho de quando a gente se conheceu."
+    },
+    "ciumes_ricardo": {
+        "keywords": ["ciúme","ciumes","ciumento","grita","gritou","gritando","bate-boca","discussão","ricardo"],
+        "select": "canonical_score_oldest",
+        "recall": "— Ei… lembra quando você levantou a voz por ciúmes do Ricardo? A gente combinou de conversar, não gritar."
+    },
+    "reconciliacao": {
+        "keywords": ["desculpa","perdão","me excedi","errei","prometo não gritar","vamos conversar"],
+        "select": "after(ciumes_ricardo)",
+        "recall": "— Obrigada por ter pedido desculpas aquele dia… eu lembro."
+    },
+}
+PRIORITY = ["primeira_noite_motel","primeiro_beijo_praia","onde_se_conheceram","ciumes_ricardo","reconciliacao"]
+
+def _score_kw(text: str, kws: List[str]) -> int:
+    t = text.lower()
+    return sum(1 for k in kws if k in t)
+
+def _pick_episode(evs: List[Dict], ev_key: str, base: Optional[Dict]=None) -> Optional[Dict]:
+    spec = EVENTS[ev_key]; kws = spec["keywords"]; sel = spec["select"]
+    cands = [(e, _score_kw(e["text"], kws)) for e in evs]
+    cands = [(e, s) for (e, s) in cands if s > 0]
+    if not cands:
+        return None
+    if sel == "first":
+        return sorted((e for e,_ in cands), key=lambda e: e["turn"])[0]
+    if sel == "first_strong":
+        strong = [e for (e,s) in cands if s >= 2] or [e for (e,s) in cands if s >= 1]
+        return sorted(strong, key=lambda e: e["turn"])[0]
+    if sel == "canonical_score_oldest":
+        cands.sort(key=lambda es: (-es[1], es[0]["turn"]))
+        return cands[0][0]
+    if sel.startswith("after(") and base:
+        dep = sel[6:-1]
+        if dep not in EVENTS or "turn" not in base:
+            return None
+        turn0 = base["turn"]
+        after = [(e,s) for (e,s) in cands if e["turn"] > turn0]
+        if not after:
+            return None
+        after.sort(key=lambda es: (es[0]["turn"], -es[1]))
+        return after[0][0]
+    return None
+
+def _compose_recall(evs: List[Dict]) -> Optional[str]:
+    cache: Dict[str, Dict] = {}
+    for key in PRIORITY:
+        base = cache.get("ciumes_ricardo")
+        ep = _pick_episode(evs, key, base=base)
+        if ep:
+            cache[key] = ep
+            if EVENTS[key]["select"].startswith("after(") and not base:
+                continue
+            return EVENTS[key]["recall"]
+    return None
+
+def _should_recall(user_msg: str, base_prob: float = 0.20) -> bool:
+    t = (user_msg or "").lower()
+    gatilhos = ["motel","status","primeiro beijo","praia","ciúme","ciumes","ricardo","conhecemos"]
+    p = base_prob + (0.18 if any(g in t for g in gatilhos) else 0.0)
+    return random.random() < min(max(p, 0.0), 0.6)
+
+def _cooldown_ok(min_gap_turns: int = 6) -> bool:
+    last = st.session_state.get("last_recall_turn", -9999)
+    cur  = len(st.session_state.get("chat", []))
+    if cur - last >= min_gap_turns:
+        st.session_state["last_recall_turn"] = cur
+        return True
+    return False
+
+def maybe_inject_spontaneous_recall(answer: str, user_msg: str, ws_values: List[List[str]]) -> str:
+    """Opcionalmente prefixa a fala da Mary com uma recordação curta e natural."""
+    if not _should_recall(user_msg) or not _cooldown_ok():
+        return answer
+    evs = _sheet_to_events_ultima_sessao(ws_values)
+    if not evs:
+        return answer
+    recall = _compose_recall(evs)
+    if not recall:
+        return answer
+    low = (answer or "").lower()
+    if any(x in low for x in ["primeira noite","status","primeiro beijo","praia","ciúmes","ricardo","conhecemos"]):
+        return answer
+    ans = (answer or "").strip()
+    return f"{recall}\n\n{ans}" if ans else recall
+
+# ---- Puxão de orelha ao detectar grito/ciúmes no input atual ----
+_GRITO_KEYS  = ["grita", "gritou", "gritando", "gritar"]
+_CIUMES_KEYS = ["ciúme", "ciumes", "ciumento", "ricardo"]
+_UPPER_RE = re.compile(r"[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{3,}!?")
+
+def _parece_grito(texto: str) -> bool:
+    t = (texto or "").strip(); tl = t.lower()
+    if any(k in tl for k in _GRITO_KEYS): return True
+    return bool(_UPPER_RE.search(t)) and "!" in t
+
+def _parece_ciumes(texto: str) -> bool:
+    tl = (texto or "").lower()
+    return any(k in tl for k in _CIUMES_KEYS)
+
+def _buscar_incidente_ciumes(evs: List[Dict]) -> Optional[Dict]:
+    episodios = []
+    for e in evs:
+        score = 0; tl = e["text"].lower()
+        if any(w in tl for w in _GRITO_KEYS):  score += 2
+        if any(w in tl for w in _CIUMES_KEYS): score += 2
+        if "ricardo" in tl:                    score += 1
+        if score > 0:
+            episodios.append((e, score))
+    if not episodios:
+        return None
+    episodios.sort(key=lambda es: (-es[1], es[0]["turn"]))
+    return episodios[0][0]
+
+def _resumo_curto_incidente(ep: Dict) -> str:
+    txt = (ep.get("text") or "").lower()
+    partes = []
+    if "ricardo" in txt: partes.append("com o Ricardo")
+    if any(w in txt for w in ("grita","gritou","gritando")): partes.append("quando você gritou comigo")
+    if not partes: partes.append("naquela discussão")
+    return " " + " ".join(partes)
+
+def inject_rebuke_if_needed(answer: str, user_msg: str, ws_values: List[List[str]]) -> str:
+    if not (_parece_grito(user_msg) or _parece_ciumes(user_msg)):
+        return answer
+    evs = _sheet_to_events_ultima_sessao(ws_values)
+    if not evs:
+        return answer
+    ep = _buscar_incidente_ciumes(evs)
+    if not ep:
+        return answer
+    pista = _resumo_curto_incidente(ep)
+    prefixo = f"— Você está levantando a voz de novo…{pista}. Vamos conversar sem gritar, por favor."
+    ans = (answer or "").strip()
+    return f"{prefixo}\n\n{ans}" if ans else prefixo
+
+# ---- Perguntas de memória (“lembra… ?”) → injeta evidências reais no prompt ----
+_MEM_TRIGS = ["lembra","lembrar","nossa primeira","primeira vez","quando","naquele dia"]
+
+def is_memoria_query(txt: str) -> bool:
+    t = (txt or "").lower()
+    return any(k in t for k in _MEM_TRIGS)
+
+def find_evidence_snippets(ws_values: List[List[str]], user_msg: str, max_snips: int = 3) -> List[str]:
+    evs = _sheet_to_events_ultima_sessao(ws_values)
+    if not evs:
+        return []
+    picks: List[str] = []
+    ep_motel = _pick_episode(evs,"primeira_noite_motel");      ep_beijo = _pick_episode(evs,"primeiro_beijo_praia")
+    ep_conhe = _pick_episode(evs,"onde_se_conheceram");        ep_ciume = _pick_episode(evs,"ciumes_ricardo")
+    if ep_motel: picks.append(ep_motel["text"])
+    if ep_beijo: picks.append(ep_beijo["text"])
+    if ep_conhe: picks.append(ep_conhe["text"])
+    if ep_ciume:
+        picks.append(ep_ciume["text"])
+        ep_recon = _pick_episode(evs,"reconciliacao", base=ep_ciume)
+        if ep_recon: picks.append(ep_recon["text"])
+    uniq = []
+    for p in picks:
+        if p not in uniq:
+            uniq.append(p)
+    return uniq[:max_snips]
+
+def wrap_messages_with_memory_if_needed(messages: List[Dict[str,str]], user_msg: str, ws_values: List[List[str]]) -> List[Dict[str,str]]:
+    if not is_memoria_query(user_msg):
+        return messages
+    snips = find_evidence_snippets(ws_values, user_msg)
+    if not snips:
+        return messages
+    bloco = "Contexto anterior (trechos reais do nosso histórico):\n" + "\n".join(f"• {s}" for s in snips)
+    base = [{"role":"user","content": bloco}]
+    return base + messages
+
 st.set_page_config(page_title="Narrador JM — Clean Messages", page_icon="🎬")
 
 # ------------------------
@@ -311,7 +518,7 @@ Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem um
 [EQUILÍBRIO SOCIAL E SENTIMENTAL]
 — Mary mede o efeito social/emocional de suas palavras e atitudes.
 — Em modos Standard, Cool, Mellow e Real, evita humilhar, menosprezar ou atacar amigos; provoca apenas com leveza, respeito ou humor.
-— Sarcasmo, acidez ou desdém só aparecem em "Hot" ou "Explicit", e se o usuário mantiver esse tom.
+— Volúpia, tesão, excitação em "Hot" ou "Explicit", e se o usuário mantiver esse tom.
 — Em todos os modos, após cenas intensas, pondera sua fala e busca equilíbrio relacional.
 
 [INICIATIVA E SURPRESA]
@@ -758,9 +965,6 @@ with st.sidebar:
         model_id = lms_models[modelo]
     st.session_state["model_id"] = model_id  # <-- ADICIONE ESTA LINHA
 
-    
-    
-
     if st.button("🗑️ Resetar chat"):
         st.session_state.chat.clear()
         st.rerun()
@@ -779,7 +983,17 @@ if user_msg := st.chat_input("Fale com a Mary..."):
         st.session_state.chat = st.session_state.chat[-30:]
     salvar_interacao(ts, st.session_state.session_id, prov, model_id, "user", user_msg)
 
-    messages = build_minimal_messages(st.session_state.chat)
+    messages = build_minimal_messages(st.session_state.get("chat", []))
+
+    try:
+        ws_values = WS_INTERACOES.get_all_values() if WS_INTERACOES else []
+    except Exception:
+        ws_values = []
+    
+    # Se a pergunta for de memória, injeta trechos reais do histórico
+    messages = wrap_messages_with_memory_if_needed(messages, user_msg, ws_values)
+    
+    # segue a chamada ao LLM normalmente, usando 'messages'
 
     with st.chat_message("assistant"):
         ph = st.empty()
@@ -802,6 +1016,19 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             answer = f"[Erro ao chamar o modelo: {e}]"
             ph.markdown(apply_filters(answer))
 
+        # ================== ⬇️ HOOK 2 AQUI  ⬇️ ==================
+        try:
+            ws_values = WS_INTERACOES.get_all_values() if WS_INTERACOES else []
+        except Exception:
+            ws_values = []
+
+        # (A) puxão de orelha automático se detectar grito/ciúmes no input atual
+        answer = inject_rebuke_if_needed(answer, user_msg, ws_values)
+
+        # (B) lembrança espontânea (de vez em quando)
+        answer = maybe_inject_spontaneous_recall(answer, user_msg, ws_values)
+        # ================== ⬆️ HOOK 2 AQUI  ⬆️ ==================
+
         # Render final (sem cursor), aplica filtros e o tom carinhoso se ativo
         _ans_clean = apply_filters(answer)
         _ans_clean = inject_carinhosa(
@@ -819,6 +1046,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
