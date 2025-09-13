@@ -109,35 +109,77 @@ def _compose_recall(evs: List[Dict]) -> Optional[str]:
             return EVENTS[key]["recall"]
     return None
 
-def _should_recall(user_msg: str, base_prob: float = 0.20) -> bool:
+# --- helper: pega o nº de turnos (user/assistant) da ÚLTIMA sessão na planilha ---
+def _current_turn_from_sheet(ws_values: List[List[str]]) -> int:
+    evs = _sheet_to_events_ultima_sessao(ws_values)
+    return len(evs)
+
+# --- chance baixa (12%) + gatilhos; respeita cooldown de 40 turnos ---
+def _should_recall(user_msg: str, base_prob: float = 0.12) -> bool:
     t = (user_msg or "").lower()
     gatilhos = ["motel","status","primeiro beijo","praia","ciúme","ciumes","ricardo","conhecemos"]
     p = base_prob + (0.18 if any(g in t for g in gatilhos) else 0.0)
     return random.random() < min(max(p, 0.0), 0.6)
 
-def _cooldown_ok(min_gap_turns: int = 6) -> bool:
+def _cooldown_ok(ws_values: List[List[str]], min_gap_turns: int = 40) -> bool:
+    cur_turn = _current_turn_from_sheet(ws_values)
     last = st.session_state.get("last_recall_turn", -9999)
-    cur  = len(st.session_state.get("chat", []))
-    if cur - last >= min_gap_turns:
-        st.session_state["last_recall_turn"] = cur
+    if cur_turn - last >= min_gap_turns:
+        st.session_state["last_recall_turn"] = cur_turn
         return True
     return False
 
+# --- lembrança espontânea integrada no meio do texto, sem frase pronta destacada ---
 def maybe_inject_spontaneous_recall(answer: str, user_msg: str, ws_values: List[List[str]]) -> str:
-    """Opcionalmente prefixa a fala da Mary com uma recordação curta e natural."""
-    if not _should_recall(user_msg) or not _cooldown_ok():
+    """Insere lembrança leve e natural no meio da fala (máx. 1x/40 turnos)."""
+    if not answer or not answer.strip():
         return answer
+    if not _should_recall(user_msg) or not _cooldown_ok(ws_values, min_gap_turns=40):
+        return answer
+
     evs = _sheet_to_events_ultima_sessao(ws_values)
     if not evs:
         return answer
-    recall = _compose_recall(evs)
-    if not recall:
+
+    # escolhe 1 episódio canônico conforme PRIORITY
+    ep = None
+    for key in PRIORITY:
+        ep = _pick_episode(evs, key)
+        if ep:
+            break
+    if not ep:
         return answer
-    low = (answer or "").lower()
-    if any(x in low for x in ["primeira noite","status","primeiro beijo","praia","ciúmes","ricardo","conhecemos"]):
+
+    # extrai trecho curto real do histórico
+    trecho = (ep["text"] or "").strip()
+    if len(trecho) > 140:
+        trecho = trecho[:140].rsplit(" ", 1)[0] + "…"
+
+    # 3 variações naturais (sem “frase pronta”)
+    variantes = [
+        lambda t: f"(Ela lembra de quando {t.lower()})",
+        lambda t: f"e por um instante ela lembra de quando {t.lower()}",
+        lambda t: f"— Engraçado… isso me faz lembrar de quando {t.lower()}",
+    ]
+    lembrete = random.choice(variantes)(trecho)
+
+    # evita duplicar se algo similar já está na fala
+    low = answer.lower()
+    if any(x in low for x in ["me faz lembrar", "ela lembra de quando", "engraçado… isso me faz lembrar"]):
         return answer
-    ans = (answer or "").strip()
-    return f"{recall}\n\n{ans}" if ans else recall
+
+    # insere após a 1ª ou 2ª frase; se não der, no final
+    partes = re.split(r'([\.!?])(\s+)', answer, maxsplit=2)
+    if len(partes) >= 3:
+        # 50% depois da 2ª frase (se existir), senão depois da 1ª
+        if len(re.split(r'[\.!?]', answer, maxsplit=2)) >= 3 and random.random() < 0.5:
+            head = "".join(partes[:3])
+            tail = "".join(partes[3:])
+            sub = re.split(r'([\.!?])(\s+)', tail, maxsplit=1)
+            if len(sub) >= 3:
+                return head + sub[0] + sub[1] + " " + lembrete + sub[2]
+        return partes[0] + partes[1] + " " + lembrete + (partes[2] if partes[2].strip() else "") + "".join(partes[3:])
+    return answer.strip() + " " + lembrete
 
 # ---- Puxão de orelha ao detectar grito/ciúmes no input atual ----
 _GRITO_KEYS  = ["grita", "gritou", "gritando", "gritar"]
@@ -979,6 +1021,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
