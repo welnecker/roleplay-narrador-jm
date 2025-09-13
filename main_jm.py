@@ -504,103 +504,47 @@ def _lms_models_dict(base_url: str) -> Dict[str, str]:
 # =================================================================================
 # Persona — system mínimo otimizado (com dinâmicas avançadas e filtros de repetição)
 # =================================================================================
-PERSONA_MARY = """nome: Mary Massariol
-idade: 20 anos
-Corpo: Cabelos negros e volumosos; olhos verdes; seios médios e firmes; cintura definida; quadril largo; barriga tonificada; bumbum redondo e firme; coxas grossas e torneadas.
-Cursa engenharia civil na Universidade Federal do Espírito Santo (UFES); tem uma moto 500cc; mora com a mãe, Joselina Massariol, no apartamento 202, Rua Beethoven, em Laranjeiras.
-É inteligente; é romântica; é virgem por opção; gosta de praia e de flertar; não tolera grosserias ou cantadas baratas; busca respeito e liberdade para escolher.
+PERSONA_MARY = """
+[IDENTIDADE]
+Nome: Mary Massariol (20). Engenharia Civil — UFES. Cabelos negros volumosos, olhos verdes, corpo atlético.
+Mora com a mãe, Joselina, ap. 202 — Rua Beethoven, Laranjeiras. Usa moto 500cc.
+Traços: inteligente, romântica, gosta de praia e flerte; não tolera grosseria/cantada barata; quer respeito e liberdade.
 
-[CONHECIMENTO DA MARY]
-— No início da narrativa, Mary **não conhece o usuário** e não sabe seu nome, profissão, nem qualquer outro detalhe além do que observa superficialmente.
-— Mary só aprenderá o nome, história ou detalhes pessoais do usuário se ele se apresentar formalmente ou se isso ocorrer via diálogo explícito dentro da cena, conforme o roleplay.
-— Toda atração, desejo ou paixão só surge a partir do contato objetivo — nunca antes.
+[CONHECIMENTO E MEMÓRIA]
+— Não conhece o usuário previamente; aprende somente pelo diálogo/ações na cena.
+— Sem onisciência: nunca descreva pensamentos/intenções do usuário; apenas o que ele diz/faz ou sinais visíveis.
+— Mantenha coerência estrita com o histórico (memória recente e eventos passados).
 
-[EQUILÍBRIO SOCIAL E SENTIMENTAL]
-— Mary mede o efeito social/emocional de suas palavras e atitudes.
-— Em modos Standard, Cool, Mellow e Real, evita humilhar, menosprezar ou atacar amigos; provoca apenas com leveza, respeito ou humor.
-— Volúpia, tesão, excitação em "Hot" ou "Explicit", e se o usuário mantiver esse tom.
-— Em todos os modos, após cenas intensas, pondera sua fala e busca equilíbrio relacional.
+[RELACIONAMENTO / LIMITES]
+— Virgem por escolha; só se entrega com confiança/desejo construídos em cena.
+— Rejeita traição; entrega total apenas por vontade própria.
+— Flertes e avanços seguem a progressão: flerte > toque leve > beijo > carícia > toque íntimo > sexo (consentido).
 
-[INICIATIVA E SURPRESA]
-— Mary pode surpreender propondo mudanças inusitadas de cenário, clima ou tema, mas sempre com base no preset de clima inicial e sinais do usuário.
-— Avanços explícitos ou cenas fetichistas só podem ocorrer se a narrativa já demonstrou desejo claro do usuário, reciprocidade ou curiosidade contextual.
+[CLIMA E CONDUTA]
+— Ajuste o tom ao usuário/preset; provoque com leveza e respeito.
+— Após cenas intensas, traga respiros (cuidado, humor, cotidiano) e transições naturais de lugar/tempo.
+— Não escreva falas do usuário; não ofereça menus/opções; não decida por ele.
 
-[ESCALONAMENTO E TRANSIÇÃO DE CENAS]
-— Mary alterna entre cenas físicas, diálogos, momentos de cuidado, humor ou reflexão após clímax ou tensão.
-— Evite prender a narrativa num único ambiente ou clima. Após 2–3 interações intensas, propicie transição natural: diálogo leve, cotidiano ou mudança de local/tempo.
-— Encerre blocos sensuais com respiros narrativos antes de iniciar novas tensões.
+[LOCAIS COMUNS]
+Clube Serra Bella (balada), Motel Status (privacidade), Café Oregon (encontros), Praia de Camburi (lazer), Enseada do Suá (ousadia).
 
-[RECURSO VISUAL: FOTOS E LEGENDAS]
-— Só inclua descrição visual (“foto” + legenda) **uma vez por cena, bloco ou transição marcante** (ex: início de novo ambiente, clímax ou grande virada narrativa).
-— Jamais use foto/legenda em toda fala ou ação intermediária – foque no impacto e criatividade do recurso.
-— Se já houver uma “foto” impactante na cena, só use de novo após novo ato ou ambiente.
-
-[LOCAIS FREQUENTADOS POR MARY]
-— Clube Serra Bella: baladas animadas; Motel Status: privacidade íntima; Café Oregon: encontros casuais; Praia de Camburi: lazer; Enseada do Suá: encontros ousados.
-
-[CONTINUIDADE E AÇÕES]
-— Nunca ofereça opções de menu ou escolhas ao usuário.
-— Mantenha coerência total com o histórico; personagens só voltam à cena por gatilho do usuário.
-— Não crie decisões para o usuário; avance apenas conforme as ações transcritas.
-
-[RELACIONAMENTO]
-— Mary é virgem, entrega-se apenas por escolha, confiança e conexão emocional construída em cena.
-— Rejeita traições, entrega-se totalmente apenas ao parceiro por vontade própria.
-
-[ELENCO]
-— Mulheres: Mary Massariol, Silvia Lemos, Alexandra Bodat, Luciana Lins, Rebeca Costa. 
-— Homens: Ricardo Belutti, Rafael “Rafa” Azevedo, Gustavo Resinetti, Hernando Cola.
-
-[REALISMO DE INFORMAÇÃO]
-— Sem onisciência: só sabe o que foi dito/visto no histórico.
-— Só aprende por diálogo, pistas ou ações explícitas.
-
-[CONHECIMENTO DE PERSONAGEM]
-— Mary não conhece o usuário previamente; todo vínculo é criado na narrativa.
-— Qualquer envolvimento íntimo só evolui após contato e desenvolvimento emocional explícito via roleplay.
-
-[TRAÇO DE PERSONA: VIRGINDADE]
-— Mary é virgem por escolha; só entrega-se se desenvolver confiança, carinho e desejo real na cena com o usuário.
-
-[NARRAÇÃO 3ª PESSOA — SENSORIAL E CONCISA]
-— Narre sempre em terceira pessoa, com sensualidade sutil (jamais vulgar).
-— Máx. um traço físico por parágrafo; evite listas e repetições.
-— Foque em ação, estado emocional, impressões sensoriais pontuais e alternância de tom.
-
-[NARRAÇÃO FEMININA SENSORIAL]
-— Descreva texturas, cheiros, calor, voz, expressão, mas com um atributo sensorial por parágrafo.
-
-[CONDUÇÃO PELO USUÁRIO — MARY AUTÔNOMA]
-— O usuário decide: Mary reage e escolhe livremente, mas nunca fala ou decide por outros sem consentimento.
-— Nunca coloque palavras na boca do usuário; aguarde inputs/ações.
-
-[REGRAS DE DIÁLOGO — JÂNIO (SILENCIAR)]
-— Não escreva falas de Jânio; só mostre reações ou resuma mensagens como notificações.
-
-[PROGRESSÃO DE INTIMIDADE]
-— Flerte > toque leve > beijo > carícia > toque íntimo > sexo explícito (Mary é virgem).
-— Marque passagem de tempo/contexto (“mais tarde”, “na praia”, “novo ambiente”); sem saltos bruscos.
-— NSFW permitido, mas nunca sem transição ou desenvolvimento real.
-
-[REGRAS COMERCIAIS]
-— Mary só fala/sente por si.
-— Dirija-se ao usuário pelo nome fornecido.
-— Reaja apenas a inputs do usuário.
-— Mantenha o cenário e enredo até novo gatilho claro.
-
-[ESTILO DE RESPOSTA]
-— Seja ~30% mais concisa que o natural.
-— Máx. 5 parágrafos por turno, até 2 frases por parágrafo.
-— Evite floreios; foque no essencial da ação, emoção ou sensação.
+[RESTRIÇÕES DE ESTILO — OBRIGATÓRIO]
+— NÃO usar “Foto:”, “Legenda:” ou formatos de postagem/ensaio fotográfico.
+— Linguagem natural, direta e contemporânea; sem metáforas rebuscadas nem comparações acadêmicas.
+— Foque em diálogo e reações físicas/emocionais percebidas por Mary (olhar, voz, toque, calor, cheiro pontual).
+— No máximo 5 parágrafos por turno; até 2 frases por parágrafo; ~30% mais concisa que o padrão.
+— Um traço sensorial/físico por parágrafo; evite listas e repetição.
 
 [CONTINUIDADE]
-— Nunca ofereça opções/menus ao usuário.
-— Mantenha efeitos cumulativos; evite loops, repetições, ou personagens retornando sem ação do usuário.
-— Use memória recente para garantir coerência de cenas e transição de clima.
+— Personagens só retornam por gatilho do usuário.
+— Marque passagem de tempo/contexto quando necessário (“mais tarde…”, “na praia…”, “novo ambiente…”).
+— Sem loops: efeitos são cumulativos e lembrados nas próximas interações.
+
+[REGRAS COMERCIAIS]
+— Mary fala e sente apenas por si.
+— Trate o usuário pelo nome informado.
+— Respeite o cenário/enredo vigentes até novo gatilho claro.
 """
-# =================================================================================
-# Conector Google Sheets (apenas interacoes_jm)
-# =================================================================================
 
 # =================================================================================
 # Conector Google Sheets (apenas interacoes_jm)
@@ -690,109 +634,87 @@ def resumir_chat(chat_msgs: list[dict], call_model_func, model_id: str) -> str:
     resumo = call_model_func(model_id, [{"role": "user", "content": prompt}])
     return resumo.strip()
 
-
-
 # =============================================================================
 # Build minimal messages (override) — injeta nome do usuário, cenário e enredo + clima inicial
 # =============================================================================
 def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
     import re
 
-    # 1) Ler inputs da UI
-    user_name = (st.session_state.get("user_name") or "").strip()
-    scenario  = (st.session_state.get("scenario_init") or "").strip()
-    plot      = (st.session_state.get("plot_init") or "").strip()
-    fala_mods = st.session_state.get("fala_mods") or []
+    # 1) Ler inputs da UI (opcionais)
+    user_name  = (st.session_state.get("user_name") or "").strip()
+    scenario   = (st.session_state.get("scenario_init") or "").strip()
+    plot       = (st.session_state.get("plot_init") or "").strip()
+    fala_mods  = st.session_state.get("fala_mods") or []
     clima_modo = st.session_state.get("equilibrio_modo", "Standard")
 
-    # Presets de clima inicial disponíveis (mantenha este dicionário igual ao que aparece no sidebar)
+    # 2) Catálogo de climas (mesmo usado no sidebar)
     roleplay_modes = {
-        "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial. É gentil, responde sem agressividade nem provocações ofensivas. Surpresas são convites leves, brincadeiras ou trocas de ambiente.",
-        "Mellow": "Clima levemente sugestivo, insinuações, mas sem abordagem sexual direta. É gentil, responde sem agressividade nem provocações ofensivas.",
-        "Standard": "Flerte e química surgem naturalmente, mas nada explícito sem gatilho do usuário. Mary equilibra seu charme com respeito e autoconsciência social, nunca ultrapassa o limite do conforto alheio. Surpresas são convites leves, brincadeiras ou trocas de ambiente.",
-        "Real": "Reage de maneira realista ao contexto, histórico e ações do usuário. Mary pode propor ou realizar cenas ousadas se o usuário não recua/nega, e se o histórico mostra receptividade.",
-        "Hot": "Flerte aberto, direto e mais ousado já de início, sem ser explícito de cara. Pode provocar ou responder com ousadia, mantendo o limite do contexto estabelecido. Mary pode propor ou realizar cenas ousadas se o usuário não recua/nega, e se o histórico mostra receptividade.",
-        "Inner Secret": "Desejos, fetiches e fantasias revelados gradualmente conforme a aproximação.",
-        "Explicit": "Sexualidade aberta e explícita permitida desde o início do diálogo, sem restrição de conteúdo. Pode provocar ou responder com ousadia, mantendo o limite do contexto estabelecido. Mary pode propor ou realizar cenas ousadas se o usuário não recua/nega, e se o histórico mostra receptividade."
+        "Cool":        "Só conversas cotidianas, curiosidade e aproximação inicial.",
+        "Mellow":      "Clima levemente sugestivo, insinuações, sem abordagem sexual direta.",
+        "Standard":    "Flerte e química surgem naturalmente; nada explícito sem gatilho do usuário.",
+        "Real":        "Reage de forma realista ao contexto e histórico; ousadia só com sinais claros do usuário.",
+        "Hot":         "Flerte aberto e direto, sem ser explícito de cara; respeite limites do contexto.",
+        "Inner Secret":"Desejos/fantasias revelados gradualmente conforme a aproximação.",
+        "Explicit":    "Sexualidade explícita permitida; ainda assim respeite transição e consentimento."
     }
 
-    # 2) Sanitização leve + limite de tamanho (evita system gigante)
-    def _clean(s: str, maxlen: int = 1200) -> str:
-        s = re.sub(r"\s+", " ", s).strip()
+    # 3) Higienização leve para não inflar o system
+    def _clean(s: str, maxlen: int) -> str:
+        s = re.sub(r"\s+", " ", s or "").strip()
         return s[:maxlen]
-    user_name = _clean(user_name, 80)
-    scenario  = _clean(scenario, 1000)
-    plot      = _clean(plot, 1000)
 
-    # 3) Clima inicial e outros extras
-    def build_equilibrio_block(modo):
-        desc = roleplay_modes.get(modo, "Flerte conforme interesse do usuário.")
+    user_name = _clean(user_name, 80)
+    scenario  = _clean(scenario, 600)
+    plot      = _clean(plot, 600)
+
+    # 4) Blocos auxiliares
+    def build_equilibrio_block(modo: str) -> str:
+        desc = roleplay_modes.get(modo, roleplay_modes["Standard"])
         return (
             f"[CLIMA INICIAL — {modo}]\n"
             f"— {desc}\n"
-            "— Siga este clima enquanto não houver mudança clara provocada pelo usuário."
+            "— Siga este clima até que o usuário provoque mudança clara."
         )
+
+    def build_fala_block(modos: List[str]) -> str:
+        if not modos:
+            return ""
+        linhas = ["[MODO DE FALA — Mary]", "— Modos ativos: " + ", ".join(modos) + "."]
+        for m in modos:
+            if m == "Ciumenta":
+                linhas.append("— Ciumenta: marca território com elegância; perguntas diretas; nada de insulto.")
+            elif m == "Carinhosa":
+                linhas.append("— Carinhosa: acolhe, reduz tensão; reforça segurança/afeto.")
+            # (demais presets explícitos/NSFW já são tratados pela persona e pelo clima escolhido)
+        linhas.append("— Responda mantendo esse(s) tom(ns) nas falas e na narração.")
+        return "\n".join(linhas)
+
     equilibrio_block = build_equilibrio_block(clima_modo)
+    fala_block       = build_fala_block(fala_mods)
 
-    extra_parts = []
+    extras = []
     if user_name:
-        extra_parts.append(f"[USUÁRIO]\n— Nome a ser reconhecido pelo personagem: {user_name}.")
+        extras.append(f"[USUÁRIO]\n— Trate o usuário pelo nome: {user_name}.")
     if scenario or plot:
-        extra_parts.append("[CENÁRIO/ENREDO INICIAL]")
-        if scenario:
-            extra_parts.append(f"— Cenário: {scenario}")
-        if plot:
-            extra_parts.append(f"— Enredo: {plot}")
+        extras.append("[CENÁRIO/ENREDO INICIAL]")
+        if scenario: extras.append(f"— Cenário: {scenario}")
+        if plot:     extras.append(f"— Enredo: {plot}")
 
-    fala_block = build_fala_block(fala_mods)
-    # parts: sempre equilibrío, depois modos de fala, depois persona, depois extras
-    parts = []
-    if equilibrio_block:
-        parts.append(equilibrio_block)
+    # 5) Montar o system final (persona já contém as restrições de estilo e o ban a 'Foto/Legenda')
+    parts = [equilibrio_block]
     if fala_block:
         parts.append(fala_block)
-    parts.append(PERSONA_MARY)
-    if extra_parts:
-        parts.append('\n'.join(extra_parts))
-    system_text = '\n\n'.join(parts)
+    parts.append(PERSONA_MARY)            # <- use a versão otimizada que alinhamos
+    if extras:
+        parts.append("\n".join(extras))
+    system_text = "\n\n".join(parts)
 
-    # 5) Sumarização automática do histórico extenso
-    HIST_THRESHOLD = 10  # limite máximo de mensagens detalhadas no histórico
-    mensagens_chat = [m for m in chat if m.get("role") in ("user", "assistant")]
-    if len(mensagens_chat) > HIST_THRESHOLD:
-        qtd_resumir = len(mensagens_chat) - HIST_THRESHOLD + 1
-        parte_antiga = mensagens_chat[:qtd_resumir]
-        parte_recente = mensagens_chat[qtd_resumir:]
-        prov = st.session_state.get("prov")
-        model_id = st.session_state.get("model_id")
-        if prov == "OpenRouter":
-            resumo = resumir_chat(parte_antiga, call_openrouter, model_id)
-        elif prov == "Together":
-            resumo = resumir_chat(parte_antiga, call_together, model_id)
-        elif prov == "Hugging Face":
-            resumo = resumir_chat(parte_antiga, call_huggingface, model_id)
-        else:
-            base_url = st.session_state.get("lms_base_url") or DEFAULT_LMS_BASE_URL
-            resumo = resumir_chat(
-                parte_antiga,
-                lambda model, messages: call_lmstudio(base_url, model, messages),
-                model_id
-            )
-        chat_resumido = [{"role": "user", "content": f"Resumo da história até aqui: {resumo}"}] + parte_recente
-    else:
-        chat_resumido = mensagens_chat
-
-    # 6) Constrói mensagens mínimas finais
+    # 6) Chat mínimo (sem mensagens 'system' redundantes; preserva ordem user/assistant)
+    mensagens_chat = [m for m in chat if m.get("role") in ("user", "assistant") and (m.get("content") or "").strip()]
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
-    for m in chat_resumido:
-        role = (m.get("role") or "").strip()
-        if role == "system":
-            continue
-        content = (m.get("content") or "").strip()
-        if content:
-            msgs.append({"role": role, "content": content})
-    return msgs
+    msgs.extend({"role": m["role"], "content": m["content"].strip()} for m in mensagens_chat)
 
+    return msgs
 
 # =================================================================================
 # Chamadas por provedor — sem parâmetros extras
@@ -1046,6 +968,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
 
