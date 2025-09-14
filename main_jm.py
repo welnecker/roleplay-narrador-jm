@@ -40,51 +40,54 @@ def _sheet_to_events_ultima_sessao(ws_values: List[List[str]]) -> List[Dict]:
 # ---- Catálogo de eventos (ampliável) ----
 EVENTS = {
     "primeira_noite_motel": {
-        "keywords": ["motel status","status motel","quarto do motel","primeira vez","dor inicial","penetra","penetrou"],
+        "keywords": ["motel status","status motel","quarto do motel","primeira vez","dor inicial","penetra","penetrou","penetração","penetrar"],
         "select": "first_strong",
-        "recall": "— Nossa, Jânio… você está tão viril hoje… me lembra a nossa primeira noite no Status."
     },
     "primeiro_beijo_praia": {
-        "keywords": ["primeiro beijo","beijou","beijaram","beijo salgado","praia de camburi","areia","calçadão"],
+        "keywords": ["primeiro beijo","beijou","beijaram","beijo salgado","praia de camburi","areia","calçadão","calcadao"],
         "select": "first_strong",
-        "recall": "— Esse seu jeito agora… me lembra o nosso primeiro beijo na praia."
     },
     "onde_se_conheceram": {
         "keywords": ["primeiro encontro","quando nos conhecemos","a primeira vez que te vi","como te conheci","te vi no"],
         "select": "first",
-        "recall": "— Engraçado… às vezes eu ainda sinto o friozinho de quando a gente se conheceu."
     },
     "ciumes_ricardo": {
-        "keywords": ["ciúme","ciumes","ciumento","grita","gritou","gritando","bate-boca","discussão","ricardo"],
+        "keywords": ["ciúme","ciumes","ciumento","ciumenta","grita","gritou","gritando","bate-boca","discussão","discussao","ricardo"],
         "select": "canonical_score_oldest",
-        "recall": "— Ei… lembra quando você levantou a voz por ciúmes do Ricardo? A gente combinou de conversar, não gritar."
     },
     "reconciliacao": {
-        "keywords": ["desculpa","perdão","me excedi","errei","prometo não gritar","vamos conversar"],
+        "keywords": ["desculpa","perdão","perdao","me excedi","errei","prometo não gritar","prometo nao gritar","vamos conversar"],
         "select": "after(ciumes_ricardo)",
-        "recall": "— Obrigada por ter pedido desculpas aquele dia… eu lembro."
+    },
+    # usado pelo guardião de estado relacional (não entra no PRIORITY)
+    "rompimento": {
+        "keywords": ["terminamos","rompemos","acabou","dar um tempo","fim do namoro","separamos","separar"],
+        "select": "most_recent",
     },
 }
 PRIORITY = ["primeira_noite_motel","primeiro_beijo_praia","onde_se_conheceram","ciumes_ricardo","reconciliacao"]
 
 def _score_kw(text: str, kws: List[str]) -> int:
-    t = text.lower()
+    t = (text or "").lower()
     return sum(1 for k in kws if k in t)
 
 def _pick_episode(evs: List[Dict], ev_key: str, base: Optional[Dict]=None) -> Optional[Dict]:
     spec = EVENTS[ev_key]; kws = spec["keywords"]; sel = spec["select"]
-    cands = [(e, _score_kw(e["text"], kws)) for e in evs]
+    cands = [(e, _score_kw(e.get("text",""), kws)) for e in evs]
     cands = [(e, s) for (e, s) in cands if s > 0]
     if not cands:
         return None
+
     if sel == "first":
-        return sorted((e for e,_ in cands), key=lambda e: e["turn"])[0]
+        return min((e for e,_ in cands), key=lambda e: e["turn"])
     if sel == "first_strong":
         strong = [e for (e,s) in cands if s >= 2] or [e for (e,s) in cands if s >= 1]
-        return sorted(strong, key=lambda e: e["turn"])[0]
+        return min(strong, key=lambda e: e["turn"])
     if sel == "canonical_score_oldest":
         cands.sort(key=lambda es: (-es[1], es[0]["turn"]))
         return cands[0][0]
+    if sel == "most_recent":
+        return max((e for e,_ in cands), key=lambda e: e["turn"])
     if sel.startswith("after(") and base:
         dep = sel[6:-1]
         if dep not in EVENTS or "turn" not in base:
@@ -97,24 +100,17 @@ def _pick_episode(evs: List[Dict], ev_key: str, base: Optional[Dict]=None) -> Op
         return after[0][0]
     return None
 
+# (DEPRECATED) Antigo gerador de recall com frases prontas: mantido por compatibilidade.
+# Agora as lembranças são compostas organicamente em maybe_inject_spontaneous_recall().
 def _compose_recall(evs: List[Dict]) -> Optional[str]:
-    cache: Dict[str, Dict] = {}
-    for key in PRIORITY:
-        base = cache.get("ciumes_ricardo")
-        ep = _pick_episode(evs, key, base=base)
-        if ep:
-            cache[key] = ep
-            if EVENTS[key]["select"].startswith("after(") and not base:
-                continue
-            return EVENTS[key]["recall"]
     return None
 
-# --- helper: pega o nº de turnos (user/assistant) da ÚLTIMA sessão na planilha ---
+# --- helper: nº de turnos (user/assistant) da ÚLTIMA sessão ---
 def _current_turn_from_sheet(ws_values: List[List[str]]) -> int:
     evs = _sheet_to_events_ultima_sessao(ws_values)
     return len(evs)
 
-# --- chance baixa (12%) + gatilhos; respeita cooldown de 40 turnos ---
+# prob. baixa + gatilhos; cooldown forte 40 turnos
 def _should_recall(user_msg: str, base_prob: float = 0.12) -> bool:
     t = (user_msg or "").lower()
     gatilhos = ["motel","status","primeiro beijo","praia","ciúme","ciumes","ricardo","conhecemos"]
@@ -129,19 +125,18 @@ def _cooldown_ok(ws_values: List[List[str]], min_gap_turns: int = 40) -> bool:
         return True
     return False
 
-# --- lembrança espontânea integrada no meio do texto, sem frase pronta destacada ---
 def maybe_inject_spontaneous_recall(answer: str, user_msg: str, ws_values: List[List[str]]) -> str:
-    """Insere lembrança leve e natural no meio da fala (máx. 1x/40 turnos)."""
+    """Insere lembrança leve no meio da fala (máx. 1x/40 turnos), sem frase pronta."""
     if not answer or not answer.strip():
         return answer
-    if not _should_recall(user_msg) or not _cooldown_ok(ws_values, min_gap_turns=40):
+    if not _should_recall(user_msg) or not _cooldown_ok(ws_values, 40):
         return answer
 
     evs = _sheet_to_events_ultima_sessao(ws_values)
     if not evs:
         return answer
 
-    # escolhe 1 episódio canônico conforme PRIORITY
+        # ep = _pick_episode_respecting_third_party(evs, user_msg)  # ❌ inexistente
     ep = None
     for key in PRIORITY:
         ep = _pick_episode(evs, key)
@@ -150,12 +145,11 @@ def maybe_inject_spontaneous_recall(answer: str, user_msg: str, ws_values: List[
     if not ep:
         return answer
 
-    # extrai trecho curto real do histórico
+
     trecho = (ep["text"] or "").strip()
     if len(trecho) > 140:
         trecho = trecho[:140].rsplit(" ", 1)[0] + "…"
 
-    # 3 variações naturais (sem “frase pronta”)
     variantes = [
         lambda t: f"(Ela lembra de quando {t.lower()})",
         lambda t: f"e por um instante ela lembra de quando {t.lower()}",
@@ -163,15 +157,12 @@ def maybe_inject_spontaneous_recall(answer: str, user_msg: str, ws_values: List[
     ]
     lembrete = random.choice(variantes)(trecho)
 
-    # evita duplicar se algo similar já está na fala
     low = answer.lower()
     if any(x in low for x in ["me faz lembrar", "ela lembra de quando", "engraçado… isso me faz lembrar"]):
         return answer
 
-    # insere após a 1ª ou 2ª frase; se não der, no final
     partes = re.split(r'([\.!?])(\s+)', answer, maxsplit=2)
     if len(partes) >= 3:
-        # 50% depois da 2ª frase (se existir), senão depois da 1ª
         if len(re.split(r'[\.!?]', answer, maxsplit=2)) >= 3 and random.random() < 0.5:
             head = "".join(partes[:3])
             tail = "".join(partes[3:])
@@ -181,15 +172,18 @@ def maybe_inject_spontaneous_recall(answer: str, user_msg: str, ws_values: List[
         return partes[0] + partes[1] + " " + lembrete + (partes[2] if partes[2].strip() else "") + "".join(partes[3:])
     return answer.strip() + " " + lembrete
 
-# ---- Puxão de orelha ao detectar grito/ciúmes no input atual ----
-_GRITO_KEYS  = ["grita", "gritou", "gritando", "gritar"]
-_CIUMES_KEYS = ["ciúme", "ciumes", "ciumento", "ricardo"]
-_UPPER_RE = re.compile(r"[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{3,}!?")
+# ---- Puxão de orelha ao detectar grito real no input atual ----
+_GRITO_KEYS  = ["grita", "gritou", "gritando", "gritar", "berrou", "berrar", "berrando", "aos gritos", "voz alta"]
+_CIUMES_KEYS = ["ciúme", "ciumes", "ciumento", "ciumenta"]  # <- sem "ricardo" para evitar falso positivo
+_UPPER_RE = re.compile(r"\b[A-ZÁÉÍÓÚÂÊÔÃÕÇ]{3,}\b")  # palavra em CAPS (≥3 letras)
 
 def _parece_grito(texto: str) -> bool:
-    t = (texto or "").strip(); tl = t.lower()
-    if any(k in tl for k in _GRITO_KEYS): return True
-    return bool(_UPPER_RE.search(t)) and "!" in t
+    t = (texto or "").strip()
+    tl = t.lower()
+    if any(k in tl for k in _GRITO_KEYS):
+        return True
+    # CAPS + "!" em textos curtos costuma indicar grito
+    return bool(_UPPER_RE.search(t)) and "!" in t and len(t) <= 120
 
 def _parece_ciumes(texto: str) -> bool:
     tl = (texto or "").lower()
@@ -198,10 +192,10 @@ def _parece_ciumes(texto: str) -> bool:
 def _buscar_incidente_ciumes(evs: List[Dict]) -> Optional[Dict]:
     episodios = []
     for e in evs:
-        score = 0; tl = e["text"].lower()
+        score = 0; tl = (e.get("text") or "").lower()
         if any(w in tl for w in _GRITO_KEYS):  score += 2
         if any(w in tl for w in _CIUMES_KEYS): score += 2
-        if "ricardo" in tl:                    score += 1
+        if "ricardo" in tl:                    score += 1  # só como prioridade (não gatilho)
         if score > 0:
             episodios.append((e, score))
     if not episodios:
@@ -209,27 +203,40 @@ def _buscar_incidente_ciumes(evs: List[Dict]) -> Optional[Dict]:
     episodios.sort(key=lambda es: (-es[1], es[0]["turn"]))
     return episodios[0][0]
 
-def _resumo_curto_incidente(ep: Dict) -> str:
-    txt = (ep.get("text") or "").lower()
-    partes = []
-    if "ricardo" in txt: partes.append("com o Ricardo")
-    if any(w in txt for w in ("grita","gritou","gritando")): partes.append("quando você gritou comigo")
-    if not partes: partes.append("naquela discussão")
-    return " " + " ".join(partes)
-
 def inject_rebuke_if_needed(answer: str, user_msg: str, ws_values: List[List[str]]) -> str:
-    if not (_parece_grito(user_msg) or _parece_ciumes(user_msg)):
+    # Só reage quando há grito real no input atual
+    if not _parece_grito(user_msg):
         return answer
+
     evs = _sheet_to_events_ultima_sessao(ws_values)
-    if not evs:
+    if not evs or not answer or not answer.strip():
         return answer
+
+    # Contexto suave (se houve discussão anterior)
+    pista = ""
     ep = _buscar_incidente_ciumes(evs)
-    if not ep:
+    if ep:
+        txt = (ep.get("text") or "").lower()
+        pista = " (como combinamos depois daquela discussão" + (" por ciúmes do Ricardo" if "ricardo" in txt else "") + ")"
+
+    # Variações curtas, orgânicas (inline)
+    variantes = [
+        lambda: f"(Ela respira fundo e pede calma{pista}.)",
+        lambda: f"— Calma. Vamos falar baixo{pista}.",
+        lambda: f"Ela baixa o tom e sugere conversarem sem elevar a voz{pista}.",
+    ]
+    lembrete = random.choice(variantes)()
+
+    low = (answer or "").lower()
+    if any(x in low for x in ["vamos falar baixo", "pede calma", "sem elevar a voz", "calma. vamos"]):
         return answer
-    pista = _resumo_curto_incidente(ep)
-    prefixo = f"— Você está levantando a voz de novo…{pista}. Vamos conversar sem gritar, por favor."
-    ans = (answer or "").strip()
-    return f"{prefixo}\n\n{ans}" if ans else prefixo
+
+    # Insere após a 1ª frase; se não houver pontuação, anexa no fim
+    partes = re.split(r'([\.!?])(\s+)', answer, maxsplit=2)
+    if len(partes) >= 3:
+        return partes[0] + partes[1] + " " + lembrete + (partes[2] if partes[2].strip() else "") + "".join(partes[3:])
+    return answer.strip() + " " + lembrete
+
 
 # ---- Perguntas de memória (“lembra… ?”) → injeta evidências reais no prompt ----
 _MEM_TRIGS = ["lembra","lembrar","nossa primeira","primeira vez","quando","naquele dia"]
@@ -252,7 +259,8 @@ def find_evidence_snippets(ws_values: List[List[str]], user_msg: str, max_snips:
         picks.append(ep_ciume["text"])
         ep_recon = _pick_episode(evs,"reconciliacao", base=ep_ciume)
         if ep_recon: picks.append(ep_recon["text"])
-    uniq = []
+    # dedup
+    uniq: List[str] = []
     for p in picks:
         if p not in uniq:
             uniq.append(p)
@@ -266,7 +274,8 @@ def wrap_messages_with_memory_if_needed(messages: List[Dict[str,str]], user_msg:
         return messages
     bloco = "Contexto anterior (trechos reais do nosso histórico):\n" + "\n".join(f"• {s}" for s in snips)
     base = [{"role":"user","content": bloco}]
-    return base + messages
+    # ✅ mantém system em primeiro
+    return messages[:1] + base + messages[1:]
 
 st.set_page_config(page_title="Narrador JM — Clean Messages", page_icon="🎬")
 
@@ -321,20 +330,6 @@ def inject_carinhosa(texto: str, user_text: str, ativo: bool) -> str:
     # mantém estilo: novo parágrafo curto, 1–2 frases
     sep = "\n\n" if not texto.endswith("\n") else "\n"
     return (texto.rstrip() + f"{sep}{frase}").strip()
-
-
-def build_fala_block(modos: List[str]) -> str:
-    if not modos:
-        return ""
-    linhas = ["[MODO DE FALA — Mary]", "— Modos ativos: " + ", ".join(modos) + "."]
-    for m in modos:
-        if m in FALA_PRESETS:
-            linhas.append(FALA_PRESETS[m]["rule"])
-    linhas.append("— Responda mantendo este(s) tom(ns) em falas e narração de Mary.")
-    return "\n".join(linhas)
-
-
-
 
 # ================================
 # UI — Roleplay comercial (cards)
@@ -557,8 +552,7 @@ Traços: inteligente, romântica, gosta de praia e flerte; não tolera grosseria
 — Seios médios e firmes; cintura definida que acentua os quadris largos.
 — Coxas grossas e torneadas; bumbum redondo e firme, que move o tecido ao andar.
 — Barriga lisa e tonificada; pele dourada pelo sol e levemente perfumada.
-— Ao descrever Mary, use apenas um traço por parágrafo e sempre de forma sensorial e integrada à ação (ex.: “o tecido estica nas coxas quando ela se inclina”).
-— Nunca apresente os traços como lista; use-os como detalhes vivos que surgem naturalmente durante o movimento ou interação.
+— Use apenas UM traço por parágrafo e integre à ação (ex.: “o tecido estica nas coxas quando ela se inclina”); nunca liste.
 
 [CONHECIMENTO E MEMÓRIA]
 — Não conhece o usuário previamente; aprende somente pelo diálogo/ações na cena.
@@ -568,7 +562,12 @@ Traços: inteligente, romântica, gosta de praia e flerte; não tolera grosseria
 [RELACIONAMENTO / LIMITES]
 — Virgem por escolha; só se entrega com confiança/desejo construídos em cena.
 — Rejeita traição; entrega total apenas por vontade própria.
-— Flertes e avanços seguem a progressão: flerte > toque leve > beijo > carícia > toque íntimo > sexo (consentido).
+— Progressão: flerte > toque leve > beijo > carícia > toque íntimo > sexo (consentido).
+
+[TERCEIROS — PRIORIDADE AO USUÁRIO]
+— Mary não inicia cenas românticas/íntimas com terceiros. Se terceiros avançarem, ela desvia com respeito e estabelece limite.
+— Menções a “Ricardo” e outros servem a conflito/plot neutro; sem carícias/beijos/avances, salvo pedido explícito do usuário.
+— Com o usuário presente, Mary prioriza atenção e respeito a ele.
 
 [CLIMA E CONDUTA]
 — Ajuste o tom ao usuário/preset; provoque com leveza e respeito.
@@ -578,15 +577,18 @@ Traços: inteligente, romântica, gosta de praia e flerte; não tolera grosseria
 [LOCAIS COMUNS]
 Clube Serra Bella (balada), Motel Status (privacidade), Café Oregon (encontros), Praia de Camburi (lazer), Enseada do Suá (ousadia).
 
+[STATUS RELACIONAL — CONSISTÊNCIA]
+— Nunca declare namoro exclusivo, rompimento ou “dar um tempo” sem evento explícito no histórico.
+— Se o usuário pedir rótulos (“terminamos?”, “somos exclusivos?”), peça confirmação ou proponha conversar com calma em cena.
+
 [RESTRIÇÕES DE ESTILO — OBRIGATÓRIO]
 — NÃO usar “Foto:”, “Legenda:” ou formatos de postagem/ensaio fotográfico.
-— NÃO criar objetos, sons, mensagens, apps, roupas ou acessórios novos que não tenham sido citados pelo usuário ou por Mary em falas anteriores.
-— NÃO inventar pensamentos, indecisões ou intenções ocultas da Mary; só mostrar sinais visíveis (gestos, tom de voz, postura, olhar).
-— Narre apenas ações e percepções imediatas de Mary, sem simbolismos, metáforas ou interpretações subjetivas.
-— Linguagem natural, direta e contemporânea; sem metáforas rebuscadas nem comparações acadêmicas.
-— Foque em diálogo e reações físicas/emocionais percebidas por Mary (olhar, voz, toque, calor, cheiro pontual).
-— No máximo 5 parágrafos por turno; até 2 frases por parágrafo; ~30% mais concisa que o padrão.
-— Um traço sensorial/físico por parágrafo; evite listas e repetição.
+— NÃO criar objetos, sons, mensagens, apps, roupas ou acessórios novos não citados antes.
+— NÃO inventar simbolismos/metáforas; narre ações e percepções imediatas de Mary.
+— Linguagem natural, direta e contemporânea; sem comparações acadêmicas.
+— Foque em diálogo e reações físicas/emocionais percebidas por Mary.
+— Máx. 5 parágrafos por turno; até 2 frases por parágrafo; ~30% mais concisa que o padrão.
+— Um traço sensorial/físico por parágrafo; evite repetição.
 
 [CONTINUIDADE]
 — Personagens só retornam por gatilho do usuário.
@@ -642,8 +644,6 @@ def salvar_interacao(ts: str, session_id: str, provider: str, model: str, role: 
 # =================================================================================
 # Carregamento de histórico persistente (últimas interações)
 # =================================================================================
-
-from typing import Tuple
 
 def carregar_ultimas_interacoes(n_min: int = 5) -> list[dict]:
     """Carrega ao menos n_min interações da última sessão registrada na aba interacoes_jm.
@@ -903,6 +903,100 @@ def stream_huggingface(model: str, messages: List[Dict[str, str]]):
         time.sleep(0.02)  # leve suavização visual
 
 # =================================================================================
+# Guardiões — consistência relacional e limites com terceiros (NPCs)
+# =================================================================================
+
+# Se você já definiu estes nomes/constantes em outro ponto, pode remover as duplicatas abaixo.
+_THIRD_NAMES = ["ricardo", "rafa", "rafael", "gustavo", "hernando", "hernando cola"]
+
+# Padrões de linguagem para detectar declarações de rompimento/exclusividade
+_BREAKUP_PATTERNS = [
+    r"\btermin(a mos|ei|ou)\b", r"\bromp(e mos|i)\b", r"\bacab(ou|ei|amos)\b",
+    r"\b(se )?paramos\b", r"\b(dar|dei|demos) um tempo\b", r"\bfim do namoro\b"
+]
+_EXCLUSIVITY_PATTERNS = [
+    r"\bestamos juntos\b", r"\bestamos namorando\b", r"\bminh[ao] (namorada|namorado)\b"
+]
+
+def _contains_any(text: str, patterns: List[str]) -> bool:
+    t = (text or "").lower()
+    return any(re.search(p, t) for p in patterns)
+
+# Requer: EVENTS["rompimento"] e _pick_episode(...) já definidos
+def _find_breakup(evs: List[Dict]) -> Optional[Dict]:
+    return _pick_episode(evs, "rompimento") if evs else None
+
+def guard_relationship_claims(answer: str, ws_values: List[List[str]]) -> str:
+    """
+    Impede que Mary declare rompimento/exclusividade sem evento explícito no histórico.
+    Em vez de negar, reescreve de forma neutra e convida a conversar.
+    """
+    if not answer or not answer.strip():
+        return answer
+
+    evs = _sheet_to_events_ultima_sessao(ws_values)
+    if not evs:
+        return answer
+
+    has_breakup = _find_breakup(evs) is not None
+
+    # Caso 1: fala em "terminamos/rompemos/acabou..." sem evidência → suaviza
+    if _contains_any(answer, _BREAKUP_PATTERNS) and not has_breakup:
+        repls = [
+            (r"\btermin(a mos|ei|ou)\b", "não quero tratar isso por mensagem"),
+            (r"\bromp(e mos|i)\b", "prefiro alinhar isso conversando"),
+            (r"\bacab(ou|ei|amos)\b", "não é assim que quero tratar a gente"),
+            (r"\b(se )?paramos\b", "melhor conversarmos com calma"),
+            (r"\b(dar|dei|demos) um tempo\b", "talvez seja melhor darmos um respiro e conversar"),
+            (r"\bfim do namoro\b", "prefiro não rotular nada agora"),
+        ]
+        fixed = answer
+        for pat, sub in repls:
+            fixed = re.sub(pat, sub, fixed, flags=re.IGNORECASE)
+        return fixed
+
+    # Caso 2 (opcional): afirma exclusividade sem evidência de pedido/aceite → suaviza
+    # Se futuramente registrar “pedido de namoro” como evento, cheque aqui antes de suavizar.
+    # if _contains_any(answer, _EXCLUSIVITY_PATTERNS) and not has_exclusivity_event:
+    #     fixed = re.sub(r"\b(minh[ao] (namorada|namorado))\b", "você", answer, flags=re.IGNORECASE)
+    #     fixed = re.sub(r"\bestamos (juntos|namorando)\b", "prefiro ir com calma", fixed, flags=re.IGNORECASE)
+    #     return fixed
+
+    return answer
+
+
+# Sinais de intimidade que não devem ocorrer com terceiros sem pedido explícito do usuário
+_INTIMATE_CUES = [
+    r"\bbeij(o|ou|ando)\b", r"\bbeija\b", r"\bcarí(ci|cia)\b", r"\bcarinho\b",
+    r"\bencosta\b", r"\bapert(a|ou)\b", r"\bm[aã]o (no|na|sobre)\b", r"\btoca(r|)\b", r"\bquadril\b"
+]
+
+def guard_third_party_intimacy(answer: str, user_msg: str) -> str:
+    """
+    Evita intimidade com NPCs (ex.: Ricardo) quando o usuário não pediu isso explicitamente no turno.
+    Mantém menções neutras a terceiros e reforça limite/respeito.
+    """
+    if not answer or not answer.strip():
+        return answer
+
+    low_ans = answer.lower()
+    if not any(n in low_ans for n in _THIRD_NAMES):
+        return answer
+
+    # Libera caso o usuário peça explicitamente cena com terceiro
+    if re.search(r"\b(quer(o)?|podemos|vamos)\b.*\b(ricardo|terceir[oa]|a três|a tres|ménage|menage|trisal)\b",
+                 (user_msg or "").lower()):
+        return answer
+
+    # Se houver gesto/ato íntimo com terceiro → substitui por limite/respeito
+    if any(re.search(p, low_ans) for p in _INTIMATE_CUES):
+        # Anexa uma linha curta de limite, sem apagar todo o texto.
+        return (answer.rstrip() +
+                " Mary recua um passo, segura o pulso com gentileza e estabelece limite — sem intimidade com terceiros.")
+
+    return answer
+
+# =================================================================================
 # UI
 # =================================================================================
 if "session_id" not in st.session_state:
@@ -992,12 +1086,16 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             ph.markdown(apply_filters(answer))
 
         # ================== ⬇️ HOOK 2 AQUI  ⬇️ ==================
-        try:
+                try:
             ws_values = WS_INTERACOES.get_all_values() if WS_INTERACOES else []
         except Exception:
             ws_values = []
 
-        # (A) puxão de orelha automático se detectar grito/ciúmes no input atual
+        # Guardiões
+        answer = guard_relationship_claims(answer, ws_values)
+        answer = guard_third_party_intimacy(answer, user_msg)
+
+        # (A) puxão de orelha automático se detectar grito real no input atual
         answer = inject_rebuke_if_needed(answer, user_msg, ws_values)
 
         # (B) lembrança espontânea (de vez em quando)
@@ -1021,52 +1119,3 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
