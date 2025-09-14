@@ -331,6 +331,16 @@ def inject_carinhosa(texto: str, user_text: str, ativo: bool) -> str:
     sep = "\n\n" if not texto.endswith("\n") else "\n"
     return (texto.rstrip() + f"{sep}{frase}").strip()
 
+ROLEPLAY_MODES = {
+    "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial.",
+    "Mellow": "Clima levemente sugestivo, insinuações, sem abordagem sexual direta.",
+    "Standard": "Flerte e química surgem naturalmente; nada explícito sem gatilho do usuário.",
+    "Real": "Reage de forma realista; ousadia só com sinais claros do usuário.",
+    "Hot": "Flerte aberto e direto, sem ser explícito de cara.",
+    "Inner Secret": "Desejos/fantasias revelados gradualmente.",
+    "Explicit": "Sexualidade explícita permitida; com transição e consentimento."
+}
+
 # ================================
 # UI — Roleplay comercial (cards)
 # ================================
@@ -343,8 +353,10 @@ with st.sidebar:
         value=st.session_state["user_name"],
         max_chars=40,
     )
+
     st.session_state.setdefault("scenario_init", "")
     st.session_state.setdefault("plot_init", "")
+
     st.session_state["scenario_init"] = st.text_area(
         "Cenário inicial",
         value=st.session_state["scenario_init"],
@@ -359,26 +371,21 @@ with st.sidebar:
     )
 
     # Presets de clima inicial (equilíbrio)
-    # no topo do arquivo:
-ROLEPLAY_MODES = {
-    "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial.",
-    "Mellow": "Clima levemente sugestivo, insinuações, sem abordagem sexual direta.",
-    "Standard": "Flerte e química surgem naturalmente; nada explícito sem gatilho do usuário.",
-    "Real": "Reage de forma realista; ousadia só com sinais claros do usuário.",
-    "Hot": "Flerte aberto e direto, sem ser explícito de cara.",
-    "Inner Secret": "Desejos/fantasias revelados gradualmente.",
-    "Explicit": "Sexualidade explícita permitida; com transição e consentimento."
-}
-
     st.session_state.setdefault("equilibrio_modo", "Standard")
     modo_eq = st.selectbox("Clima de início", list(ROLEPLAY_MODES.keys()), index=2)
-    st.caption(ROLEPLAY_MODES.get(modo_eq, ""))
 
-    st.caption(roleplay_modes.get(modo_eq, ""))  # Mostra a descrição do preset escolhido
+    # Fallback seguro
+    if modo_eq not in ROLEPLAY_MODES:
+        modo_eq = "Standard"
+    st.session_state["equilibrio_modo"] = modo_eq
+
+    # Descrição do preset escolhido
+    st.caption(ROLEPLAY_MODES.get(modo_eq, ""))
 
 with st.sidebar:
     st.markdown("**Modo de fala da Mary**")
     st.session_state.setdefault("fala_mods", [])
+
     # 5 caixas de seleção (podem combinar)
     mods_escolhidos: List[str] = []
     if st.checkbox("Boquete", value=True, key="fala_Boquete"):
@@ -393,9 +400,9 @@ with st.sidebar:
         mods_escolhidos.append("Ciumenta")
     if st.checkbox("Carinhosa", key="fala_carinhosa"):
         mods_escolhidos.append("Carinhosa")
-    
+
     st.session_state["fala_mods"] = mods_escolhidos
-    
+
     # (Opcional) dicas rápidas do tom atual
     if mods_escolhidos:
         exemplos = [
@@ -1192,5 +1199,6 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
 
