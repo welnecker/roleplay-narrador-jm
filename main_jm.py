@@ -359,18 +359,21 @@ with st.sidebar:
     )
 
     # Presets de clima inicial (equilíbrio)
-    roleplay_modes = {
-        "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial.",
-        "Mellow": "Clima levemente sugestivo, insinuações, mas sem abordagem sexual direta.",
-        "Standard": "Flerte e química surgem naturalmente, mas nada explícito sem gatilho do usuário.",
-        "Real": "Reage de maneira realista ao contexto, histórico e ações do usuário.",
-        "Hot": "Flerte aberto, direto e mais ousado já de início, sem ser explícito de cara.",
-        "Inner Secret": "Desejos, fetiches e fantasias revelados gradualmente conforme a aproximação.",
-        "Explicit": "Sexualidade aberta e explícita permitida desde o início do diálogo, sem restrição de conteúdo."
-    }
+    # no topo do arquivo:
+ROLEPLAY_MODES = {
+    "Cool": "Só conversas cotidianas, curiosidade e aproximação inicial.",
+    "Mellow": "Clima levemente sugestivo, insinuações, sem abordagem sexual direta.",
+    "Standard": "Flerte e química surgem naturalmente; nada explícito sem gatilho do usuário.",
+    "Real": "Reage de forma realista; ousadia só com sinais claros do usuário.",
+    "Hot": "Flerte aberto e direto, sem ser explícito de cara.",
+    "Inner Secret": "Desejos/fantasias revelados gradualmente.",
+    "Explicit": "Sexualidade explícita permitida; com transição e consentimento."
+}
+
     st.session_state.setdefault("equilibrio_modo", "Standard")
-    modo_eq = st.selectbox("Clima de início", list(roleplay_modes.keys()), index=2)
-    st.session_state["equilibrio_modo"] = modo_eq
+    modo_eq = st.selectbox("Clima de início", list(ROLEPLAY_MODES.keys()), index=2)
+    st.caption(ROLEPLAY_MODES.get(modo_eq, ""))
+
     st.caption(roleplay_modes.get(modo_eq, ""))  # Mostra a descrição do preset escolhido
 
 with st.sidebar:
@@ -698,10 +701,10 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
     scenario   = (st.session_state.get("scenario_init") or "").strip()
     plot       = (st.session_state.get("plot_init") or "").strip()
     fala_mods  = st.session_state.get("fala_mods") or []
-    clima_modo = st.session_state.get("equilibrio_modo", "Standard")
+    clima_modo = (st.session_state.get("equilibrio_modo") or "Standard").strip()
 
-    # 2) Catálogo de climas (mesmo usado no sidebar)
-    roleplay_modes = {
+    # 2) Catálogo de climas — usa global ROLEPLAY_MODES se existir; senão, fallback local
+    roleplay_modes = globals().get("ROLEPLAY_MODES", {
         "Cool":        "Só conversas cotidianas, curiosidade e aproximação inicial.",
         "Mellow":      "Clima levemente sugestivo, insinuações, sem abordagem sexual direta.",
         "Standard":    "Flerte e química surgem naturalmente; nada explícito sem gatilho do usuário.",
@@ -709,7 +712,11 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         "Hot":         "Flerte aberto e direto, sem ser explícito de cara; respeite limites do contexto.",
         "Inner Secret":"Desejos/fantasias revelados gradualmente conforme a aproximação.",
         "Explicit":    "Sexualidade explícita permitida; ainda assim respeite transição e consentimento."
-    }
+    })
+
+    # ✅ Fallback seguro do modo de clima
+    if clima_modo not in roleplay_modes:
+        clima_modo = "Standard"
 
     # 3) Higienização leve para não inflar o system
     def _clean(s: str, maxlen: int) -> str:
@@ -729,21 +736,10 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
             "— Siga este clima até que o usuário provoque mudança clara."
         )
 
-    def build_fala_block(modos: List[str]) -> str:
-        if not modos:
-            return ""
-        linhas = ["[MODO DE FALA — Mary]", "— Modos ativos: " + ", ".join(modos) + "."]
-        for m in modos:
-            if m == "Ciumenta":
-                linhas.append("— Ciumenta: marca território com elegância; perguntas diretas; nada de insulto.")
-            elif m == "Carinhosa":
-                linhas.append("— Carinhosa: acolhe, reduz tensão; reforça segurança/afeto.")
-            # (demais presets explícitos/NSFW já são tratados pela persona e pelo clima escolhido)
-        linhas.append("— Responda mantendo esse(s) tom(ns) nas falas e na narração.")
-        return "\n".join(linhas)
-
     equilibrio_block = build_equilibrio_block(clima_modo)
-    fala_block       = build_fala_block(fala_mods)
+
+    # Usa a função GLOBAL build_fala_block (não redefina outra dentro desta função)
+    fala_block = build_fala_block(fala_mods) if "build_fala_block" in globals() else ""
 
     extras = []
     if user_name:
@@ -753,17 +749,94 @@ def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
         if scenario: extras.append(f"— Cenário: {scenario}")
         if plot:     extras.append(f"— Enredo: {plot}")
 
-    # 5) Montar o system final (persona já contém as restrições de estilo e o ban a 'Foto/Legenda')
+    # 5) Montar o system final
     parts = [equilibrio_block]
     if fala_block:
         parts.append(fala_block)
-    parts.append(PERSONA_MARY)            # <- use a versão otimizada que alinhamos
+    parts.append(PERSONA_MARY)  # persona otimizada
     if extras:
         parts.append("\n".join(extras))
     system_text = "\n\n".join(parts)
 
-    # 6) Chat mínimo (sem mensagens 'system' redundantes; preserva ordem user/assistant)
-    mensagens_chat = [m for m in chat if m.get("role") in ("user", "assistant") and (m.get("content") or "").strip()]
+    # 6) Chat mínimo (mantém apenas user/assistant; system em primeiro)
+    mensagens_chat = [
+        m for m in chat
+        if m.get("role") in ("user", "assistant") and (m.get("content") or "").strip()
+    ]
+    msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
+    msgs.extend({"role": m["role"], "content": m["content"].strip()} for m in mensagens_chat)
+
+    return msgs
+def build_minimal_messages(chat: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    import re
+
+    # 1) Ler inputs da UI (opcionais)
+    user_name  = (st.session_state.get("user_name") or "").strip()
+    scenario   = (st.session_state.get("scenario_init") or "").strip()
+    plot       = (st.session_state.get("plot_init") or "").strip()
+    fala_mods  = st.session_state.get("fala_mods") or []
+    clima_modo = (st.session_state.get("equilibrio_modo") or "Standard").strip()
+
+    # 2) Catálogo de climas — usa global ROLEPLAY_MODES se existir; senão, fallback local
+    roleplay_modes = globals().get("ROLEPLAY_MODES", {
+        "Cool":        "Só conversas cotidianas, curiosidade e aproximação inicial.",
+        "Mellow":      "Clima levemente sugestivo, insinuações, sem abordagem sexual direta.",
+        "Standard":    "Flerte e química surgem naturalmente; nada explícito sem gatilho do usuário.",
+        "Real":        "Reage de forma realista ao contexto e histórico; ousadia só com sinais claros do usuário.",
+        "Hot":         "Flerte aberto e direto, sem ser explícito de cara; respeite limites do contexto.",
+        "Inner Secret":"Desejos/fantasias revelados gradualmente conforme a aproximação.",
+        "Explicit":    "Sexualidade explícita permitida; ainda assim respeite transição e consentimento."
+    })
+
+    # ✅ Fallback seguro do modo de clima
+    if clima_modo not in roleplay_modes:
+        clima_modo = "Standard"
+
+    # 3) Higienização leve para não inflar o system
+    def _clean(s: str, maxlen: int) -> str:
+        s = re.sub(r"\s+", " ", s or "").strip()
+        return s[:maxlen]
+
+    user_name = _clean(user_name, 80)
+    scenario  = _clean(scenario, 600)
+    plot      = _clean(plot, 600)
+
+    # 4) Blocos auxiliares
+    def build_equilibrio_block(modo: str) -> str:
+        desc = roleplay_modes.get(modo, roleplay_modes["Standard"])
+        return (
+            f"[CLIMA INICIAL — {modo}]\n"
+            f"— {desc}\n"
+            "— Siga este clima até que o usuário provoque mudança clara."
+        )
+
+    equilibrio_block = build_equilibrio_block(clima_modo)
+
+    # Usa a função GLOBAL build_fala_block (não redefina outra dentro desta função)
+    fala_block = build_fala_block(fala_mods) if "build_fala_block" in globals() else ""
+
+    extras = []
+    if user_name:
+        extras.append(f"[USUÁRIO]\n— Trate o usuário pelo nome: {user_name}.")
+    if scenario or plot:
+        extras.append("[CENÁRIO/ENREDO INICIAL]")
+        if scenario: extras.append(f"— Cenário: {scenario}")
+        if plot:     extras.append(f"— Enredo: {plot}")
+
+    # 5) Montar o system final
+    parts = [equilibrio_block]
+    if fala_block:
+        parts.append(fala_block)
+    parts.append(PERSONA_MARY)  # persona otimizada
+    if extras:
+        parts.append("\n".join(extras))
+    system_text = "\n\n".join(parts)
+
+    # 6) Chat mínimo (mantém apenas user/assistant; system em primeiro)
+    mensagens_chat = [
+        m for m in chat
+        if m.get("role") in ("user", "assistant") and (m.get("content") or "").strip()
+    ]
     msgs: List[Dict[str, str]] = [{"role": "system", "content": system_text}]
     msgs.extend({"role": m["role"], "content": m["content"].strip()} for m in mensagens_chat)
 
@@ -1119,4 +1192,5 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
 
