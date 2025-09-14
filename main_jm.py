@@ -1086,7 +1086,7 @@ if user_msg := st.chat_input("Fale com a Mary..."):
             ph.markdown(apply_filters(answer))
 
         # ================== ⬇️ HOOK 2 AQUI  ⬇️ ==================
-                try:
+        try:
             ws_values = WS_INTERACOES.get_all_values() if WS_INTERACOES else []
         except Exception:
             ws_values = []
@@ -1119,3 +1119,4 @@ if user_msg := st.chat_input("Fale com a Mary..."):
     salvar_interacao(ts2, st.session_state.session_id, prov, model_id, "assistant", _ans_clean)
 
     st.rerun()
+
